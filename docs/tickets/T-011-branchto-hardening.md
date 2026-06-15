@@ -2,7 +2,12 @@
 
 - **Priority**: 🟡 Feature / refactor
 - **Type**: Tech debt / correctness
-- **Status**: ☐ To do
+- **Status**: ✅ **Done.** Replaced the O(n) `FindIndex` scan with a precomputed
+  `offset → index` map (lazy, built once). The offset model is unchanged — it was
+  **verified correct** by compiling a real looping script with `OpenTPW/RSSEQCompiler`
+  and executing it: `RideScriptTests.BranchingLoopTerminates` runs the loop and asserts
+  it exits at `VAR_I == 3`. Also: an unknown target now logs and is ignored instead of
+  silently jumping to position 0 (the old `FindIndex` returned -1, then +1 → 0).
 - **Split out from**: [T-007](T-007-vm-opcodes-rse.md) (was a remaining bullet there).
 
 ## Problem

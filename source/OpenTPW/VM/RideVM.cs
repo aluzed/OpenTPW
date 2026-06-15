@@ -98,22 +98,32 @@ public partial class RideVM
 		handlerAttribute?.Invoke( null, parameters );
 	}
 
+	// Maps an instruction's byte offset to its index in Instructions, so BranchTo is an
+	// O(1) lookup instead of an O(n) scan. Built lazily once the script is loaded.
+	private Dictionary<long, int>? offsetToIndex;
+
 	public void BranchTo( int value )
 	{
 		//
-		// HACK: Values are provided as offsets in terms of instruction size, i.e.
-		// an offset of 7 might be 3 opcodes and 4 operands.
-		// To get around this, we convert to a position in the file, and then locate
-		// that offset in the instruction list.
-		// This is super hacky (and probably slow) and could probably be avoided
-		// if the disassembler / file handler gets re-written.
+		// Branch targets are offsets in instruction-stream units (4 bytes each: one
+		// opcode or operand). Convert to the byte offset of the target instruction, then
+		// look up its index. (Previously an O(n) FindIndex scan per branch.)
 		//
+		offsetToIndex ??= Instructions
+			.Select( ( instruction, index ) => (instruction.offset, index) )
+			.ToDictionary( x => x.offset, x => x.index );
 
-		var fileOffset = value * 4; // Each opcode + operands is 4 bytes
-		fileOffset += (int)Instructions.First().offset;
+		var fileOffset = value * 4 + (int)Instructions.First().offset;
 
-		CurrentPos = Instructions.FindIndex( x => x.offset == fileOffset );
-		CurrentPos += 1; // Ignore NO-OP
+		if ( !offsetToIndex.TryGetValue( fileOffset, out var index ) )
+		{
+			// Unknown target: leave execution where it is rather than silently jumping to
+			// the start (the old FindIndex returned -1, then +1 -> position 0).
+			Log.Warning( $"Branch target {value} (offset {fileOffset}) not found; ignoring" );
+			return;
+		}
+
+		CurrentPos = index + 1; // Ignore the leading NO-OP, as before.
 
 		Log.Trace( $"Branching to .label_{value} / {fileOffset} (location: {CurrentPos})" );
 	}

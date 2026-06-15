@@ -88,5 +88,27 @@ public class RideScriptTests
 		Assert.IsTrue( vm.Flags.HasFlag( RideVM.VMFlags.Sign ) );
 	}
 
+	// BranchTest.RSE is a compiled loop (see content/testscripts/BranchTest.rss):
+	//   VAR_I = 0; VAR_LIMIT = 3; do { VAR_I++ } while (VAR_I != VAR_LIMIT)
+	// It must terminate with VAR_I == 3, which validates branch resolution (T-011).
+	[TestMethod]
+	public void BranchingLoopTerminates()
+	{
+		Log = new();
+
+		var path = Path.Combine( AppContext.BaseDirectory, "content", "testscripts", "BranchTest.RSE" );
+		using var stream = File.OpenRead( path );
+		var vm = new RideVM( stream );
+
+		var varI = vm.VariableNames.IndexOf( "VAR_I" );
+		Assert.IsTrue( varI >= 0, "VAR_I should be in the variable table" );
+
+		// Drive the VM; the loop must exit on its own well within the step bound.
+		for ( var steps = 0; steps < 1000 && vm.CurrentPos < vm.Instructions.Count; steps++ )
+			vm.Step();
+
+		Assert.AreEqual( 3, vm.Variables[varI], "loop should run exactly until VAR_I == VAR_LIMIT" );
+	}
+
 	private static Operand Lit( RideVM vm, int value ) => new( vm, Operand.Type.Literal, value );
 }
