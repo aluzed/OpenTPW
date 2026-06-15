@@ -13,7 +13,15 @@
   seek, so GARROW fails with a clear `InvalidDataException` (*"frame list offset 0x10001 is
   out of range … unsupported .MD2 layout"*) while PAUSED still parses. Covered by
   `ModelFileTests.RejectsOutOfRangeOffsets` / `RejectsBadMagic`. Fully decoding the
-  GARROW-style variant remains. `.MAP` and `.TPWS` still to do.
+  GARROW-style variant remains.
+  - **`.MAP` finding**: these are **not terrain maps**. Every `.MAP` on the disc is a
+    `CAT_*` file under SOUND/MUSIC/SPEECH — an **audio category catalog** starting with a
+    16-byte COM class GUID (DirectMusic family `{e9612c0?-31d0-11d2-b409-00?0c993f203}`),
+    then category fields + length-prefixed entry strings (e.g. "Music\Music"). `MapFile`
+    rewritten to decode the category GUID (the bogus "TileType" terrain enum is removed);
+    the per-category entry layout is left raw. Covered by `MapFileTests`. **Remaining**:
+    decode the entry records per category type.
+  - `.TPWS` saves still to do (spec exists, but no save sample on the install disc).
 - **Note**: distinct from [T-008](T-008-unimplemented-formats.md) (which tracks the
   ❌ *not-started* formats). This ticket tracks the ⚠️ *partial* ones, which had no ticket.
 

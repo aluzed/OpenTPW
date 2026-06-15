@@ -22,7 +22,7 @@ Source: `source/OpenTPW.Files/Formats/`. Legend: ✅ done · ⚠️ partial · �
 | `.BFST` strings | ✅ | `String/BFSTReader.cs` | — |
 | `.BFUM` strings | ✅ | (BFMU variant) | — |
 | `.MD2` models | ⚠️ | `Model/ModelFile.cs` | Parses mesh models (verified: PAUSED.MD2 → readable 3D text); not robust to all variants yet (GARROW.MD2 crashes); render integration to finish. See T-012. |
-| `.MAP` maps | ⚠️ | (tied to World/Terrain) | Demo terrain hardcoded; parsing to generalize. |
+| `.MAP` | ⚠️ | `OpenTPW.Files/Public/MapFile.cs` | **Not terrain** — `.MAP` are audio category catalogs (CAT_*); leading category GUID decoded, entry layout raw. See T-012. (Demo terrain is hardcoded in `World/Terrain`.) |
 | `.TPWS` saves | ⚠️ | `Save/SaveReader.cs` | Partial read; no write. |
 | `.RSE` ride scripts | ⚠️ | `source/OpenTPW/VM/` | Loader/disassembler restored & tested; **~13% of opcodes** implemented. See T-007. |
 | `.BF4` fonts | ⚠️ | `OpenTPW.Files/Formats/Font/BF4File.cs` | Reverse-engineered: container + per-glyph char code, **width/height and 1bpp bitmap decoded** (verified by rendering an atlas of a real font). A few header fields + renderer integration remain. See T-008. |
