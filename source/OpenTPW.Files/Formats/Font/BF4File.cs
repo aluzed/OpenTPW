@@ -18,16 +18,20 @@ namespace OpenTPW;
 ///            the table tiles exactly up to the first glyph offset
 ///   ...: glyph blocks. Each block is:
 ///          0  : 4   character code (confirmed, e.g. 42 = '*')
-///          4  : 12  fields (cell height, advance, etc. — not fully decoded; kept raw)
-///          16 : 2   glyph width  (little-endian uint16)   [confirmed by rendering]
-///          18 : 2   glyph height (little-endian uint16)   [confirmed by rendering]
-///          20 : 4   fields (bearing/advance — not fully decoded)
+///          4  : 4   line height (constant 8)
+///          8  : 4   bitmap byte count (= width*height/2; redundant)
+///          12 : 4   constant 2
+///          16 : 2   glyph width  (little-endian uint16)
+///          18 : 2   glyph height (little-endian uint16)
+///          20 : 1   x bearing
+///          21 : 1   y bearing
+///          22 : 2   x advance (cursor step)
 ///          24 : ... 1bpp bitmap, MSB-first, width bits per row, height rows
 /// </code>
 ///
-/// The width/height/bitmap decode was confirmed by rendering a glyph atlas from a real
-/// font (every printable ASCII glyph is legible). See docs/tickets/T-008 for the notes.
-/// No published spec exists; this was reverse-engineered from sample fonts.
+/// All of the above were confirmed by rendering: a real font's glyph atlas is legible,
+/// and laying glyphs out by their advance produces correctly-spaced text ("GAME OVER").
+/// See docs/tickets/T-008. No published spec exists; reverse-engineered from sample fonts.
 /// </summary>
 public sealed class BF4File : BaseFormat
 {
@@ -44,6 +48,15 @@ public sealed class BF4File : BaseFormat
 
 		/// <summary>Glyph height in pixels.</summary>
 		public int Height { get; init; }
+
+		/// <summary>Left side bearing (x offset before drawing the bitmap).</summary>
+		public int XBearing { get; init; }
+
+		/// <summary>Top side bearing (y offset within the line).</summary>
+		public int YBearing { get; init; }
+
+		/// <summary>Cursor advance after this glyph, in pixels (proportional spacing).</summary>
+		public int Advance { get; init; }
 
 		/// <summary>
 		/// Row-major 1bpp pixel mask, <see cref="Width"/> × <see cref="Height"/>
@@ -103,9 +116,13 @@ public sealed class BF4File : BaseFormat
 			var charCode = (int)BinaryPrimitives.ReadUInt32LittleEndian( data.AsSpan( start, 4 ) );
 			var block = data[start..end];
 
-			// Width/height live at block offsets 16/18; the bitmap follows at 24.
-			var width = block.Length >= 20 ? BinaryPrimitives.ReadUInt16LittleEndian( block.AsSpan( 16, 2 ) ) : 0;
-			var height = block.Length >= 20 ? BinaryPrimitives.ReadUInt16LittleEndian( block.AsSpan( 18, 2 ) ) : 0;
+			// Width/height @16/18; bearings @20/21; advance @22; bitmap @24.
+			var hasMetrics = block.Length >= 24;
+			var width = hasMetrics ? BinaryPrimitives.ReadUInt16LittleEndian( block.AsSpan( 16, 2 ) ) : 0;
+			var height = hasMetrics ? BinaryPrimitives.ReadUInt16LittleEndian( block.AsSpan( 18, 2 ) ) : 0;
+			var xBearing = hasMetrics ? block[20] : 0;
+			var yBearing = hasMetrics ? block[21] : 0;
+			var advance = hasMetrics ? BinaryPrimitives.ReadUInt16LittleEndian( block.AsSpan( 22, 2 ) ) : 0;
 			var pixels = DecodeBitmap( block, width, height );
 
 			Glyphs.Add( new Glyph
@@ -113,6 +130,9 @@ public sealed class BF4File : BaseFormat
 				CharCode = charCode,
 				Width = width,
 				Height = height,
+				XBearing = xBearing,
+				YBearing = yBearing,
+				Advance = advance,
 				Pixels = pixels,
 				Data = block,
 			} );

@@ -13,8 +13,10 @@
     and **width/height + 1bpp bitmap decoded** (block offsets 16/18 = width/height; bitmap
     at 24, MSB-first, width bits/row). **Confirmed by rendering an atlas of a real
     GAME6.BF4 — every printable ASCII glyph is legible.** Validated by `BF4FileTests`
-    (synthetic 'L' shape + real font via `TPW_FONT_SAMPLE`). **Remaining**: a few header
-    fields (bearing/advance) + wiring into the renderer.
+    (synthetic 'L' shape + real font via `TPW_FONT_SAMPLE`). **Metrics now complete**:
+    x/y bearings (@20/21) and x advance (@22) decoded — confirmed by laying out glyphs by
+    advance into correctly-spaced text ("GAME OVER 0123"). `.BF4` is fully readable; only
+    engine/UI wiring remains.
   - `.LIP`/`.LIPS` **lip-sync** parsed (`OpenTPW.Files/Formats/Sound/LipSyncFile.cs`):
     a flat list of little-endian uint32 mouth keyframe timestamps, terminated by
     `0xFFFFFFFF`, monotonically non-decreasing (verified on real EN/DANISH samples).

@@ -119,5 +119,10 @@ public class BF4FileTests
 		Assert.IsTrue( zero.Width > 0 && zero.Height > 0, "'0' should have real dimensions" );
 		Assert.AreEqual( zero.Width * zero.Height, zero.Pixels.Length );
 		Assert.IsTrue( zero.Pixels.Any( p => p ), "'0' bitmap should have set pixels" );
+
+		// Proportional advance metrics (confirmed by text rendering with GAME6.BF4).
+		Assert.AreEqual( 8, font.Glyphs.First( g => g.CharCode == 'W' ).Advance, "'W' is the widest" );
+		Assert.AreEqual( 4, font.Glyphs.First( g => g.CharCode == 'I' ).Advance, "'I' is narrow" );
+		Assert.IsTrue( font.Glyphs.First( g => g.CharCode == ' ' ).Advance > 0, "space advances" );
 	}
 }
