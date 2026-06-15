@@ -2,9 +2,13 @@
 
 - **Priority**: 🟠 Medium (Linux runtime)
 - **Type**: Portability
-- **Status**: ☐ To do
+- **Status**: ⚠️ **Partial.** `BaseFileSystem.GetAbsolutePath` now resolves each path
+  segment case-insensitively against the real directory entries when the exact path
+  misses (option 1). Covered by `CaseInsensitivePathTests`. **Remaining**: archive
+  *filenames* (`FONTS.WAD` vs `fonts.wad` in `FindArchivePath`) and archive-*internal*
+  entry names (`WadArchive`/`SdtArchive`) are still case-sensitive.
 - **Context**: documented in [../03-disc-compatibility.md](../03-disc-compatibility.md)
-  and [../04-linux-compatibility.md](../04-linux-compatibility.md) but had no ticket.
+  and [../04-linux-compatibility.md](../04-linux-compatibility.md).
 
 ## Problem
 

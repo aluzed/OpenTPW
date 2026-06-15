@@ -199,9 +199,56 @@ public class BaseFileSystem
 	{
 		// Normalize to the platform's native separator so paths resolve on every OS
 		// (the game's virtual paths use '/', Windows uses '\'). See docs/tickets/T-001.
-		return Path.Combine( basePath, relativePath.TrimStart( '/' ) )
+		var absolute = Path.Combine( basePath, relativePath.TrimStart( '/' ) )
 			.Replace( '/', Path.DirectorySeparatorChar )
 			.Replace( '\\', Path.DirectorySeparatorChar );
+
+		return ResolveCaseInsensitive( absolute );
+	}
+
+	/// <summary>
+	/// The game references assets in lowercase, but the original media stores them in
+	/// uppercase 8.3 names. On a case-sensitive filesystem (Linux) an exact path can miss;
+	/// when it does, resolve each path segment case-insensitively against the real
+	/// directory entries. See docs/tickets/T-014.
+	/// </summary>
+	private string ResolveCaseInsensitive( string fullPath )
+	{
+		// Fast path: exact hit (always true on Windows / a correctly-cased FS).
+		if ( File.Exists( fullPath ) || Directory.Exists( fullPath ) )
+			return fullPath;
+
+		if ( !fullPath.StartsWith( basePath, StringComparison.Ordinal ) )
+			return fullPath;
+
+		var relative = fullPath.Substring( basePath.Length ).TrimStart( Path.DirectorySeparatorChar );
+		if ( relative.Length == 0 )
+			return fullPath;
+
+		var current = basePath;
+		foreach ( var segment in relative.Split( Path.DirectorySeparatorChar ) )
+		{
+			var candidate = Path.Combine( current, segment );
+			if ( File.Exists( candidate ) || Directory.Exists( candidate ) )
+			{
+				current = candidate;
+				continue;
+			}
+
+			// No exact child: look for a case-insensitive match among the real entries.
+			string? match = null;
+			if ( Directory.Exists( current ) )
+			{
+				match = Directory.GetFileSystemEntries( current )
+					.FirstOrDefault( entry => string.Equals(
+						Path.GetFileName( entry ), segment, StringComparison.OrdinalIgnoreCase ) );
+			}
+
+			// Fall back to the requested name so downstream errors stay meaningful.
+			current = match ?? candidate;
+		}
+
+		return current;
 	}
 
 	public string GetRelativePath( string absolutePath )

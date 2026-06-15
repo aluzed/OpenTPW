@@ -31,7 +31,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-011](T-011-branchto-hardening.md) | 🟡 Feature | ☐ To do | Harden `RideVM.BranchTo` (remove offset HACK) |
 | [T-012](T-012-partial-formats.md) | 🟡 Feature | ☐ To do | Complete partial formats: `.MD2`, `.MAP`, `.TPWS` |
 | [T-013](T-013-ci-pipeline.md) | 🟠 Medium | ✅ Done | Add CI (build + test on Linux) |
-| [T-014](T-014-case-insensitive-assets.md) | 🟠 Medium | ☐ To do | Case-insensitive asset path resolution (Linux) |
+| [T-014](T-014-case-insensitive-assets.md) | 🟠 Medium | ⚠️ Partial | Case-insensitive asset path resolution (Linux) |
 
 Priority legend: 🔴 blocking · 🟠 important · 🟡 desirable/feature · ⚪ technical debt.
 Status legend: ✅ done · ⚠️ partial · ☐ to do.
