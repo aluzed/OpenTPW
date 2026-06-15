@@ -18,4 +18,13 @@
     <ProjectReference Include="..\OpenTPW\OpenTPW.csproj" />
   </ItemGroup>
 
+  <!-- Copy shader assets next to the test assembly so ShaderTests is hermetic
+       (no hardcoded absolute paths). See docs/tickets/T-002. -->
+  <ItemGroup>
+    <Content Include="..\..\content\shaders\**\*">
+      <Link>content\shaders\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

@@ -197,7 +197,11 @@ public class BaseFileSystem
 
 	public string GetAbsolutePath( string relativePath )
 	{
-		return Path.Combine( basePath, relativePath.TrimStart( '/' ) ).Replace( "/", "\\" );
+		// Normalize to the platform's native separator so paths resolve on every OS
+		// (the game's virtual paths use '/', Windows uses '\'). See docs/tickets/T-001.
+		return Path.Combine( basePath, relativePath.TrimStart( '/' ) )
+			.Replace( '/', Path.DirectorySeparatorChar )
+			.Replace( '\\', Path.DirectorySeparatorChar );
 	}
 
 	public string GetRelativePath( string absolutePath )

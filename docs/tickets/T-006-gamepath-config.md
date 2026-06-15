@@ -2,6 +2,9 @@
 
 - **Priority**: 🟡 Low
 - **Type**: Portability / DX
+- **Status**: ⚠️ Partially addressed — the **test suite** now honors `OPENTPW_GAMEPATH`
+  (see T-002). **Remaining**: make the **game itself** read the same env var at startup,
+  overriding the Windows default in `Settings.Designer.cs` / `Client/Game.cs`.
 
 ## Findings
 

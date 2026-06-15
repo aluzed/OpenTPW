@@ -3,6 +3,10 @@
 - **Priority**: 🔴 High (blocks Linux)
 - **Type**: Bug / portability
 - **Confirmed by**: `FileSystemTests` failures on Linux
+- **Status**: ✅ **Done.** Both call sites now normalize to
+  `Path.DirectorySeparatorChar` (correct on Windows *and* Linux). Validated on Linux:
+  `FileSystemTests.TestRead` passes against a fixture set via `OPENTPW_GAMEPATH`
+  (previously failed with a mangled `\`-separated path).
 
 ## Symptom
 
@@ -27,13 +31,12 @@ return Path.Join( Settings.Default.GamePath, path ).Replace( "/", "\\" );
 return Path.Combine( basePath, relativePath.TrimStart('/') ).Replace( "/", "\\" );
 ```
 
-## Proposed fix
+## Fix applied
 
-- Remove the `.Replace("/", "\\")` calls.
-- Let `Path.Join` / `Path.Combine` handle the native separator, and normalize incoming
-  paths with `Path.DirectorySeparatorChar` when needed:
-  `path.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar)`.
-- Audit other usages: `grep -rn 'Replace( "/"' source`.
+Replaced the `.Replace("/", "\\")` calls with separator normalization
+(`.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar)`)
+so the result is correct on every OS. `GetRelativePath` already normalizes to `/` for
+the virtual-path representation and was left as-is.
 
 ## Acceptance criteria
 

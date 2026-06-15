@@ -12,6 +12,10 @@ public static class GameDir
 	/// <returns></returns>
 	public static string GetPath( string path )
 	{
-		return Path.Join( Settings.Default.GamePath, path ).Replace( "/", "\\" );
+		// Normalize to the platform's native separator so paths resolve on every OS.
+		// See docs/tickets/T-001.
+		return Path.Join( Settings.Default.GamePath, path )
+			.Replace( '/', Path.DirectorySeparatorChar )
+			.Replace( '\\', Path.DirectorySeparatorChar );
 	}
 }

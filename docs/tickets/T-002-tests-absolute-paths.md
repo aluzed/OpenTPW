@@ -2,7 +2,14 @@
 
 - **Priority**: 🔴 High
 - **Type**: Bug / test quality
-- **Confirmed by**: `dotnet test` → **7/7 failures** on Linux
+- **Confirmed by**: `dotnet test` → was **7/7 failures** on Linux
+- **Status**: ✅ **Done.** `dotnet test` now → **0 failed, 1 passed, 6 inconclusive**
+  on a clean Linux machine.
+  - `ShaderTests`: the shader assets are copied next to the test assembly
+    (`OpenTPW.Tests.csproj`) and referenced via `AppContext.BaseDirectory` → passes.
+  - `FileSystemTests`: these are integration tests needing a real game install. They now
+    read the base path from `OPENTPW_GAMEPATH` and call `RequireGameData()`, which marks
+    them `Assert.Inconclusive` (not failed) when the data is absent.
 
 ## Symptoms
 
