@@ -2,7 +2,8 @@
 
 - **Priority**: 🟠 Medium (correctness)
 - **Type**: Bug
-- **Status**: ☐ To do
+- **Status**: ✅ **Done.** `Add`/`Sub` now call `SetArithmeticFlags`; covered by
+  `RideScriptTests.AddSubSetFlags` (no-flag, Zero, Sign cases).
 - **Found during**: T-007 opcode work (comparing handlers against the ISA spec).
 
 ## Problem

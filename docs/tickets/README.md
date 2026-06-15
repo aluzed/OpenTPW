@@ -27,7 +27,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-007](T-007-vm-opcodes-rse.md) | 🟡 Feature | ⚠️ Partial | Ride VM: `.RSE` loader restored; 30/210 opcodes (MULT/DIV/MOD added) |
 | [T-008](T-008-unimplemented-formats.md) | 🟡 Feature | ☐ To do | Unimplemented formats: `.BF4`, `.MTR`, `.LIPS`, `.TQI/.TGQ` |
 | [T-009](T-009-build-warnings.md) | ⚪ Debt | ☐ To do | build warnings (nullable, Dispose, etc.) |
-| [T-010](T-010-add-sub-flags.md) | 🟠 Medium | ☐ To do | ADD/SUB don't set arithmetic flags (branch correctness) |
+| [T-010](T-010-add-sub-flags.md) | 🟠 Medium | ✅ Done | ADD/SUB don't set arithmetic flags (branch correctness) |
 | [T-011](T-011-branchto-hardening.md) | 🟡 Feature | ☐ To do | Harden `RideVM.BranchTo` (remove offset HACK) |
 | [T-012](T-012-partial-formats.md) | 🟡 Feature | ☐ To do | Complete partial formats: `.MD2`, `.MAP`, `.TPWS` |
 | [T-013](T-013-ci-pipeline.md) | 🟠 Medium | ☐ To do | Add CI (build + test on Linux) |

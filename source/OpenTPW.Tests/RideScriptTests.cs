@@ -60,5 +60,33 @@ public class RideScriptTests
 		Assert.AreEqual( 2, dest.Value );
 	}
 
+	// ADD / SUB must set the Zero/Sign flags from their result (T-010).
+	[TestMethod]
+	public void AddSubSetFlags()
+	{
+		Log = new();
+
+		var path = Path.Combine( AppContext.BaseDirectory, "content", "testscripts", "Test.RSE" );
+		using var stream = File.OpenRead( path );
+		var vm = new RideVM( stream );
+
+		var dest = new Operand( vm, Operand.Type.Variable, 0, 0 );
+
+		// 5 + 5 = 10 -> no flags
+		dest.Value = 5;
+		OpcodeHandlers.Math.Add( ref vm, dest, Lit( vm, 5 ) );
+		Assert.AreEqual( 10, dest.Value );
+		Assert.AreEqual( RideVM.VMFlags.None, vm.Flags );
+
+		// 5 - 5 = 0 -> Zero
+		dest.Value = 5;
+		OpcodeHandlers.Math.Sub( ref vm, Lit( vm, 5 ), Lit( vm, 5 ), dest );
+		Assert.IsTrue( vm.Flags.HasFlag( RideVM.VMFlags.Zero ) );
+
+		// 5 - 9 = -4 -> Sign
+		OpcodeHandlers.Math.Sub( ref vm, Lit( vm, 5 ), Lit( vm, 9 ), dest );
+		Assert.IsTrue( vm.Flags.HasFlag( RideVM.VMFlags.Sign ) );
+	}
+
 	private static Operand Lit( RideVM vm, int value ) => new( vm, Operand.Type.Literal, value );
 }

@@ -8,12 +8,14 @@ partial class OpcodeHandlers
 		public static void Add( ref RideVM vm, Operand dest, Operand value )
 		{
 			dest.Value = dest.Value + value.Value;
+			SetArithmeticFlags( ref vm, dest.Value );
 		}
 
 		[OpcodeHandler( Opcode.SUB, "Subtract one value from another" )]
 		public static void Sub( ref RideVM vm, Operand valueA, Operand valueB, Operand dest )
 		{
 			dest.Value = valueA.Value - valueB.Value;
+			SetArithmeticFlags( ref vm, dest.Value );
 		}
 
 		[OpcodeHandler( Opcode.MULT, "Multiply two values together" )]
