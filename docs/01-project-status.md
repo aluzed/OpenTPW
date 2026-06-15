@@ -27,7 +27,8 @@ You therefore **need a legal copy of the game** to provide the assets — which 
 | **OpenTPW.Common** | Virtual file system, client abstractions | Zio |
 | **OpenTPW.Files** | **Format parsers** (the reverse-engineering core) | SharpZipLib, ImageSharp, StbImage |
 | **OpenTPW** | The game: rendering, world, UI, ride VM | Veldrid, SDL2, ImGui.NET, NAudio |
-| **OpenTPW.ModKit** | Asset editor/viewer (ImGui) | NAudio, System.Drawing.Common |
+| **OpenTPW.ModKit** | Asset editor/viewer (ImGui) | NLayer, OpenAL, System.Drawing.Common |
+| **OpenTPW.WadTool** | CLI to list/extract `.wad` (DWFB) archives | — |
 | **OpenTPW.Tests** | MSTest tests | — |
 
 All targets are **`net8.0`**.
