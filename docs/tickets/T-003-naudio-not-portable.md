@@ -2,6 +2,10 @@
 
 - **Priority**: 🟠 Medium
 - **Type**: Portability
+- **Status**: ⚠️ Partially addressed — the NAudio package reference is now Windows-only
+  (`Condition="'$(IsWindows)' == 'true'"`) and `SoundViewer.cs` playback is guarded with
+  `#if WINDOWS`, so the Linux build excludes it. **Remaining**: implement an actual
+  cross-platform audio output so sound works on Linux (the fix below).
 
 ## Context
 

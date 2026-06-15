@@ -2,6 +2,13 @@
 
 - **Priority**: 🟠 Medium
 - **Type**: Portability
+- **Status**: ✅ Mostly resolved — `System.Drawing.Common` was an **unused** reference
+  (no GDI+ types used anywhere) and is now Windows-only in `OpenTPW.ModKit.csproj`, so
+  the Linux build excludes it. Note: a **transitive** `System.Drawing.Common 6.0.0`
+  still enters the main project via `System.Configuration.ConfigurationManager` →
+  `System.Security.Permissions`, but 6.0.0 ships a Unix implementation and is never
+  called, so it is harmless. Removing `ConfigurationManager` (see T-006) would drop it
+  entirely.
 
 ## Context
 
