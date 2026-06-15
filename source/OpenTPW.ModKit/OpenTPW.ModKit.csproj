@@ -14,7 +14,7 @@
          See docs/tickets/T-003 and T-004. -->
     <PackageReference Include="NAudio" Version="2.2.1" Condition="'$(IsWindows)' == 'true'" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.0" Condition="'$(IsWindows)' == 'true'" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.6" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageReference Include="Veldrid" Version="4.9.0" />
     <PackageReference Include="Veldrid.ImGui" Version="5.72.0" />
     <PackageReference Include="Veldrid.SDL2" Version="4.8.0" />

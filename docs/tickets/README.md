@@ -22,7 +22,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-002](T-002-tests-absolute-paths.md) | 🔴 High | ✅ Done | Tests: hardcoded absolute paths + dependency on a game install |
 | [T-003](T-003-naudio-not-portable.md) | 🟠 Medium | ⚠️ Partial | NAudio (audio) not portable off Windows |
 | [T-004](T-004-system-drawing-modkit.md) | 🟠 Medium | ✅ Mostly | `System.Drawing.Common` is Windows-only in the ModKit |
-| [T-005](T-005-vulnerable-dependencies.md) | 🟠 Medium | ☐ To do | Vulnerable dependencies (ImageSharp high, Zio low) |
+| [T-005](T-005-vulnerable-dependencies.md) | 🟠 Medium | ✅ Done | Vulnerable dependencies (direct + transitive) |
 | [T-006](T-006-gamepath-config.md) | 🟡 Low | ✅ Done | Windows default `GamePath` + no portable override |
 | [T-007](T-007-vm-opcodes-rse.md) | 🟡 Feature | ☐ To do | Ride VM: re-enable the `.RSE` loader + ~180 opcodes |
 | [T-008](T-008-unimplemented-formats.md) | 🟡 Feature | ☐ To do | Unimplemented formats: `.BF4`, `.MTR`, `.LIPS`, `.TQI/.TGQ` |

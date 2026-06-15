@@ -13,6 +13,15 @@
     <IsOSX Condition="$([MSBuild]::IsOSPlatform('OSX'))">true</IsOSX>
   </PropertyGroup>
 
+  <!--
+    Security pin: Newtonsoft.Json is pulled transitively (via Veldrid) as 9.0.1, which
+    has a known High advisory (GHSA-5crp-9r3c-p9vr). Pinning a direct reference to a
+    patched version overrides the transitive one in every project. See docs/tickets/T-005.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+
   <!-- Per-OS compilation symbols (appended, never overwriting existing ones). -->
   <PropertyGroup Condition="'$(IsWindows)' == 'true'">
     <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
