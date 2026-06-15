@@ -155,12 +155,23 @@ ls /tmp/tpw-cd/DATA            # the assets OpenTPW needs
 
 ## 5. Point OpenTPW at the game data
 
-OpenTPW expects `GamePath/data/` (default is a Windows path in
-`source/OpenTPW/Settings.Designer.cs`). On Linux, copy/normalize the `DATA/` folder to
-lowercase `data/` and set `GamePath` to its parent directory.
+OpenTPW expects `<gamePath>/data/`. Set the install location with the
+**`OPENTPW_GAMEPATH`** environment variable (it takes precedence over the persisted
+Windows default in `source/OpenTPW/Settings.Designer.cs`):
 
-> A clean environment-variable override is proposed in
-> [tickets/T-006](tickets/T-006-gamepath-config.md).
+```bash
+export OPENTPW_GAMEPATH="$HOME/games/theme-park-world"
+./build-linux.sh run
+```
+
+The same variable drives the integration tests:
+
+```bash
+OPENTPW_GAMEPATH="$HOME/games/theme-park-world" ./build-linux.sh test
+```
+
+On a case-sensitive Linux FS, copy/normalize the disc's `DATA/` folder to lowercase
+`data/` (and lowercase the asset paths) — see [03-disc-compatibility.md](03-disc-compatibility.md).
 
 ---
 

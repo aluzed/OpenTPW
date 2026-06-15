@@ -2,9 +2,11 @@
 
 - **Priority**: 🟡 Low
 - **Type**: Portability / DX
-- **Status**: ⚠️ Partially addressed — the **test suite** now honors `OPENTPW_GAMEPATH`
-  (see T-002). **Remaining**: make the **game itself** read the same env var at startup,
-  overriding the Windows default in `Settings.Designer.cs` / `Client/Game.cs`.
+- **Status**: ✅ **Done.** `GameDir.GamePath` resolves the install path with
+  `OPENTPW_GAMEPATH` taking precedence over the persisted setting; `Client/Game.cs` now
+  uses it for the data/save directories, and the test suite honors the same variable
+  (T-002). Covered by `GameDirTests.EnvironmentVariableOverridesGamePath`.
+  **Optional follow-up**: auto-detection (Wine prefix, GOG, `~/.local/share`).
 
 ## Findings
 
@@ -18,12 +20,14 @@ Windows default value, and resolution goes through `System.Configuration`
 (`app.config`), which is awkward for Linux/CI. There is no simple way to point at the
 game via an environment variable.
 
-## Proposed fix
+## Fix applied
 
-- Allow an override via an **environment variable** (e.g. `OPENTPW_GAMEPATH`) read at
-  startup, taking precedence over the `app.config` setting.
-- Document the setting in [../Linux.md](../Linux.md).
-- Optional: auto-detection (Wine prefix, `~/.local/share`, GOG…).
+- Added `GameDir.GamePath`: returns `OPENTPW_GAMEPATH` when set, else
+  `Settings.Default.GamePath`.
+- `Client/Game.cs` resolves the path once via `GameDir.GamePath` and uses
+  `Path.Join` for the `data`/`save` subfolders (no hardcoded `/`).
+- Documented in [../Linux.md](../Linux.md) §5.
+- Optional (not done): auto-detection (Wine prefix, `~/.local/share`, GOG…).
 
 ## Link
 

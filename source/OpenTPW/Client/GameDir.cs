@@ -6,7 +6,22 @@
 public static class GameDir
 {
 	/// <summary>
-	/// Joins <see cref="Settings.Default.GamePath"/> to <param name="path">path</param>.
+	/// The resolved Theme Park World install path. The <c>OPENTPW_GAMEPATH</c>
+	/// environment variable takes precedence over the persisted
+	/// <see cref="Settings.Default.GamePath"/> setting, so the game can be pointed at any
+	/// install (Linux / CI / Wine prefix) without editing config. See docs/tickets/T-006.
+	/// </summary>
+	public static string GamePath
+	{
+		get
+		{
+			var env = Environment.GetEnvironmentVariable( "OPENTPW_GAMEPATH" );
+			return string.IsNullOrWhiteSpace( env ) ? Settings.Default.GamePath : env;
+		}
+	}
+
+	/// <summary>
+	/// Joins <see cref="GamePath"/> to <param name="path">path</param>.
 	/// </summary>
 	/// <param name="path"></param>
 	/// <returns></returns>
@@ -14,7 +29,7 @@ public static class GameDir
 	{
 		// Normalize to the platform's native separator so paths resolve on every OS.
 		// See docs/tickets/T-001.
-		return Path.Join( Settings.Default.GamePath, path )
+		return Path.Join( GamePath, path )
 			.Replace( '/', Path.DirectorySeparatorChar )
 			.Replace( '\\', Path.DirectorySeparatorChar );
 	}
