@@ -1,0 +1,27 @@
+<Project>
+
+  <!--
+    Shared build properties for all OpenTPW projects (auto-imported by MSBuild).
+    OS detection + per-OS compilation constants so platform-specific code can be
+    guarded with #if WINDOWS / #if LINUX / #if OSX without touching each .csproj.
+    These properties are additive and do not change existing build behavior.
+  -->
+
+  <PropertyGroup>
+    <IsWindows Condition="$([MSBuild]::IsOSPlatform('Windows'))">true</IsWindows>
+    <IsLinux Condition="$([MSBuild]::IsOSPlatform('Linux'))">true</IsLinux>
+    <IsOSX Condition="$([MSBuild]::IsOSPlatform('OSX'))">true</IsOSX>
+  </PropertyGroup>
+
+  <!-- Per-OS compilation symbols (appended, never overwriting existing ones). -->
+  <PropertyGroup Condition="'$(IsWindows)' == 'true'">
+    <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IsLinux)' == 'true'">
+    <DefineConstants>$(DefineConstants);LINUX</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IsOSX)' == 'true'">
+    <DefineConstants>$(DefineConstants);OSX</DefineConstants>
+  </PropertyGroup>
+
+</Project>

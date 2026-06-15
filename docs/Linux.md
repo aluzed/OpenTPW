@@ -47,11 +47,33 @@ sudo apt-get install -y dotnet-sdk-8.0
 
 ## 2. Build & test OpenTPW
 
+### Quick way — the dedicated Linux helper
+
+A `build-linux.sh` script at the repo root wraps the dotnet calls (locates the SDK on
+`PATH` or in `~/.dotnet`, sets telemetry opt-out):
+
+```bash
+./build-linux.sh            # build the solution (Debug)
+./build-linux.sh -c Release # build in Release
+./build-linux.sh test       # build + run the test suite
+./build-linux.sh run        # build + run the OpenTPW game project
+./build-linux.sh clean      # remove bin/ and obj/
+```
+
+> If `./build-linux.sh` is blocked by filesystem permissions, run `bash build-linux.sh`.
+
+### Manual way
+
 ```bash
 cd /var/www/reverse/OpenTPW/source
 dotnet build OpenTPW.sln -c Debug      # → 6 projects, 0 errors (109 warnings)
 dotnet test OpenTPW.Tests/OpenTPW.Tests.csproj --no-build
 ```
+
+> A `global.json` pins the SDK to .NET 8 (any installed `8.0.x` works), and
+> `source/Directory.Build.props` defines per-OS compilation constants
+> (`WINDOWS` / `LINUX` / `OSX`) so platform-specific code can be guarded with
+> `#if LINUX` once the Windows locks are addressed (see the tickets).
 
 > Current state: the build succeeds, but tests fail (hardcoded paths + no game
 > install). See [tickets/T-001](tickets/T-001-backslash-paths-linux.md) and
