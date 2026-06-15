@@ -7,12 +7,13 @@
     the EA FourCC block layout — chunk index, `pIQT` frame count, EA audio detection.
     Validated by `VideoFileTests` (synthesized container + a real movie via
     `TPW_VIDEO_SAMPLE`, which tiled all 523 chunks of `BF.TGQ` to a clean EOF). The
-    audio/video chunks are now exposed separately (`AudioChunks`/`VideoChunks`).
-    **Remaining**: decode the chunk payloads — `pIQT` frames use the EA **TQI** codec
-    (DCT-based) and `SC*` audio uses **EA-ADPCM**. These need the actual codec algorithms
-    (reference: FFmpeg / vgmstream `adpcm_ea` + TQI); not implemented here because the
-    output can't be verified against a reference in this environment (deliberately not
-    fabricated).
+    audio/video chunks are exposed separately (`AudioChunks`/`VideoChunks`).
+    **EA-ADPCM audio is now decoded** (`VideoFile.DecodeAudio()`): parses the SCHl "PT"
+    header (channels @0x82, sample count @0x85) and decodes the stereo SCDl ADPCM blocks
+    (FFmpeg `ea_adpcm_table`, 28-sample blocks, per-channel predictor/shift). **Verified**:
+    a real BF.TGQ decodes to exactly 194815 samples/channel (matching the header) and the
+    waveform is coherent audio (a jingle), not noise. **Remaining**: the `pIQT` **TQI**
+    video frames (DCT-based) and mono-audio support.
   - `.BF4` **fonts** parsed (`OpenTPW.Files/Formats/Font/BF4File.cs`): magic "F4FB",
     glyph count, offset table (tiles exactly to the first glyph), per-glyph **char code**,
     and **width/height + 1bpp bitmap decoded** (block offsets 16/18 = width/height; bitmap

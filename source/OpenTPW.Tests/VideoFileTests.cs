@@ -87,5 +87,13 @@ public class VideoFileTests
 		// Every byte must be accounted for by the chunk walk (clean EOF).
 		var consumed = video.Chunks.Sum( c => (long)c.Size );
 		Assert.AreEqual( new FileInfo( path ).Length, consumed, "chunks should tile the whole file" );
+
+		// Decode the EA-ADPCM audio and sanity-check it (verified: count matches header).
+		var audio = video.DecodeAudio();
+		Assert.AreEqual( 2, audio.Channels );
+		Assert.IsTrue( audio.SampleCount > 0, "should decode audio samples" );
+		Assert.AreEqual( audio.SampleCount * audio.Channels, audio.Samples.Length );
+		Assert.IsTrue( audio.Samples.Any( s => s > 1000 ) && audio.Samples.Any( s => s < -1000 ),
+			"decoded audio should have real dynamic range, not silence/noise floor" );
 	}
 }

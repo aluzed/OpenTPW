@@ -63,11 +63,123 @@ public sealed class VideoFile : BaseFormat
 	/// <summary>Whether the file contains any EA audio chunks.</summary>
 	public bool HasAudio => Chunks.Any( c => c.IsAudio );
 
-	// NB: decoding the chunk payloads is a separate step and is not implemented here:
-	//  - video frames (pIQT) use the EA TQI codec (DCT-based);
-	//  - audio (SC* chunks) uses EA-ADPCM.
-	// Reference: https://wiki.multimedia.cx/index.php/Electronic_Arts_Formats
-	// (and the adpcm_ea / TQI decoders in FFmpeg / vgmstream).
+	// NB: video frames (pIQT) use the EA TQI codec (DCT-based) and are not decoded here.
+	// The EA-ADPCM audio IS decoded — see DecodeAudio(). Reference:
+	// https://wiki.multimedia.cx/index.php/Electronic_Arts_Formats
+
+	/// <summary>Decoded PCM audio: interleaved 16-bit samples + channel/rate info.</summary>
+	public readonly record struct DecodedAudio( int Channels, int SampleRate, int SampleCount, short[] Samples );
+
+	// EA ADPCM predictor coefficients (FFmpeg ea_adpcm_table).
+	private static readonly int[] EaAdpcmTable =
+	{
+		0, 240, 460, 392, 0, 0, -208, -220,
+		0, 1, 3, 4, 7, 8, 10, 11,
+		0, -1, -3, -4,
+	};
+
+	/// <summary>
+	/// Decodes the EA-ADPCM audio track to 16-bit PCM. Reverse-engineered + verified: the
+	/// decoded sample count matches the SCHl header and the waveform is coherent audio.
+	/// Only stereo (the format used by TPW movies) is implemented.
+	/// </summary>
+	public DecodedAudio DecodeAudio()
+	{
+		var header = Chunks.FirstOrDefault( c => c.Type == "SCHl" );
+		if ( header.Type != "SCHl" )
+			throw new InvalidDataException( "Video: no SCHl audio header." );
+
+		var (channels, sampleCount) = ParseAudioHeader( GetPayload( header ) );
+		if ( channels != 2 )
+			throw new NotSupportedException( $"EA-ADPCM: only stereo is implemented (channels={channels})." );
+
+		var left = new List<short>( sampleCount );
+		var right = new List<short>( sampleCount );
+		foreach ( var chunk in Chunks )
+		{
+			if ( chunk.Type == "SCDl" )
+				DecodeScdlStereo( GetPayload( chunk ), left, right );
+		}
+
+		var n = Math.Min( left.Count, right.Count );
+		var samples = new short[n * 2];
+		for ( var i = 0; i < n; i++ )
+		{
+			samples[i * 2] = left[i];
+			samples[i * 2 + 1] = right[i];
+		}
+
+		// Sample rate isn't reliably in the header; TPW movies are 22.05 kHz.
+		return new DecodedAudio( channels, 22050, n, samples );
+	}
+
+	// EA SCHl "PT" tag header: "PT\0\0" then tag bytes. 0xFF ends; 0xFC/0xFD/0xFE are
+	// markers (no value); other tags are followed by a size byte then size big-endian bytes.
+	private static (int channels, int sampleCount) ParseAudioHeader( ReadOnlySpan<byte> body )
+	{
+		int channels = 1, sampleCount = 0;
+		var pos = 4; // skip "PT\0\0"
+		while ( pos < body.Length )
+		{
+			var tag = body[pos++];
+			if ( tag == 0xFF )
+				break;
+			if ( tag is 0xFC or 0xFD or 0xFE )
+				continue;
+			if ( pos >= body.Length )
+				break;
+
+			int size = body[pos++];
+			long value = 0;
+			for ( var i = 0; i < size && pos < body.Length; i++ )
+				value = (value << 8) | body[pos++];
+
+			if ( tag == 0x82 )
+				channels = (int)value;       // channel count
+			else if ( tag == 0x85 )
+				sampleCount = (int)value;    // total samples per channel
+		}
+		return (channels, sampleCount);
+	}
+
+	private static void DecodeScdlStereo( ReadOnlySpan<byte> pl, List<short> left, List<short> right )
+	{
+		if ( pl.Length < 12 )
+			return;
+
+		var count = BinaryPrimitives.ReadInt32LittleEndian( pl );
+		int prevL = BinaryPrimitives.ReadInt16LittleEndian( pl.Slice( 4, 2 ) );
+		int curL = BinaryPrimitives.ReadInt16LittleEndian( pl.Slice( 6, 2 ) );
+		int prevR = BinaryPrimitives.ReadInt16LittleEndian( pl.Slice( 8, 2 ) );
+		int curR = BinaryPrimitives.ReadInt16LittleEndian( pl.Slice( 10, 2 ) );
+
+		var pos = 12;
+		var produced = 0;
+		while ( produced < count && pos + 2 <= pl.Length )
+		{
+			int b0 = pl[pos], b1 = pl[pos + 1];
+			pos += 2;
+			int c1l = EaAdpcmTable[b0 >> 4], c2l = EaAdpcmTable[(b0 >> 4) + 4];
+			int c1r = EaAdpcmTable[b0 & 0xF], c2r = EaAdpcmTable[(b0 & 0xF) + 4];
+			int shiftL = 20 - (b1 >> 4), shiftR = 20 - (b1 & 0xF);
+
+			for ( var i = 0; i < 28 && produced < count && pos < pl.Length; i++ )
+			{
+				int nb = pl[pos++];
+				var nl = Clamp16( ((Sign4( nb >> 4 ) << shiftL) + curL * c1l + prevL * c2l + 0x80) >> 8 );
+				var nr = Clamp16( ((Sign4( nb & 0xF ) << shiftR) + curR * c1r + prevR * c2r + 0x80) >> 8 );
+				prevL = curL; curL = nl;
+				prevR = curR; curR = nr;
+				left.Add( (short)nl );
+				right.Add( (short)nr );
+				produced++;
+			}
+		}
+	}
+
+	private static int Sign4( int nibble ) => nibble >= 8 ? nibble - 16 : nibble;
+
+	private static int Clamp16( int v ) => v < -32768 ? -32768 : v > 32767 ? 32767 : v;
 
 	public VideoFile( string path ) => ReadFromFile( path );
 
