@@ -40,7 +40,7 @@ OpenTPW is currently in a very early stage of development, and is not yet playab
 | Save Files ([.TPWS](https://opentpw.gu3.me/formats/tpws-ints-lays.html))                | ⚠️     |
 | Fonts ([.BF4](https://opentpw.gu3.me/formats/bf4.html))                      | ⚠️     |
 | Lip Sync ([.LIPS](https://opentpw.gu3.me/formats/lips.html))                  | ⚠️     |
-| Materials ([.MTR](https://opentpw.gu3.me/formats/mtr.html))                   | ❌     |
+| Materials ([.MTR](https://opentpw.gu3.me/formats/mtr.html))                   | ⚠️     |
 | Video ([.TQI](https://opentpw.gu3.me/formats/tqi.html))                       | ⚠️     |
 
 ### Documentation

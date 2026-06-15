@@ -27,7 +27,7 @@ Source: `source/OpenTPW.Files/Formats/`. Legend: ✅ done · ⚠️ partial · �
 | `.RSE` ride scripts | ⚠️ | `source/OpenTPW/VM/` | Loader/disassembler restored & tested; **~13% of opcodes** implemented. See T-007. |
 | `.BF4` fonts | ⚠️ | `OpenTPW.Files/Formats/Font/BF4File.cs` | Reverse-engineered: container + per-glyph char code, **width/height and 1bpp bitmap decoded** (verified by rendering an atlas of a real font). A few header fields + renderer integration remain. See T-008. |
 | `.LIP`/`.LIPS` lip-sync | ⚠️ | `OpenTPW.Files/Formats/Sound/LipSyncFile.cs` | Reverse-engineered: a list of uint32 mouth keyframe timestamps terminated by 0xFFFFFFFF (verified monotonic on real files). Timestamp unit + renderer wiring remain. See T-008. |
-| `.MTR` materials | ❌ | — | Not implemented. |
+| `.MTR` materials | ⚠️ | `OpenTPW.Files/Formats/Model/MTRFile.cs` | Reverse-engineered: magic 0x2E5915AF, version, name (companion to same-named `.MD2`); mesh-coupled material/index array kept raw. See T-008. |
 | `.TQI` / `.TGQ` video | ⚠️ | `OpenTPW.Files/Formats/Video/VideoFile.cs` | EA FourCC container parsed (chunk index, frame count, audio); TQI/EA-ADPCM codec decode remains. See T-008. |
 
 ## Focus: the ride-script VM (`.RSE`)

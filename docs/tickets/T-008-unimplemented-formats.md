@@ -20,7 +20,13 @@
     `0xFFFFFFFF`, monotonically non-decreasing (verified on real EN/DANISH samples).
     Validated by `LipSyncFileTests` (synthetic + real via `TPW_LIP_SAMPLE`). **Remaining**:
     the timestamp unit and the mouth-shape semantics.
-  - `.MTR` (mesh/material) still to do; `.MD2` and `.MAP` tracked in T-012.
+  - `.MTR` **materials** parsed (`OpenTPW.Files/Formats/Model/MTRFile.cs`): magic
+    0x2E5915AF, version, and the material name (the header's name offset points to the
+    embedded string, e.g. "s_bkrupt" — confirmed). `.MTR` is the material companion to the
+    same-named `.MD2`; the mesh-coupled material/index array is kept raw. Validated by
+    `MTRFileTests` (synthetic + real BANKRUPT.MTR via `TPW_MTR_SAMPLE`). **Remaining**:
+    decode the index array and bind it to the `.MD2` mesh + textures.
+  - `.MD2` and `.MAP` tracked in T-012.
 
 ## Tooling: WAD extractor
 
@@ -52,9 +58,10 @@ extraction.
 - Followed by an increasing small-int array (looks like an index/face buffer) and an
   embedded ASCII name (e.g. `s_bkrupt`, `s_congrats`).
 
-The full vertex/face/material layout is **not** safely derivable from a couple of samples;
-implementing it should start from these notes + cross-referencing the `.MD2` mesh format.
-**Not implemented** to avoid shipping a speculative/incorrect parser.
+**Update**: the header field at offset 20 is a **name offset** (confirmed: points exactly
+to the embedded string, e.g. "s_bkrupt"). `MTRFile` now decodes magic + version + name
+and keeps the mesh-coupled index array raw. The full index/material layout (binding to the
+`.MD2` mesh + textures) still needs cross-referencing with the companion `.MD2`.
 
 ## `.BF4` glyph-block notes
 
