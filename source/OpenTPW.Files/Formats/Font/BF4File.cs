@@ -16,12 +16,18 @@ namespace OpenTPW;
 ///   6  : 2   glyph count (little-endian uint16)
 ///   8  : n*4 glyph offset table (uint32 byte offset of each glyph block);
 ///            the table tiles exactly up to the first glyph offset
-///   ...: glyph blocks, each starting with a uint32 character code (confirmed,
-///        e.g. 42 = '*'); the remaining per-glyph fields (metrics + bitmap) are not
-///        yet fully decoded and are exposed here as raw bytes.
+///   ...: glyph blocks. Each block is:
+///          0  : 4   character code (confirmed, e.g. 42 = '*')
+///          4  : 12  fields (cell height, advance, etc. — not fully decoded; kept raw)
+///          16 : 2   glyph width  (little-endian uint16)   [confirmed by rendering]
+///          18 : 2   glyph height (little-endian uint16)   [confirmed by rendering]
+///          20 : 4   fields (bearing/advance — not fully decoded)
+///          24 : ... 1bpp bitmap, MSB-first, width bits per row, height rows
 /// </code>
 ///
-/// See docs/tickets/T-008 for the full reverse-engineering notes.
+/// The width/height/bitmap decode was confirmed by rendering a glyph atlas from a real
+/// font (every printable ASCII glyph is legible). See docs/tickets/T-008 for the notes.
+/// No published spec exists; this was reverse-engineered from sample fonts.
 /// </summary>
 public sealed class BF4File : BaseFormat
 {
@@ -33,10 +39,19 @@ public sealed class BF4File : BaseFormat
 		/// <summary>The character this glyph represents (the block's leading uint32).</summary>
 		public int CharCode { get; init; }
 
+		/// <summary>Glyph width in pixels.</summary>
+		public int Width { get; init; }
+
+		/// <summary>Glyph height in pixels.</summary>
+		public int Height { get; init; }
+
 		/// <summary>
-		/// The raw glyph block (metrics + bitmap). Its inner layout is not yet decoded —
-		/// see the class summary / T-008.
+		/// Row-major 1bpp pixel mask, <see cref="Width"/> × <see cref="Height"/>
+		/// (<c>true</c> = set). Empty for zero-size glyphs (e.g. space).
 		/// </summary>
+		public bool[] Pixels { get; init; }
+
+		/// <summary>The raw glyph block (for fields not yet decoded). See T-008.</summary>
 		public byte[] Data { get; init; }
 	}
 
@@ -86,7 +101,45 @@ public sealed class BF4File : BaseFormat
 			}
 
 			var charCode = (int)BinaryPrimitives.ReadUInt32LittleEndian( data.AsSpan( start, 4 ) );
-			Glyphs.Add( new Glyph { CharCode = charCode, Data = data[start..end] } );
+			var block = data[start..end];
+
+			// Width/height live at block offsets 16/18; the bitmap follows at 24.
+			var width = block.Length >= 20 ? BinaryPrimitives.ReadUInt16LittleEndian( block.AsSpan( 16, 2 ) ) : 0;
+			var height = block.Length >= 20 ? BinaryPrimitives.ReadUInt16LittleEndian( block.AsSpan( 18, 2 ) ) : 0;
+			var pixels = DecodeBitmap( block, width, height );
+
+			Glyphs.Add( new Glyph
+			{
+				CharCode = charCode,
+				Width = width,
+				Height = height,
+				Pixels = pixels,
+				Data = block,
+			} );
 		}
+	}
+
+	/// <summary>
+	/// Decodes the 1bpp glyph bitmap that starts at block offset 24: a continuous
+	/// MSB-first bitstream, <paramref name="width"/> bits per row, <paramref name="height"/>
+	/// rows. Missing bits (short block) read as 0.
+	/// </summary>
+	private static bool[] DecodeBitmap( byte[] block, int width, int height )
+	{
+		const int bitmapOffset = 24;
+		var count = width * height;
+		var pixels = new bool[count < 0 ? 0 : count];
+
+		for ( var i = 0; i < pixels.Length; i++ )
+		{
+			var bit = i;
+			var byteIndex = bitmapOffset + (bit >> 3);
+			if ( byteIndex >= block.Length )
+				break;
+
+			pixels[i] = ( (block[byteIndex] >> (7 - (bit & 7))) & 1 ) != 0;
+		}
+
+		return pixels;
 	}
 }

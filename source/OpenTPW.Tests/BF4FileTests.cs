@@ -10,25 +10,35 @@ namespace OpenTPW.Tests;
 [TestClass]
 public class BF4FileTests
 {
-	// Builds a minimal valid BF4: header + offset table + two glyph blocks.
-	private static byte[] BuildFont( params int[] charCodes )
+	// One glyph block: char code @0, width @16, height @18, 1bpp bitmap @24.
+	private static byte[] GlyphBlock( int charCode, int width, int height, byte[] bitmap )
+	{
+		var block = new byte[24 + bitmap.Length];
+		BinaryPrimitives.WriteUInt32LittleEndian( block.AsSpan( 0, 4 ), (uint)charCode );
+		BinaryPrimitives.WriteUInt16LittleEndian( block.AsSpan( 16, 2 ), (ushort)width );
+		BinaryPrimitives.WriteUInt16LittleEndian( block.AsSpan( 18, 2 ), (ushort)height );
+		bitmap.CopyTo( block, 24 );
+		return block;
+	}
+
+	// Assembles a BF4 (header + offset table + glyph blocks).
+	private static byte[] BuildFont( params byte[][] blocks )
 	{
 		const int headerSize = 8;
-		const int blockSize = 12; // 4-byte char code + 8 bytes of (placeholder) glyph data
-		var tableEnd = headerSize + charCodes.Length * 4;
-
-		var total = tableEnd + charCodes.Length * blockSize;
+		var tableEnd = headerSize + blocks.Length * 4;
+		var total = tableEnd + blocks.Sum( b => b.Length );
 		var data = new byte[total];
 
 		Encoding.ASCII.GetBytes( "F4FB" ).CopyTo( data, 0 );
 		data[4] = 2; // version
-		BinaryPrimitives.WriteUInt16LittleEndian( data.AsSpan( 6, 2 ), (ushort)charCodes.Length );
+		BinaryPrimitives.WriteUInt16LittleEndian( data.AsSpan( 6, 2 ), (ushort)blocks.Length );
 
-		for ( var i = 0; i < charCodes.Length; i++ )
+		var offset = tableEnd;
+		for ( var i = 0; i < blocks.Length; i++ )
 		{
-			var blockOffset = tableEnd + i * blockSize;
-			BinaryPrimitives.WriteUInt32LittleEndian( data.AsSpan( headerSize + i * 4, 4 ), (uint)blockOffset );
-			BinaryPrimitives.WriteUInt32LittleEndian( data.AsSpan( blockOffset, 4 ), (uint)charCodes[i] );
+			BinaryPrimitives.WriteUInt32LittleEndian( data.AsSpan( headerSize + i * 4, 4 ), (uint)offset );
+			blocks[i].CopyTo( data, offset );
+			offset += blocks[i].Length;
 		}
 
 		return data;
@@ -37,7 +47,10 @@ public class BF4FileTests
 	[TestMethod]
 	public void ParsesHeaderAndGlyphCharCodes()
 	{
-		var bytes = BuildFont( '*', '1', 'A' );
+		var bytes = BuildFont(
+			GlyphBlock( '*', 0, 0, Array.Empty<byte>() ),
+			GlyphBlock( '1', 0, 0, Array.Empty<byte>() ),
+			GlyphBlock( 'A', 0, 0, Array.Empty<byte>() ) );
 
 		using var stream = new MemoryStream( bytes );
 		var font = new BF4File( stream );
@@ -47,8 +60,29 @@ public class BF4FileTests
 		CollectionAssert.AreEqual(
 			new[] { (int)'*', '1', 'A' },
 			font.Glyphs.Select( g => g.CharCode ).ToArray() );
-		// Data is the full raw block (char code + 8 placeholder bytes).
-		Assert.AreEqual( 12, font.Glyphs[0].Data.Length );
+	}
+
+	[TestMethod]
+	public void DecodesGlyphBitmap()
+	{
+		// An 'L', 4x5: bytes 0x88,0x88,0xF0 = rows (4 bits each, MSB-first):
+		// 1000 / 1000 / 1000 / 1000 / 1111  → a left bar with a full bottom row.
+		var bytes = BuildFont( GlyphBlock( 'L', 4, 5, new byte[] { 0x88, 0x88, 0xF0 } ) );
+
+		using var stream = new MemoryStream( bytes );
+		var font = new BF4File( stream );
+
+		var g = font.Glyphs.Single();
+		Assert.AreEqual( (int)'L', g.CharCode );
+		Assert.AreEqual( 4, g.Width );
+		Assert.AreEqual( 5, g.Height );
+
+		string Row( int r ) => string.Concat(
+			Enumerable.Range( 0, g.Width ).Select( c => g.Pixels[r * g.Width + c] ? '#' : '.' ) );
+
+		Assert.AreEqual( "#...", Row( 0 ) );
+		Assert.AreEqual( "#...", Row( 3 ) );
+		Assert.AreEqual( "####", Row( 4 ) );
 	}
 
 	[TestMethod]
@@ -75,10 +109,15 @@ public class BF4FileTests
 		var font = new BF4File( stream );
 
 		Assert.IsTrue( font.Glyphs.Count > 0, "a font should contain glyphs" );
+		// Note: real fonts can have several glyphs for one char code (e.g. space), so
+		// look up the first match rather than building a dictionary.
 		var codes = font.Glyphs.Select( g => g.CharCode ).ToHashSet();
-		// Real TPW fonts include the digits and common punctuation.
-		Assert.IsTrue( codes.Contains( '1' ) && codes.Contains( '0' ),
+		Assert.IsTrue( codes.Contains( '0' ) && codes.Contains( '1' ),
 			"font should contain digit glyphs" );
-		Assert.IsTrue( font.Glyphs.All( g => g.Data.Length >= 4 ) );
+
+		var zero = font.Glyphs.First( g => g.CharCode == '0' );
+		Assert.IsTrue( zero.Width > 0 && zero.Height > 0, "'0' should have real dimensions" );
+		Assert.AreEqual( zero.Width * zero.Height, zero.Pixels.Length );
+		Assert.IsTrue( zero.Pixels.Any( p => p ), "'0' bitmap should have set pixels" );
 	}
 }

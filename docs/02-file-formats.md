@@ -25,7 +25,7 @@ Source: `source/OpenTPW.Files/Formats/`. Legend: ✅ done · ⚠️ partial · �
 | `.MAP` maps | ⚠️ | (tied to World/Terrain) | Demo terrain hardcoded; parsing to generalize. |
 | `.TPWS` saves | ⚠️ | `Save/SaveReader.cs` | Partial read; no write. |
 | `.RSE` ride scripts | ⚠️ | `source/OpenTPW/VM/` | Loader/disassembler restored & tested; **~13% of opcodes** implemented. See T-007. |
-| `.BF4` fonts | ⚠️ | `OpenTPW.Files/Formats/Font/BF4File.cs` | Container reverse-engineered (magic "F4FB", glyph count, offset table, per-glyph char code); inner glyph bitmap layout still raw. See T-008. |
+| `.BF4` fonts | ⚠️ | `OpenTPW.Files/Formats/Font/BF4File.cs` | Reverse-engineered: container + per-glyph char code, **width/height and 1bpp bitmap decoded** (verified by rendering an atlas of a real font). A few header fields + renderer integration remain. See T-008. |
 | `.LIPS` lip-sync | ❌ | — | Not implemented. |
 | `.MTR` materials | ❌ | — | Not implemented. |
 | `.TQI` / `.TGQ` video | ⚠️ | `OpenTPW.Files/Formats/Video/VideoFile.cs` | EA FourCC container parsed (chunk index, frame count, audio); TQI/EA-ADPCM codec decode remains. See T-008. |
