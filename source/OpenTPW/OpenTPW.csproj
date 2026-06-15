@@ -23,9 +23,6 @@
 
 	<ItemGroup>
 		<PackageReference Include="ImGui.NET" Version="1.87.2" />
-		<!-- Windows-only (WinMM/Media Foundation); currently unused in this project.
-		     Guarded so the non-Windows build excludes it. See docs/tickets/T-003. -->
-		<PackageReference Include="NAudio" Version="2.2.1" Condition="'$(IsWindows)' == 'true'" />
 		<PackageReference Include="SharpText.Veldrid" Version="0.3.1" />
 		<PackageReference Include="SharpZipLib" Version="1.4.2" />
 		<PackageReference Include="StbImageSharp" Version="2.27.8" />

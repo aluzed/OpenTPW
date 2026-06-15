@@ -5,15 +5,19 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- OpenAL device/context handles are pointers (AudioPlayer). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="ImGui.NET" Version="1.87.2" />
-    <!-- Windows-only deps: NAudio (WinMM/Media Foundation) and System.Drawing.Common
-         (GDI+) throw on Linux/macOS. Guarded so the non-Windows build excludes them.
-         See docs/tickets/T-003 and T-004. -->
-    <PackageReference Include="NAudio" Version="2.2.1" Condition="'$(IsWindows)' == 'true'" />
+    <!-- System.Drawing.Common (GDI+) throws on Linux/macOS; kept Windows-only. See T-004. -->
     <PackageReference Include="System.Drawing.Common" Version="8.0.0" Condition="'$(IsWindows)' == 'true'" />
+    <!-- Cross-platform audio: NLayer decodes MPEG (.mp2), OpenAL plays it (replaces the
+         Windows-only NAudio path). .Soft.Native bundles libopenal. See docs/tickets/T-003. -->
+    <PackageReference Include="NLayer" Version="1.16.0" />
+    <PackageReference Include="Silk.NET.OpenAL" Version="2.23.0" />
+    <PackageReference Include="Silk.NET.OpenAL.Soft.Native" Version="1.23.1" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageReference Include="Veldrid" Version="4.9.0" />
     <PackageReference Include="Veldrid.ImGui" Version="5.72.0" />

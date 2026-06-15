@@ -75,17 +75,19 @@ dotnet test OpenTPW.Tests/OpenTPW.Tests.csproj --no-build
 > (`WINDOWS` / `LINUX` / `OSX`) so platform-specific code can be guarded with
 > `#if LINUX` once the Windows locks are addressed (see the tickets).
 
-> Current state: the build succeeds, but tests fail (hardcoded paths + no game
-> install). See [tickets/T-001](tickets/T-001-backslash-paths-linux.md) and
-> [tickets/T-002](tickets/T-002-tests-absolute-paths.md).
+> Current state: the build succeeds (0 errors) and `dotnet test` is green
+> (0 failed, 2 passed, 6 inconclusive — the inconclusive ones need a game install).
 
 ### Runtime libraries (to actually launch the game window)
 
 Veldrid uses Vulkan or OpenGL via SDL2. Install the runtime libs:
 
 ```bash
-sudo apt-get install -y libsdl2-2.0-0 libvulkan1 mesa-vulkan-drivers libopenal1
+sudo apt-get install -y libsdl2-2.0-0 libvulkan1 mesa-vulkan-drivers
 ```
+
+> Audio (OpenAL) needs no system package: `Silk.NET.OpenAL.Soft.Native` bundles
+> `libopenal.so` under `runtimes/linux-x64/native/` in the build output (see T-003).
 
 > Note: even with these, the game will not run cleanly until the Windows locks are
 > fixed (paths/NAudio/System.Drawing) — see [04-linux-compatibility.md](04-linux-compatibility.md).
