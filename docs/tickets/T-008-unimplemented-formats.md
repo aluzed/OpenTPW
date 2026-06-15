@@ -15,7 +15,12 @@
     GAME6.BF4 — every printable ASCII glyph is legible.** Validated by `BF4FileTests`
     (synthetic 'L' shape + real font via `TPW_FONT_SAMPLE`). **Remaining**: a few header
     fields (bearing/advance) + wiring into the renderer.
-  - `.MTR`, `.MD2`, `.LIP`, `.MAP` still to do.
+  - `.LIP`/`.LIPS` **lip-sync** parsed (`OpenTPW.Files/Formats/Sound/LipSyncFile.cs`):
+    a flat list of little-endian uint32 mouth keyframe timestamps, terminated by
+    `0xFFFFFFFF`, monotonically non-decreasing (verified on real EN/DANISH samples).
+    Validated by `LipSyncFileTests` (synthetic + real via `TPW_LIP_SAMPLE`). **Remaining**:
+    the timestamp unit and the mouth-shape semantics.
+  - `.MTR` (mesh/material) still to do; `.MD2` and `.MAP` tracked in T-012.
 
 ## Tooling: WAD extractor
 
