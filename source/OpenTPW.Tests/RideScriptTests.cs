@@ -30,4 +30,35 @@ public class RideScriptTests
 		Assert.AreEqual( 10, vm.Config.LimboSize );
 		Assert.AreEqual( 10, vm.Config.WalkSize );
 	}
+
+	// Exercises the newly implemented arithmetic opcodes (MULT / DIV / MOD).
+	[TestMethod]
+	public void ArithmeticOpcodes()
+	{
+		Log = new();
+
+		var path = Path.Combine( AppContext.BaseDirectory, "content", "testscripts", "Test.RSE" );
+		using var stream = File.OpenRead( path );
+		var vm = new RideVM( stream );
+
+		// Variable index 0 exists after the common-variable padding.
+		var dest = new Operand( vm, Operand.Type.Variable, 0, 0 );
+
+		OpcodeHandlers.Math.Mult( ref vm, Lit( vm, 6 ), Lit( vm, 7 ), dest );
+		Assert.AreEqual( 42, dest.Value );
+
+		OpcodeHandlers.Math.Div( ref vm, Lit( vm, 20 ), Lit( vm, 4 ), dest );
+		Assert.AreEqual( 5, dest.Value );
+		Assert.IsFalse( vm.Flags.HasFlag( RideVM.VMFlags.Zero ) );
+
+		// Divide-by-zero is guarded to 0 (and sets the Zero flag).
+		OpcodeHandlers.Math.Div( ref vm, Lit( vm, 7 ), Lit( vm, 0 ), dest );
+		Assert.AreEqual( 0, dest.Value );
+		Assert.IsTrue( vm.Flags.HasFlag( RideVM.VMFlags.Zero ) );
+
+		OpcodeHandlers.Math.Mod( ref vm, Lit( vm, 17 ), Lit( vm, 5 ), dest );
+		Assert.AreEqual( 2, dest.Value );
+	}
+
+	private static Operand Lit( RideVM vm, int value ) => new( vm, Operand.Type.Literal, value );
 }
