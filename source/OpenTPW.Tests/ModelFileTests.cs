@@ -1,5 +1,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using System.Linq;
 
@@ -8,6 +9,30 @@ namespace OpenTPW.Tests;
 [TestClass]
 public class ModelFileTests
 {
+	// An out-of-range offset (as in unsupported .MD2 variants like GARROW.MD2) must fail
+	// with a clear InvalidDataException, not an opaque EndOfStreamException. See T-012.
+	[TestMethod]
+	public void RejectsOutOfRangeOffsets()
+	{
+		var data = new byte[0x80];
+		BinaryPrimitives.WriteUInt32LittleEndian( data.AsSpan( 0, 4 ), 0x1CD15D46 ); // magic
+		BinaryPrimitives.WriteUInt16LittleEndian( data.AsSpan( 0x36, 2 ), 0 );        // frameCount
+		BinaryPrimitives.WriteUInt16LittleEndian( data.AsSpan( 0x44, 2 ), 1 );        // meshCnt
+		BinaryPrimitives.WriteUInt32LittleEndian( data.AsSpan( 0x50, 4 ), 0 );        // off2
+		BinaryPrimitives.WriteUInt32LittleEndian( data.AsSpan( 0x54, 4 ), 0 );        // frameList
+		BinaryPrimitives.WriteUInt32LittleEndian( data.AsSpan( 0x70, 4 ), 0x1000_0000 ); // bogus meshPtr
+
+		using var stream = new MemoryStream( data );
+		Assert.ThrowsExactly<InvalidDataException>( () => new ModelFile( stream ) );
+	}
+
+	[TestMethod]
+	public void RejectsBadMagic()
+	{
+		using var stream = new MemoryStream( new byte[0x80] ); // magic 0, not 0x1CD15D46
+		Assert.ThrowsExactly<InvalidDataException>( () => new ModelFile( stream ) );
+	}
+
 	// Optional validation of the .MD2 parser against a real model. Set TPW_MODEL_SAMPLE.
 	[TestMethod]
 	public void ParsesRealModelSample()

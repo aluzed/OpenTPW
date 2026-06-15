@@ -8,7 +8,12 @@
   `ModelFileTests.ParsesRealModelSample` (gated on `TPW_MODEL_SAMPLE`; asserts meshes,
   triangle indices in range, finite positions). **Finding**: the parser uses hardcoded
   offsets and is **not robust to all `.MD2` variants** — the small `DATA/GENERIC/DYNAMIC/
-  GARROW.MD2` throws `EndOfStreamException`. `.MAP` and `.TPWS` still to do.
+  GARROW.MD2` (a static, frameCount-0 variant) used to throw `EndOfStreamException`.
+  **Now hardened**: `ModelFile` validates the magic (`0x1CD15D46`) and bounds-checks every
+  seek, so GARROW fails with a clear `InvalidDataException` (*"frame list offset 0x10001 is
+  out of range … unsupported .MD2 layout"*) while PAUSED still parses. Covered by
+  `ModelFileTests.RejectsOutOfRangeOffsets` / `RejectsBadMagic`. Fully decoding the
+  GARROW-style variant remains. `.MAP` and `.TPWS` still to do.
 - **Note**: distinct from [T-008](T-008-unimplemented-formats.md) (which tracks the
   ❌ *not-started* formats). This ticket tracks the ⚠️ *partial* ones, which had no ticket.
 
