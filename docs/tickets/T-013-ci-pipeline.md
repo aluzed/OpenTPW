@@ -2,9 +2,11 @@
 
 - **Priority**: 🟠 Medium (process)
 - **Type**: Infrastructure
-- **Status**: ☐ To do
-- **Context**: the repo has **no CI** (the `.github` directory was deleted in history).
-  Now that the solution builds and tests pass on Linux, a CI guard is cheap and high-value.
+- **Status**: ✅ **Done.** Added `.github/workflows/ci.yml` (restore → build → test →
+  vulnerable-package report on `ubuntu-latest`, .NET pinned via `global.json`). Validated
+  locally in Release: build 0 errors, tests 0 failed / 5 passed / 6 inconclusive.
+  *(Will run once pushed to a fork with Actions enabled.)*
+- **Context**: the repo had **no CI** (the `.github` directory was deleted in history).
 
 ## Proposed fix
 
