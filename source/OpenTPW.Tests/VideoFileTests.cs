@@ -43,6 +43,11 @@ public class VideoFileTests
 		Assert.AreEqual( "SCHl", video.Chunks[0].Type );
 		Assert.AreEqual( 8, video.Chunks[0].PayloadLength );
 
+		// pIQT payload bytes are 1,2,3,4,... so width=0x0201, height=0x0403.
+		var info = video.GetVideoInfo();
+		Assert.AreEqual( 0x0201, info.Width );
+		Assert.AreEqual( 0x0403, info.Height );
+
 		// Payload of the first video frame is the bytes 1..16.
 		var frame = video.Chunks[1];
 		Assert.AreEqual( "pIQT", frame.Type );
@@ -87,6 +92,10 @@ public class VideoFileTests
 		// Every byte must be accounted for by the chunk walk (clean EOF).
 		var consumed = video.Chunks.Sum( c => (long)c.Size );
 		Assert.AreEqual( new FileInfo( path ).Length, consumed, "chunks should tile the whole file" );
+
+		// Frame dimensions from the pIQT header (a real BF.TGQ is 320x352 per ffprobe).
+		var vinfo = video.GetVideoInfo();
+		Assert.IsTrue( vinfo.Width > 0 && vinfo.Height > 0, "frame should have real dimensions" );
 
 		// Decode the EA-ADPCM audio and sanity-check it (verified: count matches header).
 		var audio = video.DecodeAudio();

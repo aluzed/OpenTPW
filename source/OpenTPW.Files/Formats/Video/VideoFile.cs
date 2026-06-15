@@ -60,6 +60,33 @@ public sealed class VideoFile : BaseFormat
 	/// <summary>Number of <c>pIQT</c> video frames.</summary>
 	public int VideoFrameCount => Chunks.Count( c => c.IsVideo );
 
+	/// <summary>Video frame dimensions (width × height), read from the first frame header.</summary>
+	public readonly record struct VideoInfo( int Width, int Height );
+
+	/// <summary>
+	/// Reads the video frame size from the first <c>pIQT</c> frame header (the frame starts
+	/// with little-endian uint16 width then height — confirmed: a real BF.TGQ is 320×352,
+	/// matching ffprobe).
+	///
+	/// Decoding the frame pixels is a separate, large task: TQI is an MPEG-1-style intra
+	/// DCT codec (DC/AC VLC + IDCT + 4:2:0 YUV). It must be implemented independently from
+	/// the MPEG-1 spec — do NOT port FFmpeg's (LGPL) decoder into this MIT project. See T-008.
+	/// </summary>
+	public VideoInfo GetVideoInfo()
+	{
+		var frame = Chunks.FirstOrDefault( c => c.IsVideo );
+		if ( frame.Type != VideoChunkType )
+			throw new InvalidDataException( "Video: no pIQT video frame." );
+
+		var payload = GetPayload( frame );
+		if ( payload.Length < 4 )
+			throw new InvalidDataException( "Video: pIQT frame header too small." );
+
+		var width = BinaryPrimitives.ReadUInt16LittleEndian( payload );
+		var height = BinaryPrimitives.ReadUInt16LittleEndian( payload.Slice( 2, 2 ) );
+		return new VideoInfo( width, height );
+	}
+
 	/// <summary>Whether the file contains any EA audio chunks.</summary>
 	public bool HasAudio => Chunks.Any( c => c.IsAudio );
 

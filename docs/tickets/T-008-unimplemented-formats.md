@@ -12,8 +12,13 @@
     header (channels @0x82, sample count @0x85) and decodes the stereo SCDl ADPCM blocks
     (FFmpeg `ea_adpcm_table`, 28-sample blocks, per-channel predictor/shift). **Verified**:
     a real BF.TGQ decodes to exactly 194815 samples/channel (matching the header) and the
-    waveform is coherent audio (a jingle), not noise. **Remaining**: the `pIQT` **TQI**
-    video frames (DCT-based) and mono-audio support.
+    waveform is coherent audio (a jingle), not noise. The **TQI video frame header** is
+    parsed too (`GetVideoInfo()` → width/height; confirmed 320×352 on BF.TGQ, matching
+    `ffprobe`). The video content was confirmed decodable via ffprobe/ffmpeg (BF.TGQ is the
+    Bullfrog frog logo). **Remaining**: the TQI pixel decoder — an MPEG-1-style intra DCT
+    codec (DC/AC VLC + IDCT + 4:2:0). It must be implemented **independently from the MPEG-1
+    spec** (do not port FFmpeg's LGPL decoder into this MIT project); that is a sizeable
+    separate effort. Mono-audio support also remains.
   - `.BF4` **fonts** parsed (`OpenTPW.Files/Formats/Font/BF4File.cs`): magic "F4FB",
     glyph count, offset table (tiles exactly to the first glyph), per-glyph **char code**,
     and **width/height + 1bpp bitmap decoded** (block offsets 16/18 = width/height; bitmap
