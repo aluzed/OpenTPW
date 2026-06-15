@@ -36,6 +36,8 @@ public class VideoFileTests
 
 		Assert.AreEqual( 4, video.Chunks.Count );
 		Assert.AreEqual( 2, video.VideoFrameCount );
+		Assert.AreEqual( 2, video.VideoChunks.Count() );
+		Assert.AreEqual( 2, video.AudioChunks.Count() ); // SCHl + SCEl
 		Assert.IsTrue( video.HasAudio );
 
 		Assert.AreEqual( "SCHl", video.Chunks[0].Type );

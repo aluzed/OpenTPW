@@ -51,11 +51,23 @@ public sealed class VideoFile : BaseFormat
 	/// <summary>All FourCC blocks, in file order.</summary>
 	public List<Chunk> Chunks { get; } = new();
 
+	/// <summary>The <c>pIQT</c> (TQI) video frame chunks, in order.</summary>
+	public IEnumerable<Chunk> VideoChunks => Chunks.Where( c => c.IsVideo );
+
+	/// <summary>The EA audio chunks (<c>SC*</c>), in order.</summary>
+	public IEnumerable<Chunk> AudioChunks => Chunks.Where( c => c.IsAudio );
+
 	/// <summary>Number of <c>pIQT</c> video frames.</summary>
 	public int VideoFrameCount => Chunks.Count( c => c.IsVideo );
 
 	/// <summary>Whether the file contains any EA audio chunks.</summary>
 	public bool HasAudio => Chunks.Any( c => c.IsAudio );
+
+	// NB: decoding the chunk payloads is a separate step and is not implemented here:
+	//  - video frames (pIQT) use the EA TQI codec (DCT-based);
+	//  - audio (SC* chunks) uses EA-ADPCM.
+	// Reference: https://wiki.multimedia.cx/index.php/Electronic_Arts_Formats
+	// (and the adpcm_ea / TQI decoders in FFmpeg / vgmstream).
 
 	public VideoFile( string path ) => ReadFromFile( path );
 
