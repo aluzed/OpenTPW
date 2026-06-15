@@ -10,9 +10,9 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 ## Build / test state (observed)
 
 - **Build**: ✅ `dotnet build OpenTPW.sln` → 6 projects, **0 errors**.
-- **Tests**: ✅ `dotnet test` → **0 failed, 7 passed, 6 inconclusive** on a clean Linux
-  machine (was 7/7 failing). The 6 inconclusive are integration tests that need a game
-  install (`OPENTPW_GAMEPATH`). See T-002.
+- **Tests**: ✅ `dotnet test` → **0 failed, 9 passed, 7 inconclusive** on a clean Linux
+  machine (was 7/7 failing). The inconclusive ones are integration tests that need a game
+  install (`OPENTPW_GAMEPATH`) or a movie sample (`TPW_VIDEO_SAMPLE`). See T-002 / T-008.
 
 ## Index
 
@@ -25,7 +25,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-005](T-005-vulnerable-dependencies.md) | 🟠 Medium | ✅ Done | Vulnerable dependencies (direct + transitive) |
 | [T-006](T-006-gamepath-config.md) | 🟡 Low | ✅ Done | Windows default `GamePath` + no portable override |
 | [T-007](T-007-vm-opcodes-rse.md) | 🟡 Feature | ⚠️ Partial | Ride VM: `.RSE` loader restored; 30/210 opcodes (MULT/DIV/MOD added) |
-| [T-008](T-008-unimplemented-formats.md) | 🟡 Feature | ☐ To do | Unimplemented formats: `.BF4`, `.MTR`, `.LIPS`, `.TQI/.TGQ` |
+| [T-008](T-008-unimplemented-formats.md) | 🟡 Feature | ⚠️ Partial | Unimplemented formats: `.TQI/.TGQ` container done; `.BF4`, `.MTR`, `.LIPS` remain |
 | [T-009](T-009-build-warnings.md) | ⚪ Debt | ☐ To do | build warnings (nullable, Dispose, etc.) |
 | [T-010](T-010-add-sub-flags.md) | 🟠 Medium | ✅ Done | ADD/SUB don't set arithmetic flags (branch correctness) |
 | [T-011](T-011-branchto-hardening.md) | 🟡 Feature | ✅ Done | Harden `RideVM.BranchTo` (O(1) map; verified by a compiled loop) |

@@ -28,7 +28,7 @@ Source: `source/OpenTPW.Files/Formats/`. Legend: ✅ done · ⚠️ partial · �
 | `.BF4` fonts | ❌ | — | Not implemented. |
 | `.LIPS` lip-sync | ❌ | — | Not implemented. |
 | `.MTR` materials | ❌ | — | Not implemented. |
-| `.TQI` / `.TGQ` video | ❌ | — | Bullfrog video codec. `.TGQ` files present on disc (`DATA/MOVIES/`). |
+| `.TQI` / `.TGQ` video | ⚠️ | `OpenTPW.Files/Formats/Video/VideoFile.cs` | EA FourCC container parsed (chunk index, frame count, audio); TQI/EA-ADPCM codec decode remains. See T-008. |
 
 ## Focus: the ride-script VM (`.RSE`)
 

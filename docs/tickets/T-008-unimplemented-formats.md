@@ -2,6 +2,12 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Feature / reverse engineering
+- **Status**: ⚠️ **In progress.** `.TQI`/`.TGQ` **video container** is now parsed
+  (`OpenTPW.Files/Formats/Video/VideoFile.cs`): the EA FourCC block layout — chunk index,
+  `pIQT` frame count, EA audio detection. Validated by `VideoFileTests` (a synthesized
+  container + a real movie via the `TPW_VIDEO_SAMPLE` env var, which tiled all 523 chunks
+  of `BF.TGQ` to a clean EOF). **Remaining** for video: decode the TQI frames + EA-ADPCM
+  audio. `.BF4`, `.MTR`, `.LIPS` still to do.
 
 ## Formats to handle
 

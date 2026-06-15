@@ -41,7 +41,7 @@ OpenTPW is currently in a very early stage of development, and is not yet playab
 | Fonts ([.BF4](https://opentpw.gu3.me/formats/bf4.html))                      | ❌     |
 | Lip Sync ([.LIPS](https://opentpw.gu3.me/formats/lips.html))                  | ❌     |
 | Materials ([.MTR](https://opentpw.gu3.me/formats/mtr.html))                   | ❌     |
-| Video ([.TQI](https://opentpw.gu3.me/formats/tqi.html))                       | ❌     |
+| Video ([.TQI](https://opentpw.gu3.me/formats/tqi.html))                       | ⚠️     |
 
 ### Documentation
 
