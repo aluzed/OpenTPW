@@ -4,11 +4,13 @@ namespace OpenTPW;
 
 public partial class RideVM
 {
+	private readonly RideScriptFile rsseqFile;
+
 	public string ScriptName { get; set; } = "Unnamed";
 
 	public bool IsRunning { get; set; }
 	public int CurrentPos { get; set; }
-	// public string Disassembly => rsseqFile.Disassembly;
+	public string Disassembly => rsseqFile.Disassembly;
 	public List<Instruction> Instructions { get; } = new List<Instruction>();
 
 	/// <summary>
@@ -34,7 +36,8 @@ public partial class RideVM
 
 	public RideVM( Stream stream )
 	{
-		// rsseqFile = new RideScriptFile( this, stream );
+		// Parse the .RSE script: populates Variables, Strings, Instructions, Branches.
+		rsseqFile = new RideScriptFile( this, stream );
 
 		// DEBUG: Log implemented opcode counts
 		var implementedOpcodes = OpcodeHandlers.Keys.ToList();
@@ -45,9 +48,22 @@ public partial class RideVM
 		Log.Info( $"Implemented {implementedCount} / {totalCount} ({totalPercent.CeilToInt()}%) opcodes" );
 
 		// Set up basic ride variables
+		EnsureCommonVariables();
 		Variables[(int)RideVariables.VAR_RIDECLOSED] = 1;
 		Variables[(int)RideVariables.VAR_CAPACITY] = 16;
 		Variables[(int)RideVariables.VAR_DURATION] = 30;
+	}
+
+	/// <summary>
+	/// All rides are expected to expose the common <see cref="RideVariables"/> set. Pad
+	/// the variable table if a script declares fewer (e.g. a minimal test script) so the
+	/// default initialization below cannot index out of range.
+	/// </summary>
+	private void EnsureCommonVariables()
+	{
+		var required = Enum.GetValues<RideVariables>().Length;
+		while ( Variables.Count < required )
+			Variables.Add( 0 );
 	}
 
 	public void Step()

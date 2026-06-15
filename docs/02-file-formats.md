@@ -24,7 +24,7 @@ Source: `source/OpenTPW.Files/Formats/`. Legend: ✅ done · ⚠️ partial · �
 | `.MD2` models | ⚠️ | `Model/ModelFile.cs` | Incomplete loading; render integration to finish. |
 | `.MAP` maps | ⚠️ | (tied to World/Terrain) | Demo terrain hardcoded; parsing to generalize. |
 | `.TPWS` saves | ⚠️ | `Save/SaveReader.cs` | Partial read; no write. |
-| `.RSE` ride scripts | ⚠️ | `source/OpenTPW/VM/` | **~13% of opcodes**; `.RSE` loader commented out. |
+| `.RSE` ride scripts | ⚠️ | `source/OpenTPW/VM/` | Loader/disassembler restored & tested; **~13% of opcodes** implemented. See T-007. |
 | `.BF4` fonts | ❌ | — | Not implemented. |
 | `.LIPS` lip-sync | ❌ | — | Not implemented. |
 | `.MTR` materials | ❌ | — | Not implemented. |
