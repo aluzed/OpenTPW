@@ -2,7 +2,13 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Feature / reverse engineering
-- **Status**: ☐ To do
+- **Status**: ⚠️ **In progress.** `.MD2` parser **verified against a real model**: a
+  real `ENGLISH/MESHES/ENGLISH/PAUSED.MD2` parses and reconstructs as the 3D "PAUSED"
+  sign (rendered top-view from the parsed vertices/faces). Added the regression test
+  `ModelFileTests.ParsesRealModelSample` (gated on `TPW_MODEL_SAMPLE`; asserts meshes,
+  triangle indices in range, finite positions). **Finding**: the parser uses hardcoded
+  offsets and is **not robust to all `.MD2` variants** — the small `DATA/GENERIC/DYNAMIC/
+  GARROW.MD2` throws `EndOfStreamException`. `.MAP` and `.TPWS` still to do.
 - **Note**: distinct from [T-008](T-008-unimplemented-formats.md) (which tracks the
   ❌ *not-started* formats). This ticket tracks the ⚠️ *partial* ones, which had no ticket.
 
@@ -10,7 +16,7 @@
 
 | Format | Code | Current state | Remaining |
 |--------|------|---------------|-----------|
-| `.MD2` models | `OpenTPW.Files/Formats/Model/ModelFile.cs` | partial load | finish parsing + render integration (note: `Formats\Model\**` is excluded from the main `OpenTPW.csproj` compile). |
+| `.MD2` models | `OpenTPW.Files/Formats/Model/ModelFile.cs` | parses mesh models (verified: PAUSED.MD2 → readable 3D text) | make it robust to all variants (GARROW.MD2 crashes); render integration. |
 | `.MAP` maps | `World/Terrain` | demo terrain hardcoded | generalize parsing; load real level geometry. |
 | `.TPWS` saves | `OpenTPW.Files/Formats/Save/SaveReader.cs` | partial read | complete read; implement write. |
 
