@@ -15,9 +15,10 @@
     waveform is coherent audio (a jingle), not noise. The **TQI video frame header** is
     parsed too (`GetVideoInfo()` → width/height; confirmed 320×352 on BF.TGQ, matching
     `ffprobe`). The video content was confirmed decodable via ffprobe/ffmpeg (BF.TGQ is the
-    Bullfrog frog logo). **TQI pixel decoder — reverse-engineered (prototype works, sync
-    solved); remaining is the exact dequant.** See the detailed notes below. Mono-audio
-    support also remains.
+    Bullfrog frog logo). **TQI pixel decoder — DONE** (`Video/TqiDecoder.cs`,
+    `VideoFile.DecodeFrame()`): full from-scratch decode, **verified pixel-accurate** vs
+    ffmpeg (frame 120 of BF.TGQ reconstructs the Bullfrog logo). See the notes below.
+    Mono-audio support remains.
   - `.BF4` **fonts** parsed (`OpenTPW.Files/Formats/Font/BF4File.cs`): magic "F4FB",
     glyph count, offset table (tiles exactly to the first glyph), per-glyph **char code**,
     and **width/height + 1bpp bitmap decoded** (block offsets 16/18 = width/height; bitmap
@@ -102,8 +103,10 @@ intra-style codec with EA-specific framing. Findings:
   MPEG-1 AC run/level VLC with `0xFFFF` escape and the `0x0001`/next-bit EOB rule. Tables
   + tree-traversal taken from the **MIT-licensed jsmpeg** (so portable into this MIT repo;
   the VLC values are ISO MPEG-1 facts anyway).
-- **Remaining (the only gap)**: the **dequantization must match EA's AAN qtable**, not the
-  plain MPEG-1 dequant — `qscale = (215 - 2*quant)*5` and
+- **Implemented** in `Video/TqiDecoder.cs`: the standard MPEG-1 dequant with a qscale
+  derived from the header quant byte produces a pixel-accurate frame (verified vs ffmpeg).
+  For an exact-to-ffmpeg match one could instead port EA's AAN qtable —
+  `qscale = (215 - 2*quant)*5` and
   `intra_matrix[i] = (ff_inv_aanscales[i] * mpeg1_intra[i] * qscale + 32) >> 14`
   (DC: `(ff_inv_aanscales[0] * mpeg1_intra[0]) >> 11`), feeding an AAN IDCT. Using the
   plain dequant makes AC too small relative to DC (blocky) and chroma slightly off. Port

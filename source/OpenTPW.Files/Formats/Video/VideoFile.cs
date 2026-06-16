@@ -87,6 +87,23 @@ public sealed class VideoFile : BaseFormat
 		return new VideoInfo( width, height );
 	}
 
+	/// <summary>
+	/// Decodes the <paramref name="index"/>-th video frame (<c>pIQT</c>) to RGB via the
+	/// reverse-engineered <see cref="TqiDecoder"/>.
+	/// </summary>
+	public TqiDecoder.Frame DecodeFrame( int index )
+	{
+		var i = 0;
+		foreach ( var chunk in Chunks )
+		{
+			if ( !chunk.IsVideo )
+				continue;
+			if ( i++ == index )
+				return TqiDecoder.Decode( GetPayload( chunk ) );
+		}
+		throw new ArgumentOutOfRangeException( nameof( index ), $"No video frame at index {index}." );
+	}
+
 	/// <summary>Whether the file contains any EA audio chunks.</summary>
 	public bool HasAudio => Chunks.Any( c => c.IsAudio );
 

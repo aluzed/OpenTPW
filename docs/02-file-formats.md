@@ -28,7 +28,7 @@ Source: `source/OpenTPW.Files/Formats/`. Legend: ✅ done · ⚠️ partial · �
 | `.BF4` fonts | ✅ | `OpenTPW.Files/Formats/Font/BF4File.cs` | Fully reverse-engineered: char code, width/height, 1bpp bitmap, **bearings + advance** (verified — renders correctly-spaced text). Engine/UI wiring is separate. See T-008. |
 | `.LIP`/`.LIPS` lip-sync | ⚠️ | `OpenTPW.Files/Formats/Sound/LipSyncFile.cs` | Reverse-engineered: a list of uint32 mouth keyframe timestamps terminated by 0xFFFFFFFF (verified monotonic on real files). Timestamp unit + renderer wiring remain. See T-008. |
 | `.MTR` materials | ⚠️ | `OpenTPW.Files/Formats/Model/MTRFile.cs` | Reverse-engineered: magic 0x2E5915AF, version, name (companion to same-named `.MD2`); mesh-coupled material/index array kept raw. See T-008. |
-| `.TQI` / `.TGQ` video | ⚠️ | `OpenTPW.Files/Formats/Video/VideoFile.cs` | EA container parsed; **EA-ADPCM audio fully decoded** (`DecodeAudio()`, verified — sample count matches header, waveform is coherent). TQI video-frame decode remains. See T-008. |
+| `.TQI` / `.TGQ` video | ✅ | `Video/VideoFile.cs`, `Video/TqiDecoder.cs` | Container + **EA-ADPCM audio** (`DecodeAudio()`) + **TQI video frames** (`DecodeFrame()`) fully decoded — verified pixel-accurate against ffmpeg (the Bullfrog logo). See T-008. |
 
 ## Focus: the ride-script VM (`.RSE`)
 
