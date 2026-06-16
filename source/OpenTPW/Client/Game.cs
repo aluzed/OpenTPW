@@ -123,6 +123,26 @@ internal static class Game
 		Render.ClearColor = RgbaFloat.Black;
 
 		//
+		// Background music (T-031): play the calm track from the global music archive, looping.
+		//
+		try
+		{
+			var musicPath = Path.Join( gamePath, "data", "global", "sound", "MusicHD.sdt" );
+			if ( File.Exists( musicPath ) )
+			{
+				var music = new SdtArchive( musicPath );
+				var track = music.soundFiles.FirstOrDefault( x => x.Name.StartsWith( "level4c", StringComparison.OrdinalIgnoreCase ) )
+							?? music.soundFiles.FirstOrDefault();
+				if ( track != null )
+					Audio.PlayMusic( track.SoundData, loop: true );
+			}
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( $"Background music unavailable: {e.Message}" );
+		}
+
+		//
 		// Run game loop
 		//
 		Render.OnUpdate += level.Update;
