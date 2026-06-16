@@ -15,8 +15,10 @@ You therefore **need a legal copy of the game** to provide the assets — which 
 ## Maturity
 
 - **Stage: boots & runs on Linux** (window + Vulkan render loop), not yet playable. Verified by
-  running on an AMD Radeon (Mesa/Vulkan) after fixing the Vulkan `libdl` load ([T-023](tickets/T-023-linux-vulkan-libdl.md));
-  the scene currently renders black ([T-024](tickets/T-024-linux-black-screen.md)).
+  running on an AMD Radeon (Mesa/Vulkan) after fixing the Vulkan `libdl` load ([T-023](tickets/T-023-linux-vulkan-libdl.md)).
+  The **lobby renders** — island, advisor model, water, sky, and the purple buttons with text
+  labels — behind a "LOADING…" screen during the (synchronous) level load
+  ([T-024](tickets/T-024-linux-black-screen.md), resolved).
 - **Upstream** (`OpenTPW/OpenTPW`) is dormant (last real activity early 2025). **This fork**
   is under active development: full Linux portability, CI, and a large reverse-engineering
   push this session (see the Update below).
@@ -97,11 +99,14 @@ of what's left needs the ride engine itself (which also lets further RE be verif
 1. **Ride engine** — the biggest unlock: instantiate ride objects/animations/sound/lights in the
    world. This backs **Batch B** of the VM (the 63 engine opcodes, incl. `SPAWNCHILD`) and lets
    `.PLB` particles / `.LIP` lip-sync / `.MAP` mixing actually run.
-2. **Engine wiring**: ⏳ in progress. **Bitmap fonts are now wired** — `FontAtlas` (CPU,
+2. **Engine wiring**: ⏳ in progress. **Bitmap fonts are wired and live** — `FontAtlas` (CPU,
    unit-tested) packs `.BF4` glyphs into an atlas + layout, `Render/Assets/Font.cs` uploads it,
-   and `Graphics.DrawText` draws a quad per glyph; placing it in the live UI (e.g. button
-   labels) is the next visible step. Models (`.MD2`) already render in the lobby. Drawing a real
-   level from textures remains (terrain is hardcoded).
+   `Graphics.DrawText` batches a quad per glyph (UV V-flipped to match the UI shader, Y-up baseline
+   alignment), and it now draws the **loading screen** and the **PurpleButton labels** in the lobby.
+   Only the **1bpp** `.BF4` fonts decode cleanly (e.g. `GAME12`); the antialiased/multi-bit faces
+   (`MENU*`, `TITLE*`, `*AA`) still render as noise — [T-025](tickets/T-025-bf4-antialiased-fonts.md).
+   Models (`.MD2`) already render in the lobby. Drawing a real level from textures remains
+   (terrain is hardcoded).
 3. **Format tails** (each now its own ticket): `.MD2` static variant [T-015], `.MAP` records
    [T-016], `.TPWS` [T-017], `.PLB` params [T-019], `.LIP` shapes [T-020], exact TQI dequant
    [T-021], mono EA-ADPCM [T-022]. Several need the engine or Ghidra on the spawn/render paths.
