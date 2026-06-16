@@ -11,6 +11,10 @@ public static partial class Input
 	public static float Forward { get; set; }
 	public static float Right { get; set; }
 
+	/// <summary>True for the single frame the left mouse button transitions from up to down.</summary>
+	public static bool MouseLeftPressed { get; private set; }
+	private static bool _lastMouseLeft;
+
 	internal static List<InputButton> LastKeysDown { get; set; } = new();
 	internal static List<InputButton> KeysDown { get; set; } = new();
 
@@ -98,6 +102,9 @@ public static partial class Input
 		};
 
 		Mouse = mouseInfo;
+
+		MouseLeftPressed = mouseInfo.Left && !_lastMouseLeft;
+		_lastMouseLeft = mouseInfo.Left;
 
 		Right = 0;
 		Forward = 0;

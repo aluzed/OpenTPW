@@ -17,6 +17,8 @@ public partial class Renderer
 	private int _fpsFrames;
 	private float _fps;
 	private bool _fpsKeyWas;
+	private bool _volDownWas;
+	private bool _volUpWas;
 	private Font? _debugFont;
 
 	public Window Window;
@@ -267,6 +269,22 @@ public partial class Renderer
 		if ( f3 && !_fpsKeyWas )
 			ShowFps = !ShowFps;
 		_fpsKeyWas = f3;
+
+		// Music volume: '-' down, '+' up in 0.1 steps (edge-detected).
+		var volDown = Input.Keyboard.KeysDown.Contains( Key.Minus );
+		var volUp = Input.Keyboard.KeysDown.Contains( Key.Plus );
+		if ( volDown && !_volDownWas )
+		{
+			Audio.MusicVolume -= 0.1f;
+			Log.Info( $"Music volume: {Audio.MusicVolume:F1}" );
+		}
+		if ( volUp && !_volUpWas )
+		{
+			Audio.MusicVolume += 0.1f;
+			Log.Info( $"Music volume: {Audio.MusicVolume:F1}" );
+		}
+		_volDownWas = volDown;
+		_volUpWas = volUp;
 
 		PreRender();
 		PreUpdate?.Invoke();

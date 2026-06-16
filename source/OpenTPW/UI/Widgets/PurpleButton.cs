@@ -19,6 +19,31 @@ internal class PurpleButton : Panel
 
 	public string Text { get; set; }
 
+	// UI click sound (T-031), loaded once from the global UI sound archive.
+	private static byte[]? clickSound;
+	private static bool clickSoundTried;
+	private static byte[]? ClickSound
+	{
+		get
+		{
+			if ( clickSoundTried )
+				return clickSound;
+			clickSoundTried = true;
+			try
+			{
+				var path = Path.Join( GameDir.GamePath, "data", "global", "sound", "sfUiHD.sdt" );
+				if ( File.Exists( path ) )
+				{
+					var sdt = new SdtArchive( path );
+					clickSound = sdt.soundFiles
+						.FirstOrDefault( x => x.Name.StartsWith( "textclick", StringComparison.OrdinalIgnoreCase ) )?.SoundData;
+				}
+			}
+			catch ( Exception e ) { Log.Warning( $"UI click sound unavailable: {e.Message}" ); }
+			return clickSound;
+		}
+	}
+
 	public PurpleButton( string text )
 	{
 		ButtonText1 = new Texture( "ui/textures/button_text1.wct", TextureFlags.PointFilter );
@@ -26,6 +51,26 @@ internal class PurpleButton : Panel
 
 		Text = Localization.Parse( text );
 		Log.Info( $"Parsed '{text}' as '{Text}'" );
+	}
+
+	protected override void OnUpdate()
+	{
+		// Play a click when the cursor is over the button and the left button was just pressed.
+		if ( Input.MouseLeftPressed && IsCursorOver() && ClickSound != null )
+			Audio.PlaySfx( "ui_click", ClickSound );
+	}
+
+	// True when the mouse is over the visible pill. The mouse is in window pixels (Y-down); convert
+	// to the UI's Y-up space. (The window matches the UI size, so no extra scaling is needed.)
+	private bool IsCursorOver()
+	{
+		var mx = Input.Mouse.Position.X;
+		var my = Screen.Size.Y - Input.Mouse.Position.Y;
+		var left = position.X - 550f;
+		var right = Math.Min( position.X + 40f, Screen.Size.X );
+		var bottom = position.Y - 130f;
+		var top = position.Y - 2f;
+		return mx >= left && mx <= right && my >= bottom && my <= top;
 	}
 
 	protected override void OnRender()

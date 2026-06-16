@@ -28,10 +28,18 @@ internal static unsafe class Audio
 	private static uint musicSource;
 	private static uint musicBuffer;
 
+	// One-shot SFX: a small round-robin pool of sources + a cache of decoded buffers keyed by name
+	// (so a sound decodes once and replays cheaply).
+	private const int SfxSourceCount = 8;
+	private static readonly uint[] sfxSources = new uint[SfxSourceCount];
+	private static int sfxNext;
+	private static readonly Dictionary<string, uint> sfxBuffers = new();
+
 	private static bool triedInit;
 	private static bool available;
 
 	private static float musicVolume = 0.5f;
+	private static float sfxVolume = 0.8f;
 
 	/// <summary>Background-music gain in [0,1].</summary>
 	public static float MusicVolume
@@ -42,6 +50,51 @@ internal static unsafe class Audio
 			musicVolume = Math.Clamp( value, 0f, 1f );
 			if ( available )
 				al.SetSourceProperty( musicSource, SourceFloat.Gain, musicVolume );
+		}
+	}
+
+	/// <summary>Sound-effects gain in [0,1] (applied to each SFX as it plays).</summary>
+	public static float SfxVolume
+	{
+		get => sfxVolume;
+		set => sfxVolume = Math.Clamp( value, 0f, 1f );
+	}
+
+	/// <summary>
+	/// Plays a one-shot sound effect from an MPEG (.mp2) byte stream. <paramref name="key"/> caches
+	/// the decoded buffer so repeated effects (e.g. UI clicks) decode only once. Uses a round-robin
+	/// source pool so overlapping effects don't cut each other off.
+	/// </summary>
+	public static void PlaySfx( string key, byte[] mpegData )
+	{
+		if ( !EnsureInitialized() )
+			return;
+
+		try
+		{
+			if ( !sfxBuffers.TryGetValue( key, out var buffer ) )
+			{
+				if ( !TryDecode( mpegData, out var pcm, out var sampleRate, out var channels ) || pcm.Length == 0 )
+					return;
+
+				buffer = al.GenBuffer();
+				var fmt = channels >= 2 ? BufferFormat.Stereo16 : BufferFormat.Mono16;
+				fixed ( short* data = pcm )
+					al.BufferData( buffer, fmt, data, pcm.Length * sizeof( short ), sampleRate );
+				sfxBuffers[key] = buffer;
+			}
+
+			var src = sfxSources[sfxNext];
+			sfxNext = ( sfxNext + 1 ) % SfxSourceCount;
+
+			al.SourceStop( src );
+			al.SetSourceProperty( src, SourceInteger.Buffer, (int)buffer );
+			al.SetSourceProperty( src, SourceFloat.Gain, sfxVolume );
+			al.SourcePlay( src );
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( $"SFX playback failed: {e.Message}" );
 		}
 	}
 
@@ -147,6 +200,8 @@ internal static unsafe class Audio
 			context = alc.CreateContext( device, null );
 			alc.MakeContextCurrent( context );
 			musicSource = al.GenSource();
+			for ( var i = 0; i < SfxSourceCount; i++ )
+				sfxSources[i] = al.GenSource();
 
 			available = true;
 			Log.Info( "OpenAL audio initialized." );
