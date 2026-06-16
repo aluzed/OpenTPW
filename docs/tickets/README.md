@@ -39,8 +39,8 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-018](T-018-mtr-material-semantics.md) | 🟡 Feature | ☐ To do | `.MTR` material semantics + `.MD2` texture binding |
 | [T-019](T-019-plb-parameter-fields.md) | 🟡 Feature | ☐ To do | `.PLB` particle parameter fields (beyond the colour ramp) |
 | [T-020](T-020-lip-mouth-shapes.md) | 🟡 Feature | ☐ To do | `.LIP` mouth-shape semantics + lip-sync wiring |
-| [T-021](T-021-tqi-exact-dequant.md) | ⚪ Polish | ☐ To do | `.TQI` video: exact (AAN) dequantization |
+| [T-021](T-021-tqi-exact-dequant.md) | ⚪ Polish | ⏸️ Deferred | `.TQI`: float AAN IDCT confirmed (Ghidra); exact port deferred (decoder already renders correctly) |
 | [T-022](T-022-ea-adpcm-mono.md) | 🟡 Feature | ☐ To do | EA-ADPCM mono audio support |
 
 Priority legend: 🔴 blocking · 🟠 important · 🟡 desirable/feature · ⚪ technical debt/polish.
-Status legend: ✅ done · ⚠️ partial · ☐ to do · 🗂️ split into focused tickets.
+Status legend: ✅ done · ⚠️ partial · ☐ to do · 🗂️ split into focused tickets · ⏸️ deferred.

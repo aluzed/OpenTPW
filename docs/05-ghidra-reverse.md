@@ -31,6 +31,10 @@ in clear (`0x1CD15D46`, `.md2`×43, `M3D2`, `.rse`, `lips`, `.plb`…).
 **Loaders reversed so far:**
 - **`.MD2`** — `FUN_0046d6d0`: load-and-relocate; gates on version fields at offsets 4/8
   (current = `0xDD`/`0xCB`, legacy/static = `0x18`/`0x17`). Applied in `ModelFile` (T-015).
+- **`.TQI` codec** — `FUN_00677140` is a **float AAN IDCT**; constants in `idct_dat`
+  (`0.382683` = sin π/8, `0.541196`, `1.306563`, `1/(2√2)`). Dequant is `coeff × Q16 matrix`
+  at `DAT_00fb7820` (AAN-prescaled). Findings in [T-021](tickets/T-021-tqi-exact-dequant.md)
+  (deferred — the current decoder already renders correctly).
 
 Headless workflow used:
 ```bash
