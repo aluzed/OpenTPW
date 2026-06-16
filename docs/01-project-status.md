@@ -95,8 +95,11 @@ of what's left needs the ride engine itself (which also lets further RE be verif
 1. **Ride engine** — the biggest unlock: instantiate ride objects/animations/sound/lights in the
    world. This backs **Batch B** of the VM (the 63 engine opcodes, incl. `SPAWNCHILD`) and lets
    `.PLB` particles / `.LIP` lip-sync / `.MAP` mixing actually run.
-2. **Engine wiring**: draw a real UI/level from the decoded fonts (`.BF4`), models (`.MD2`) and
-   textures (currently terrain is hardcoded).
+2. **Engine wiring**: ⏳ in progress. **Bitmap fonts are now wired** — `FontAtlas` (CPU,
+   unit-tested) packs `.BF4` glyphs into an atlas + layout, `Render/Assets/Font.cs` uploads it,
+   and `Graphics.DrawText` draws a quad per glyph; placing it in the live UI (e.g. button
+   labels) is the next visible step. Models (`.MD2`) already render in the lobby. Drawing a real
+   level from textures remains (terrain is hardcoded).
 3. **Format tails** (each now its own ticket): `.MD2` static variant [T-015], `.MAP` records
    [T-016], `.TPWS` [T-017], `.PLB` params [T-019], `.LIP` shapes [T-020], exact TQI dequant
    [T-021], mono EA-ADPCM [T-022]. Several need the engine or Ghidra on the spawn/render paths.
