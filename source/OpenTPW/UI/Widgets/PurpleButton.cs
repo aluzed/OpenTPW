@@ -66,8 +66,15 @@ internal class PurpleButton : Panel
 		//
 		if ( !string.IsNullOrEmpty( Text ) )
 		{
-			var centerX = position.X - 255;
-			var centerY = position.Y - 80;
+			// The pill is the union of the three quads above: X spans [position.X - 550,
+			// position.X + 40], Y (Y-up) spans [position.Y - 130, position.Y - 2]. Buttons are
+			// right-anchored, so the right cap can run past the screen edge — centre the label on
+			// the *visible* (screen-clamped) part, else it drifts into the off-screen overhang.
+			var visibleLeft = Math.Max( position.X - 550, 0f );
+			var visibleRight = Math.Min( position.X + 40, Screen.Size.X );
+			var centerX = (visibleLeft + visibleRight) / 2f;
+			var centerY = position.Y - 66;
+
 			// Centre on the label's actual ink (caps don't fill the line box, so centring the box
 			// leaves text riding high). DrawText's originY is the line top; place it so the ink
 			// midpoint lands on centerY: the ink sits (Top+Bottom)/2 * scale below the line top.
