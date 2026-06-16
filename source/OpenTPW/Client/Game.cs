@@ -58,11 +58,21 @@ internal static class Game
 		catch ( Exception e ) { Log.Warning( $"Loading-screen font unavailable: {e.Message}" ); }
 
 		Render.ClearColor = new RgbaFloat( 0.35f, 0.72f, 0.92f, 1f );
-		Render.RenderLoadingScreen( () =>
+
+		void DrawLoading()
 		{
 			if ( loadingFont != null )
-				Graphics.DrawText( loadingFont, "LOADING...", Screen.Size.X / 2f, Screen.Size.Y / 2f, TextAlign.Center );
-		} );
+				Graphics.DrawText( loadingFont, "LOADING...", Screen.Size.X / 2f, Screen.Size.Y / 2f, TextAlign.Center, scale: 4f );
+		}
+
+		// Show the loading screen for a brief minimum so it's actually visible (and keep the
+		// window responsive by re-presenting/pumping each iteration).
+		var loadingStart = System.Diagnostics.Stopwatch.StartNew();
+		do
+		{
+			Render.RenderLoadingScreen( DrawLoading );
+		}
+		while ( loadingStart.ElapsedMilliseconds < 1500 );
 
 		//
 		// Create level

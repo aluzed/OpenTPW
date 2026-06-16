@@ -137,7 +137,7 @@ public sealed class FontAtlas
 	/// <paramref name="align"/> anchors each line horizontally at <paramref name="originX"/>.
 	/// </summary>
 	public IReadOnlyList<PlacedGlyph> Layout( string text, float originX = 0, float originY = 0,
-		TextAlign align = TextAlign.Left )
+		TextAlign align = TextAlign.Left, float scale = 1f )
 	{
 		var placed = new List<PlacedGlyph>();
 		var lineY = originY;
@@ -147,7 +147,7 @@ public sealed class FontAtlas
 			var penX = originX;
 			if ( align != TextAlign.Left )
 			{
-				var width = Measure( line );
+				var width = Measure( line ) * scale;
 				penX = align == TextAlign.Center ? originX - width / 2f : originX - width;
 			}
 
@@ -159,14 +159,15 @@ public sealed class FontAtlas
 				if ( g.Width > 0 && g.Height > 0 )
 				{
 					placed.Add( new PlacedGlyph(
-						penX + g.XBearing, lineY + g.YBearing, g.Width, g.Height,
+						penX + g.XBearing * scale, lineY + g.YBearing * scale,
+						(int)(g.Width * scale), (int)(g.Height * scale),
 						g.U0, g.V0, g.U1, g.V1 ) );
 				}
 
-				penX += g.Advance;
+				penX += g.Advance * scale;
 			}
 
-			lineY += LineHeight;
+			lineY += LineHeight * scale;
 		}
 
 		return placed;
