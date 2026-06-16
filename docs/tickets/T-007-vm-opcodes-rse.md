@@ -59,6 +59,12 @@ runtime). Classification: **43 `pure`** (VM-state only — implementable now) an
    `GETTIMER` = max(0, expiry−now)). New `Handlers/Time.cs`; the VM gained an injectable
    `WallClock`, `GameTime`, and `Timer`. Coverage **34 → 42 / 106**. Covered by
    `RideScriptTests.DateTimeOpcodes` / `TimerOpcodes`.
+9. ✅ **Child/parent variable opcodes** (`SET/GETVARIN{CHILD,PARENT}`) from the executor: each
+   resolves the linked VM (the original matches a handle in a global VM list — struct +0x0C
+   child, +0x10 parent — and indexes its variables at +0x1C, bounded by +0x8C). Modelled with
+   a clean VM hierarchy (`RideVM.Parent` / `RideVM.ActiveChild`), which `SPAWNCHILD` will
+   populate. Operand order confirmed: `SET(index, value)`, `GET(dest, index)`. Coverage
+   **42 → 46 / 106**. Covered by `RideScriptTests.ChildParentVariableOpcodes`.
 
 > Note: the instruction doc describes `CMP` as a *bitwise-AND* comparison, but the current
 > `Math.Compare` does equality/less-than. Left as-is for now (changing it could shift branch

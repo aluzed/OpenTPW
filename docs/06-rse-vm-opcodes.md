@@ -11,13 +11,13 @@ The **Operands** column is authoritative and is what the reflection dispatcher
 
 - **Implemented**: a handler exists in `source/OpenTPW/VM/Handlers/`.
 - **Kind**: `pure` = realizable with VM state only (arithmetic, flags, stack, variables,
-  timers, date) — implementable and unit-testable now. `engine` = a ride-engine side effect
-  (objects, animations, sound, lights, walk/limbo, scream…) that needs engine subsystems that
-  don't exist yet.
+  timers, date, VM hierarchy) — implementable and unit-testable now. `engine` = a ride-engine
+  side effect (objects, animations, sound, lights, walk/limbo, scream…) that needs engine
+  subsystems that don't exist yet.
 
-Status: **42 / 106 implemented**. Of all 106, **43 are `pure`** and **63 are `engine`**. The
-date/time + timer opcodes (`YEAR`…`SEC`, `GETTIME`, `SETTIMER`, `GETTIMER`) were implemented
-from the executor's verified semantics — see [tickets/T-007](tickets/T-007-vm-opcodes-rse.md).
+Status: **46 / 106 implemented**. Of all 106, **43 are `pure`** and **63 are `engine`**. The
+remaining `pure` opcodes (`WAIT`/`WAITABS` need a scheduler; `HUSH`/`HOP`/`SETLV` need their
+semantics read) are the tail of Batch A. See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md).
 
 | # | Opcode | Operands | Implemented | Kind |
 |---|--------|:--------:|:-----------:|------|
@@ -87,10 +87,10 @@ from the executor's verified semantics — see [tickets/T-007](tickets/T-007-vm-
 | 63 | `SPAWNCHILD` | 1 | ☐ | engine |
 | 64 | `SPAWNSOUND` | 1 | ☐ | engine |
 | 65 | `REMOVECHILD` | 0 | ☐ | engine |
-| 66 | `SETVARINCHILD` | 2 | ☐ | pure |
-| 67 | `GETVARINCHILD` | 2 | ☐ | pure |
-| 68 | `SETVARINPARENT` | 2 | ☐ | pure |
-| 69 | `GETVARINPARENT` | 2 | ☐ | pure |
+| 66 | `SETVARINCHILD` | 2 | ✅ | pure |
+| 67 | `GETVARINCHILD` | 2 | ✅ | pure |
+| 68 | `SETVARINPARENT` | 2 | ✅ | pure |
+| 69 | `GETVARINPARENT` | 2 | ✅ | pure |
 | 70 | `BOUNCESETNODE` | 1 | ✅ | engine |
 | 71 | `BOUNCESETBASE` | 1 | ✅ | engine |
 | 72 | `BOUNCE` | 2 | ✅ | engine |

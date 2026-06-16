@@ -23,6 +23,13 @@ public partial class RideVM
 	// Single ride timer (the original keeps one per script). SETTIMER sets its expiry to
 	// GameTime + value; GETTIMER returns the remaining time (never negative).
 	public int Timer { get; set; }
+
+	// VM hierarchy for the child/parent variable opcodes. The original finds the other VM by a
+	// handle (struct +0x0c child, +0x10 parent) in a global VM list; modelled here as direct
+	// references. SPAWNCHILD (engine, not yet implemented) will set these when it spawns a
+	// child ride script. SET/GETVARIN{CHILD,PARENT} read/write the linked VM's Variables.
+	public RideVM? Parent { get; set; }
+	public RideVM? ActiveChild { get; set; }
 	public string Disassembly => rsseqFile.Disassembly;
 	public List<Instruction> Instructions { get; } = new List<Instruction>();
 

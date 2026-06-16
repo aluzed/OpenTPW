@@ -204,6 +204,38 @@ public class RideScriptTests
 		Assert.AreEqual( 0, dest.Value, "elapsed timer clamps to zero" );
 	}
 
+	// Cross-VM variable opcodes operate on the linked child/parent VM's Variables (T-007).
+	[TestMethod]
+	public void ChildParentVariableOpcodes()
+	{
+		Log = new();
+		var parent = LoadTestVm();
+		var child = LoadTestVm();
+		parent.ActiveChild = child;
+		child.Parent = parent;
+
+		// Parent sets child var 2, then reads it back into its own var 0.
+		OpcodeHandlers.Hierarchy.SetVarInChild( ref parent, Lit( parent, 2 ), Lit( parent, 77 ) );
+		Assert.AreEqual( 77, child.Variables[2] );
+
+		var pdest = new Operand( parent, Operand.Type.Variable, 0, 0 );
+		OpcodeHandlers.Hierarchy.GetVarInChild( ref parent, pdest, Lit( parent, 2 ) );
+		Assert.AreEqual( 77, parent.Variables[0] );
+
+		// Child sets parent var 3, then reads it back into its own var 1.
+		OpcodeHandlers.Hierarchy.SetVarInParent( ref child, Lit( child, 3 ), Lit( child, 88 ) );
+		Assert.AreEqual( 88, parent.Variables[3] );
+
+		var cdest = new Operand( child, Operand.Type.Variable, 1, 1 );
+		OpcodeHandlers.Hierarchy.GetVarInParent( ref child, cdest, Lit( child, 3 ) );
+		Assert.AreEqual( 88, child.Variables[1] );
+
+		// A missing link or out-of-range index is a guarded no-op (no throw).
+		var orphan = LoadTestVm();
+		OpcodeHandlers.Hierarchy.SetVarInChild( ref orphan, Lit( orphan, 0 ), Lit( orphan, 1 ) );
+		OpcodeHandlers.Hierarchy.SetVarInChild( ref parent, Lit( parent, 99999 ), Lit( parent, 1 ) );
+	}
+
 	private static RideVM LoadTestVm()
 	{
 		var path = Path.Combine( AppContext.BaseDirectory, "content", "testscripts", "Test.RSE" );

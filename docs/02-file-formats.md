@@ -24,7 +24,7 @@ Source: `source/OpenTPW.Files/Formats/`. Legend: ✅ done · ⚠️ partial · �
 | `.MD2` models | ⚠️ | `Model/ModelFile.cs` | Parses the current mesh format (verified: PAUSED.MD2 → readable 3D text). Gates on the **version fields at offsets 4/8 (0xDD/0xCB)** — Ghidra-confirmed from the loader `FUN_0046d6d0` — rejecting legacy/static variants (GARROW.MD2 = 0x18/0x17) exactly as the original does. Static-variant decode + render integration remain. See T-015. |
 | `.MAP` | ⚠️ | `OpenTPW.Files/Public/MapFile.cs` | **Not terrain** — `.MAP` are audio category catalogs (CAT_*). GUID + **variant** (BANK/SFX) decoded; BANK **entry names** (e.g. `Sound\Kids`) and SFX **category header** (sound count + 3 float defaults 1.0/2.0/0.5) decoded and verified on real `cat_*`. Per-record mixing fields need Ghidra. See T-016. (Demo terrain is hardcoded in `World/Terrain`.) |
 | `.TPWS` saves | ⚠️ | `Save/SaveReader.cs` | Partial read; no write. |
-| `.RSE` ride scripts | ⚠️ | `source/OpenTPW/VM/` | Loader/disassembler restored & tested; **42/106 opcodes** (count, arities + time/timer semantics Ghidra-confirmed). See T-007 + [06-rse-vm-opcodes.md](06-rse-vm-opcodes.md). |
+| `.RSE` ride scripts | ⚠️ | `source/OpenTPW/VM/` | Loader/disassembler restored & tested; **46/106 opcodes** (Ghidra-confirmed; time/timer/child-parent done). See T-007 + [06-rse-vm-opcodes.md](06-rse-vm-opcodes.md). |
 | `.BF4` fonts | ✅ | `OpenTPW.Files/Formats/Font/BF4File.cs` | Fully reverse-engineered: char code, width/height, 1bpp bitmap, **bearings + advance** (verified — renders correctly-spaced text). Engine/UI wiring is separate. See T-008. |
 | `.LIP`/`.LIPS` lip-sync | ⚠️ | `OpenTPW.Files/Formats/Sound/LipSyncFile.cs` | Reverse-engineered: a list of uint32 mouth keyframe timestamps terminated by 0xFFFFFFFF. **Unit confirmed = microseconds** (last keyframe ≈ companion speech clip length across all 4 levels; `Duration`/`TimeOf` exposed). Mouth-shape semantics + renderer wiring remain. See T-008. |
 | `.MTR` materials | ✅ | `OpenTPW.Files/Formats/Model/MTRFile.cs` | Reader for the on-disc tool artifact (magic 0x2E5915AF, version, name, `uint32[]` index array). **The game never loads `.MTR`** (Ghidra: no loader in the runtime) — model textures are bound from the `.MD2` itself (`ModelFile` → `Material.Name`, e.g. `paws_grad.tga`). See T-018. |
@@ -39,14 +39,14 @@ The most "reverse engineering" component of the project.
   Ghidra-confirmed from the binary's opcode table; see [06-rse-vm-opcodes.md](06-rse-vm-opcodes.md).
 - **`VM/RideVM.cs`**: the executor. Discovers handlers via reflection using the
   `OpcodeHandlerAttribute`.
-- **`VM/Handlers/`**: `Bounce.cs`, `Logic.cs`, `Math.cs`, `Misc.cs`, `Time.cs` → **42 / 106
-  handlers** (loader + disassembler restored; LIFO call stack; branches/JSR/RETURN/END;
-  date/time + timers).
+- **`VM/Handlers/`**: `Bounce.cs`, `Logic.cs`, `Math.cs`, `Misc.cs`, `Time.cs`, `Hierarchy.cs`
+  → **46 / 106 handlers** (loader + disassembler restored; LIFO call stack;
+  branches/JSR/RETURN/END; date/time + timers; child/parent variables).
 - **Known limitation**: `BranchTo` is still "hacky" (offsets converted by hand).
 
-**Remaining VM work**: 72 opcodes unimplemented. Across all 106, **43 are `pure`** (VM-state
-only — the actionable batch) and **63 are `engine`** (blocked on the ride engine). Wire the VM
-to real rides. See T-007.
+**Remaining VM work**: 60 opcodes unimplemented. Across all 106, **43 are `pure`** (VM-state
+only — nearly done) and **63 are `engine`** (blocked on the ride engine). Wire the VM to real
+rides. See T-007.
 
 ## Assets confirmed present on the provided disc
 
