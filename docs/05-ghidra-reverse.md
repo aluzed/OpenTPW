@@ -119,6 +119,12 @@ confirmation** below is what Ghidra would add (on a GOG/decrypted build).
 | `.MAP` catalogs | ⚠️ names + SFX header | BANK record fields + SFX per-sound list | [T-016](tickets/T-016-map-entry-records.md) |
 | `.RSE` VM opcodes | ⚠️ 34/106 | per-opcode semantics (table + arities recovered) | [T-007](tickets/T-007-vm-opcodes-rse.md) |
 
+## See also
+
+- [07-ghidra-render.md](07-ghidra-render.md) — the original's render loop, present path, frame
+  pacing and per-frame state management (DirectDraw + D3D Immediate Mode execute buffers + MMX
+  software fallback), with recovered function addresses ([T-029](tickets/T-029-native-render-loop-re.md)).
+
 ## Legal framing
 
 Reverse engineering for **interoperability / preservation** of an abandoned game, from

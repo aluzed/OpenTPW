@@ -2,7 +2,7 @@
 
 - **Priority**: 🟢 Low (reference / validation track; not blocking the perf fixes)
 - **Type**: Reverse engineering
-- **Status**: ☐ To do
+- **Status**: ✅ Done — documented in [07-ghidra-render.md](../07-ghidra-render.md).
 - **Related**: [T-026](T-026-render-resource-churn.md), [05-ghidra-reverse.md](../05-ghidra-reverse.md).
 
 ## Why
@@ -15,22 +15,30 @@ VM — the **original renderer and main loop were never reverse-engineered**. RE
 (the `WAIT` opcodes scale by a "framerate factor", hinting at a fixed logic tick — see
 [T-007](T-007-vm-opcodes-rse.md)).
 
-## To do
+## Done
 
-1. ☐ Extract the no-CD `tp.exe` from `crk-02988-Theme_Park_World_Nocd.7z` (`7z e ...`) and import it
-   into Ghidra (no project exists yet). It is unencrypted (the disc binary is SafeDisc — see
-   [05-ghidra-reverse.md](../05-ghidra-reverse.md)).
-2. ☐ Find `WinMain` + the Windows message pump (`PeekMessage`/`GetMessage`/`DispatchMessage`) and
-   the per-frame render dispatch. Identify the graphics API (Direct3D immediate-mode expected;
-   confirm — `DirectDrawCreate`/`Direct3DCreate`/`IDirect3DDevice` imports).
-3. ☐ Document: scene model (retained vs immediate), how vertex/texture/state are managed per frame
-   (persistent buffers vs per-draw rebuild), and the frame-pacing/timing loop. Write up in a new
-   `docs/07-ghidra-render.md` and cross-link from `05-ghidra-reverse.md`.
+1. ✅ Extracted the no-CD `tp.exe` (PE32, x86, 3.6 MB) and ran a Ghidra 12.1 headless analysis.
+2. ✅ Found the main message pump (`FUN_0045a960`, a `PeekMessage` pump-then-render game loop, with
+   the decompiled loop quoted), the frame timer (`FUN_005f5f10`, QPC + `timeGetTime`), and DirectDraw
+   init (`FUN_00563460`/`FUN_005fa2b0`). Graphics API identified from imports + the DX error tables:
+   **DirectDraw + Direct3D Immediate Mode (DX6/7 execute buffers), HAL with an MMX software-rasteriser
+   fallback**, presenting via DirectDraw page-flip.
+3. ✅ Documented the comparison in [07-ghidra-render.md](../07-ghidra-render.md): the original creates
+   textures/materials **once** and submits **per-frame execute buffers** (batched geometry, persistent
+   resources) — confirming the [T-026](T-026-render-resource-churn.md)/[T-027](tickets/T-027-ui-draw-batching.md)
+   direction and that the upstream per-draw resource churn matched neither the original nor modern practice.
 
 ## Acceptance
 
-A documented comparison of the original render loop vs OpenTPW's, plus the original's frame-pacing
-mechanism, usable to sanity-check [T-026](T-026-render-resource-churn.md)/[T-030](T-030-async-level-load.md).
+✅ A documented comparison of the original render loop vs OpenTPW's + the original's frame-pacing,
+usable to sanity-check the renderer work.
+
+## Method note
+
+Findings come from the PE import table + embedded DirectX error-string tables (`objdump`, `strings`)
+cross-checked with a Ghidra 12.1 headless auto-analysis and a Java post-script that resolved the
+IAT-slot references to their calling functions. The import/string evidence alone is conclusive about
+the API and loop shape; Ghidra supplied the concrete `FUN_` addresses and the decompiled pump body.
 
 ## Affected files
 
