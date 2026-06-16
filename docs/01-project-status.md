@@ -40,45 +40,45 @@ All targets are **`net8.0`**.
 - **ImGui.NET**: debug UI and ModKit.
 - `ShaderCompiler` cross-compiles shaders to the backend target.
 
+> **Update (2026-06-16):** large progress this session — full Linux portability + CI, the
+> ride-script VM loader restored, and **every file format now decodes at least partially**
+> (no more ❌). See the [file-format table](02-file-formats.md) and [tickets](tickets/).
+
 ## What works (✅)
 
-- **Virtual file system** over the game's `data/` folder, mounting `.WAD`
-  (`WadArchive`) and `.SDT` (`SDTArchive`) archives.
+- **Linux/cross-platform**: builds + tests on Linux, CI, portable audio (NLayer + OpenAL),
+  `OPENTPW_GAMEPATH`, case-insensitive asset resolution. See [04](04-linux-compatibility.md).
+- **Virtual file system** over `data/`, mounting `.WAD`/`.SDT` archives; `WadTool` CLI.
 - **Decompression**: Refpack (EA/Bullfrog) and LZSS.
-- **`.WCT` textures**: full decode (including D4 wavelets) → ✅.
-- **`.SAM` settings**: full parser.
-- **Strings**: `.BFMU`, `.BFST`.
-- **Sounds**: `.SDT`, `.MP2` (via NAudio — Windows-only at runtime).
-- **Basic rendering**: window, demo terrain (`levels/jungle/...`), ImGui UI.
+- **Formats fully decoded**: `.WCT` textures, `.SAM`, strings (`.BFMU`/`.BFST`),
+  `.SDT`/`.MP2` sounds, **`.BF4` fonts** (glyphs + metrics), and **`.TQI`/`.TGQ` video**
+  (EA container + EA-ADPCM audio + TQI frames — verified pixel-accurate).
+- **`.RSE` ride VM**: loader/disassembler restored; branching verified.
+- **Basic rendering**: window, demo terrain, ImGui UI.
 
 ## What is partial (⚠️)
 
-- **`.MD2` models** (`ModelFile.cs`): partial.
-- **`.MAP` maps**, **`.TPWS` saves**: partial.
-- **`.RSE` ride scripts**: VM present but **~27 of ~210 documented opcodes
-  implemented (~13%)**. See `source/OpenTPW/VM/`. Several handlers are TODO/no-op
-  (`Misc.cs`: `GETTIME`, `SETLV`, `ENDSLICE`…). The `.RSE` disassembler/loader is even
-  commented out (`RideVM.cs`: `rsseqFile` disabled).
+- **`.RSE` opcodes**: 30 / ~210 implemented (arithmetic, logic, branches). The rest are
+  ride-engine side-effects needing engine hooks. See [T-007](tickets/T-007-vm-opcodes-rse.md).
+- **`.MD2` models**: parses + verified-renders the localized mesh variant; not robust to
+  every variant (the static GARROW variant differs). [T-012](tickets/T-012-partial-formats.md).
+- **`.LIP` lip-sync**: keyframe timestamps decoded (unit not pinned). **`.MTR` materials**:
+  header + name decoded; the mesh-coupled index array is raw. [T-008](tickets/T-008-unimplemented-formats.md).
+- **`.MAP`**: identified as an audio category catalog (not terrain); GUID decoded, entries raw.
+- **`.TPWS` saves**: spec known, partial reader; no sample on the install disc to verify.
 
 ## What is not started (❌)
 
-- **`.BF4` fonts**, **`.LIPS` lip-sync**, **`.MTR` materials**, **`.TQI`/`.TGQ` video**.
 - Real game logic (park management, visitor AI, economy, functional saving).
-- Multiplayer / online aspect (the game had servers, long since shut down).
+- Multiplayer / online aspect (the game's servers are long shut down).
+- Engine wiring of the decoded assets (fonts/models/video into the renderer).
 
-## Technical markers found (`TODO`/`NotImplemented`)
+## Remaining work (see [tickets/](tickets/))
 
-- `VM/Handlers/Misc.cs`: `Crit lock`, `Set level`, `End slice`, `Get time` → TODO/no-op.
-- `Render/Assets/Material.cs`, `Render/ShaderCompiler.cs`: `NotImplementedException` branches.
-- `Files/Image/TextureFile.Decode.cs`: unhandled pixel formats → `NotImplementedException`.
-- `ModKit/Editor/Viewers/{Settings,Sound}Viewer.cs`: `NotImplementedException`.
-
-## Suggested priorities ("what's left to do")
-
-1. **Make the project portable/testable** (Windows locks → see [04](04-linux-compatibility.md); fix failing tests).
-2. **Install/extract assets** from the provided disc → see [03](03-disc-compatibility.md).
-3. **Finish the ride VM**: re-enable the `.RSE` loader and complete the opcodes.
-4. **Complete `.MD2` models + `.MAP` maps** to render a real level.
-5. **Tackle the ❌ formats** (`.BF4`, `.MTR`, `.TQI`/`.TGQ`) — this is where **Ghidra**
-   helps most: reverse `TP.EXE` to understand the undocumented formats
-   (see [05](05-ghidra-reverse.md)).
+1. **Engine wiring**: use the decoded fonts (`.BF4`), models (`.MD2`) and textures in the
+   renderer to draw a real UI/level (currently terrain is hardcoded).
+2. **Finish the ride VM** opcodes ([T-007](tickets/T-007-vm-opcodes-rse.md)) — needs the
+   ride-entity/animation engine to back the side-effecting opcodes.
+3. **Format polish**: `.MD2` variant robustness + `.MAP`/`.TPWS` ([T-012](tickets/T-012-partial-formats.md)),
+   `.MTR` index decode, mono-audio, exact-vs-ffmpeg TQI dequant.
+4. **Tech debt**: build warnings ([T-009](tickets/T-009-build-warnings.md)).
