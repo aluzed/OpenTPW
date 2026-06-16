@@ -1,5 +1,4 @@
-﻿using ImGuiNET;
-using NAudio.Wave;
+using ImGuiNET;
 using Veldrid;
 
 namespace OpenTPW.ModKit;
@@ -14,22 +13,12 @@ internal class SoundViewer : IFileViewer
 		soundFile = new SoundFile( fileName );
 	}
 
-	private void PlaySound()
-	{
-		using var stream = new MemoryStream( soundFile.buffer );
-		var audioStream = new StreamMediaFoundationReader( stream );
-		var waveOut = new WaveOutEvent();
-
-		waveOut.Init( audioStream );
-		audioStream.Seek( 0, SeekOrigin.Begin );
-		waveOut.Play();
-	}
-
 	public void DrawPreview()
 	{
-		if ( ImGui.Button( "Play" ))
+		// Cross-platform playback via AudioPlayer (NLayer + OpenAL). See docs/tickets/T-003.
+		if ( ImGui.Button( "Play" ) )
 		{
-			PlaySound();
+			AudioPlayer.Play( soundFile.buffer );
 		}
 	}
 

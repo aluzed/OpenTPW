@@ -2,7 +2,7 @@
 
 public sealed class StringFile : BaseFormat
 {
-	public string[] Entries { get; private set; }
+	public string[] Entries { get; private set; } = null!;
 
 	public StringFile( string path )
 	{

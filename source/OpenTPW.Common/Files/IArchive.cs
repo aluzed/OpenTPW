@@ -3,11 +3,6 @@
 public interface IArchive : IFileFormat, IDisposable
 {
 	/// <summary>
-	/// Disposes of the resources used by the archive
-	/// </summary>
-	void Dispose();
-
-	/// <summary>
 	/// Retrieves the names of all files within a specified internal path in the archive
 	/// </summary>
 	/// <param name="internalPath"></param>

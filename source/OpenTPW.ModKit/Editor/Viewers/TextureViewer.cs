@@ -9,8 +9,8 @@ internal class TextureViewer : IFileViewer
 {
 	private TextureFile textureFile;
 
-	private Texture texture;
-	private TextureView textureView;
+	private Texture texture = null!;
+	private TextureView textureView = null!;
 	private nint imguiPtr;
 
 	public TextureViewer( string fileName )

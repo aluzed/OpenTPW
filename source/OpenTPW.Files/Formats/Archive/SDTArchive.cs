@@ -2,10 +2,10 @@
 
 public class SdtArchive : IArchive
 {
-	private ExpandedMemoryStream memoryStream;
-	private SoundFile mp2Reader;
+	private ExpandedMemoryStream memoryStream = null!;
+	private SoundFile mp2Reader = null!;
 
-	public byte[] buffer;
+	public byte[] buffer = null!;
 	public List<MP2File> soundFiles;
 
 	public SdtArchive( string path )
@@ -86,7 +86,7 @@ public class SdtArchive : IArchive
 
 	public ArchiveFile GetFile( string name )
 	{
-		int index = soundFiles.FindIndex( x => x.Name.StartsWith( name ) );
+		int index = soundFiles.FindIndex( x => x.Name.StartsWith( name, StringComparison.OrdinalIgnoreCase ) );
 		return soundFiles[index];
 	}
 

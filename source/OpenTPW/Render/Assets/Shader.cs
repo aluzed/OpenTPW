@@ -12,7 +12,7 @@ public class Shader : Asset
 	public ResourceLayoutDescription[] ResourceLayouts => shaderInfo.Reflection.ResourceLayouts;
 	public Veldrid.Shader[] ShaderProgram => shaderInfo.ShaderProgram;
 	public bool IsDirty { get; private set; }
-	public Action OnRecompile { get; set; }
+	public Action OnRecompile { get; set; } = null!;
 
 	private FileSystemWatcher watcher;
 
@@ -26,7 +26,7 @@ public class Shader : Asset
 		var directoryName = System.IO.Path.GetDirectoryName( Path );
 		var fileName = System.IO.Path.GetFileName( Path );
 
-		watcher = new FileSystemWatcher( directoryName, fileName );
+		watcher = new FileSystemWatcher( directoryName!, fileName );
 
 		watcher.NotifyFilter = NotifyFilters.Attributes
 							 | NotifyFilters.CreationTime

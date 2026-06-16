@@ -5,8 +5,8 @@ namespace OpenTPW;
 
 public class SaveReader : BaseFormat
 {
-	private ExpandedMemoryStream memoryStream;
-	public byte[] buffer;
+	private ExpandedMemoryStream memoryStream = null!;
+	public byte[] buffer = null!;
 
 	public SaveReader( string path )
 	{

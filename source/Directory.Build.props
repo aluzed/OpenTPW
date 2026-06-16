@@ -1,0 +1,36 @@
+<Project>
+
+  <!--
+    Shared build properties for all OpenTPW projects (auto-imported by MSBuild).
+    OS detection + per-OS compilation constants so platform-specific code can be
+    guarded with #if WINDOWS / #if LINUX / #if OSX without touching each .csproj.
+    These properties are additive and do not change existing build behavior.
+  -->
+
+  <PropertyGroup>
+    <IsWindows Condition="$([MSBuild]::IsOSPlatform('Windows'))">true</IsWindows>
+    <IsLinux Condition="$([MSBuild]::IsOSPlatform('Linux'))">true</IsLinux>
+    <IsOSX Condition="$([MSBuild]::IsOSPlatform('OSX'))">true</IsOSX>
+  </PropertyGroup>
+
+  <!--
+    Security pin: Newtonsoft.Json is pulled transitively (via Veldrid) as 9.0.1, which
+    has a known High advisory (GHSA-5crp-9r3c-p9vr). Pinning a direct reference to a
+    patched version overrides the transitive one in every project. See docs/tickets/T-005.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+
+  <!-- Per-OS compilation symbols (appended, never overwriting existing ones). -->
+  <PropertyGroup Condition="'$(IsWindows)' == 'true'">
+    <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IsLinux)' == 'true'">
+    <DefineConstants>$(DefineConstants);LINUX</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IsOSX)' == 'true'">
+    <DefineConstants>$(DefineConstants);OSX</DefineConstants>
+  </PropertyGroup>
+
+</Project>

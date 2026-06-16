@@ -4,7 +4,7 @@ namespace OpenTPW;
 
 internal class Layout
 {
-	public RootPanel Hud;
+	public RootPanel Hud = null!;
 
 	public Layout()
 	{

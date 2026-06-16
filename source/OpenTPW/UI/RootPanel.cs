@@ -27,8 +27,8 @@ public class RootPanel : Entity
 		if ( obj is null )
 			obj = Activator.CreateInstance( typeof( T ) ) as T;
 
-		Children.Add( obj );
+		Children.Add( obj! );
 
-		return obj;
+		return obj!;
 	}
 }

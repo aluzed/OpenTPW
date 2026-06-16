@@ -1,0 +1,13 @@
+#setlimbo 10
+#setwalk  10
+
+variable VAR_I
+variable VAR_LIMIT
+
+.init   NAME        "Branch Test"
+        COPY        VAR_I       0
+        COPY        VAR_LIMIT   3
+.loop   ADD         VAR_I       1
+        CMP         VAR_I       VAR_LIMIT
+        BRANCH_NZ   loop
+        NOP

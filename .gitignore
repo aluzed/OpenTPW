@@ -368,3 +368,10 @@ FodyWeavers.xsd
 [Ii]mgui.ini
 .opentpw
 dumps
+
+# Game data / disc images (do not version copyrighted assets)
+*.7z
+*.iso
+*.img
+*.ccd
+*.sub

@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          # Honors the version pinned in global.json.
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore source/OpenTPW.sln
+
+      - name: Build
+        run: dotnet build source/OpenTPW.sln -c Release --no-restore
+
+      - name: Test
+        # The 6 filesystem integration tests are Inconclusive without a game install
+        # (set OPENTPW_GAMEPATH to run them); they do not fail the build. See T-002.
+        run: dotnet test source/OpenTPW.Tests/OpenTPW.Tests.csproj -c Release --no-build
+
+      - name: Report vulnerable packages (non-blocking)
+        if: always()
+        run: dotnet list source/OpenTPW.sln package --vulnerable --include-transitive || true

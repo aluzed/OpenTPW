@@ -19,7 +19,7 @@ public sealed class WadArchiveFile : ArchiveFile
 		if ( CachedData != null )
 			return CachedData;
 
-		var data = Archive.GetData( OffsetInArchive, SizeInArchive );
+		var data = Archive!.GetData( OffsetInArchive, SizeInArchive );
 
 		// Decompress file if necessary
 		if ( Compressed )
@@ -42,14 +42,14 @@ public sealed class WadArchiveFile : ArchiveFile
 
 public sealed class WadArchive : IArchive
 {
-	private ExpandedMemoryStream memoryStream;
-	public byte[] Buffer { get; internal set; }
+	private ExpandedMemoryStream memoryStream = null!;
+	public byte[] Buffer { get; internal set; } = null!;
 
 	/// <summary>
 	/// The root directory ("/") for this archive.
 	/// This may contain a collection of <see cref="ArchiveItem"/>s as children.
 	/// </summary>
-	public ArchiveDirectory Root { get; internal set; }
+	public ArchiveDirectory Root { get; internal set; } = null!;
 
 	public WadArchive( string path )
 	{
@@ -182,7 +182,7 @@ public sealed class WadArchive : IArchive
 
 				foreach ( string dir in splitPath )
 				{
-					ArchiveDirectory newSubDir;
+					ArchiveDirectory? newSubDir;
 
 					newSubDir = subDirectory.Children.OfType<ArchiveDirectory>().FirstOrDefault( x => x.Name == dir );
 
@@ -237,10 +237,10 @@ public sealed class WadArchive : IArchive
 
 			if ( i == splitPath.Length - 1 )
 			{
-				return internalDirectory.Children.OfType<T>().FirstOrDefault( x => x.Name.Equals( dir, StringComparison.CurrentCultureIgnoreCase ) );
+				return internalDirectory.Children.OfType<T>().FirstOrDefault( x => x.Name!.Equals( dir, StringComparison.CurrentCultureIgnoreCase ) )!;
 			}
 
-			internalDirectory = internalDirectory.Children.OfType<ArchiveDirectory>().First( x => x.Name.Equals( dir, StringComparison.CurrentCultureIgnoreCase ) );
+			internalDirectory = internalDirectory.Children.OfType<ArchiveDirectory>().First( x => x.Name!.Equals( dir, StringComparison.CurrentCultureIgnoreCase ) );
 		}
 
 		throw new FileNotFoundException( $"File not found: {internalPath}" );
@@ -248,7 +248,7 @@ public sealed class WadArchive : IArchive
 
 	private List<T> EnumerateItems<T>( string internalPath ) where T : ArchiveItem
 	{
-		var internalDirectory = Root;
+		ArchiveDirectory? internalDirectory = Root;
 
 		if ( internalPath != "" )
 		{
@@ -256,11 +256,11 @@ public sealed class WadArchive : IArchive
 
 			foreach ( string dir in splitPath )
 			{
-				internalDirectory = internalDirectory.Children.OfType<ArchiveDirectory>().FirstOrDefault( x => x.Name.Equals( dir, StringComparison.CurrentCultureIgnoreCase ) );
+				internalDirectory = internalDirectory!.Children.OfType<ArchiveDirectory>().FirstOrDefault( x => x.Name!.Equals( dir, StringComparison.CurrentCultureIgnoreCase ) );
 			}
 		}
 
-		return internalDirectory?.Children.OfType<T>().ToList() ?? null;
+		return internalDirectory?.Children.OfType<T>().ToList() ?? new List<T>();
 	}
 
 	public ArchiveFile GetFile( string internalPath )
@@ -295,8 +295,10 @@ public sealed class WadArchive : IArchive
 	{
 		var file = GetFile( path );
 
+		// GetFile may still yield null at runtime for a missing entry; preserve the
+		// existing "return null" behavior for that case.
 		if ( file == null )
-			return null;
+			return null!;
 
 		return new MemoryStream( file.GetData() );
 	}

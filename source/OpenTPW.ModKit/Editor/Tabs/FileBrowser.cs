@@ -125,7 +125,7 @@ internal sealed class FileBrowser : BaseTab
 	internal class FileSystemDirectory : FileSystemObject
 	{
 		public List<FileSystemObject> Children { get; set; }
-		public FileSystemDirectory( string name, FileSystemDirectory parent, List<FileSystemObject> children ) : base( name, parent ) { Children = children; }
+		public FileSystemDirectory( string name, FileSystemDirectory? parent, List<FileSystemObject> children ) : base( name, parent ) { Children = children; }
 	}
 
 	internal class FileSystemFile : FileSystemObject
@@ -169,11 +169,11 @@ internal sealed class FileBrowser : BaseTab
 		return newPath;
 	}
 
-	public FileSystemDirectory BaseNode;
-	public FileSystemDirectory CurrentDirectory;
-	public FileSystemFile CurrentFile;
+	public FileSystemDirectory BaseNode = null!;
+	public FileSystemDirectory CurrentDirectory = null!;
+	public FileSystemFile CurrentFile = null!;
 
-	public IFileViewer CurrentFileViewer;
+	public IFileViewer CurrentFileViewer = null!;
 
 	public FileBrowser()
 	{
@@ -189,7 +189,7 @@ internal sealed class FileBrowser : BaseTab
 
 		BaseNode = FileSystemObject.FromDirectory( BasePath );
 		CurrentDirectory = BaseNode;
-		CurrentFile = null;
+		CurrentFile = null!;
 	}
 
 	private void DrawContextMenu()
@@ -270,13 +270,13 @@ internal sealed class FileBrowser : BaseTab
 				if ( ImGui.Selectable( $"{uniqueName}", selected ) )
 				{
 					CurrentFile = file;
-					CurrentFileViewer = null;
+					CurrentFileViewer = null!;
 				}
 
 				if ( ImGui.BeginPopupContextItem() )
 				{
 					CurrentFile = file;
-					CurrentFileViewer = null;
+					CurrentFileViewer = null!;
 					DrawContextMenu();
 					ImGui.EndPopup();
 				}

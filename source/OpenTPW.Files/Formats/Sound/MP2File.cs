@@ -11,7 +11,8 @@ public sealed class MP2File : ArchiveFile
 		MP2_STEREO = 37 // on mp2 (112kbit/s stereo)
 	}
 
-	public string Name { get; set; }
+	// Hides the nullable ArchiveItem.Name with a non-null one (always set in the ctor).
+	public new string Name { get; set; }
 	public int Header { get; set; }
 	public byte[] SoundData { get; set; }
 	public byte[] Data { get; set; }

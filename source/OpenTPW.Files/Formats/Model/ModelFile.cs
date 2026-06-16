@@ -8,7 +8,7 @@ namespace OpenTPW;
 
 public partial class ModelFile : BaseFormat
 {
-	public List<Mesh> Meshes { get; private set; }
+	public List<Mesh> Meshes { get; private set; } = null!;
 
 	public ModelFile( Stream stream )
 	{
@@ -28,7 +28,7 @@ public partial class ModelFile : BaseFormat
 
 	public class Mesh
 	{
-		public string Name { get; set; }
+		public string Name { get; set; } = null!;
 		public uint VertexOffset { get; set; }
 		public uint UvOffset { get; set; }
 		public uint VertCnt { get; set; }
@@ -38,13 +38,13 @@ public partial class ModelFile : BaseFormat
 		public uint VertexCount { get; set; }
 		public uint VertexOrderLen { get; set; }
 		public uint VertexOrderOffset { get; set; }
-		public Vertex[] Vertices { get; set; }
-		public uint[] Indices { get; set; }
-		public Vector2[] TexCoords { get; set; }
+		public Vertex[] Vertices { get; set; } = null!;
+		public uint[] Indices { get; set; } = null!;
+		public Vector2[] TexCoords { get; set; } = null!;
 		public Matrix4x4 TransformMatrix { get; set; }
-		public MaterialData[] Materials { get; set; }
+		public MaterialData[] Materials { get; set; } = null!;
 
-		public Vector3[] Normals { get; set; }
+		public Vector3[] Normals { get; set; } = null!;
 	}
 
 	public struct FrameData
@@ -65,7 +65,7 @@ public partial class ModelFile : BaseFormat
 		public ushort EndIndex;
 		public uint Pad;
 
-		public string Name;
+		public string Name = null!;
 		public uint Flags;
 	}
 
@@ -73,12 +73,32 @@ public partial class ModelFile : BaseFormat
 	{
 		using ( BinaryReader reader = new BinaryReader( stream, Encoding.ASCII, true ) )
 		{
+			var fileLength = reader.BaseStream.Length;
+
+			// Validate that an offset we're about to seek to is inside the file. Some .MD2
+			// variants (e.g. the static GARROW.MD2 with frameCount 0) use a different
+			// header layout, which would otherwise drive reads past EOF; fail with a clear,
+			// catchable error instead of an opaque EndOfStreamException. See T-012.
+			void Require( long offset, string what )
+			{
+				if ( offset < 0 || offset > fileLength )
+					throw new InvalidDataException(
+						$"MD2: {what} offset 0x{offset:X} is out of range (file is {fileLength} bytes); " +
+						"unsupported .MD2 layout." );
+			}
+
+			// Magic: 0x1CD15D46.
+			var magic = reader.ReadUInt32();
+			if ( magic != 0x1CD15D46 )
+				throw new InvalidDataException( $"MD2: bad magic 0x{magic:X8}, expected 0x1CD15D46." );
+
 			reader.BaseStream.Seek( 0x50, SeekOrigin.Begin );
 			uint off2 = reader.ReadUInt32();
 
 			reader.BaseStream.Seek( 0x36, SeekOrigin.Begin );
 			ushort frameCount = reader.ReadUInt16();
 
+			Require( off2 + (8L * frameCount), "texture list" );
 			reader.BaseStream.Seek( off2 + (8 * frameCount), SeekOrigin.Begin );
 
 			List<string> textures = new();
@@ -97,6 +117,7 @@ public partial class ModelFile : BaseFormat
 			reader.BaseStream.Seek( 0x54, SeekOrigin.Begin );
 			uint frameListOffset = reader.ReadUInt32();
 
+			Require( frameListOffset, "frame list" );
 			reader.BaseStream.Seek( frameListOffset, SeekOrigin.Begin );
 			List<FrameData> frameData = new();
 			for ( int i = 0; i < frameCount; ++i )
@@ -114,12 +135,14 @@ public partial class ModelFile : BaseFormat
 			reader.BaseStream.Seek( 0x70, SeekOrigin.Begin );
 			uint meshPtr = reader.ReadUInt32();
 
+			Require( meshPtr, "mesh table" );
 			reader.BaseStream.Seek( meshPtr, SeekOrigin.Begin );
 
 			Meshes = new List<Mesh>( meshCnt );
 
 			for ( int meshIdx = 0; meshIdx < meshCnt; meshIdx++ )
 			{
+				Require( meshPtr + (160L * meshIdx), "mesh entry" );
 				reader.BaseStream.Seek( meshPtr + (160 * meshIdx), SeekOrigin.Begin );
 
 				reader.BaseStream.Seek( 16, SeekOrigin.Current ); // Skip initial mesh data

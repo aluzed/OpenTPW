@@ -9,14 +9,12 @@ using Veldrid;
 namespace OpenTPW;
 public partial class Editor
 {
-	public static Editor Instance { get; private set; }
+	public static Editor Instance { get; private set; } = null!;
 
 	public ImGuiRenderer imguiRenderer { get; private set; }
 	public GraphicsDevice graphicsDevice { get; private set; }
 
 	private List<BaseTab> tabs = new();
-
-	private bool shouldRender = true;
 
 	public static ImFontPtr MonospaceFont { get; private set; }
 	public static ImFontPtr SansSerifFont { get; private set; }

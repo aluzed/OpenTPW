@@ -11,7 +11,7 @@ namespace OpenTPW;
 /// </summary>
 public class Window
 {
-	public static Window Current { get; set; }
+	public static Window Current { get; set; } = null!;
 	public Sdl2Window SdlWindow { get; private set; }
 	public Point2 Size => new Point2( SdlWindow.Width, SdlWindow.Height );
 

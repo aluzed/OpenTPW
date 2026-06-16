@@ -4,11 +4,13 @@ namespace OpenTPW;
 
 public partial class RideVM
 {
+	private readonly RideScriptFile rsseqFile;
+
 	public string ScriptName { get; set; } = "Unnamed";
 
 	public bool IsRunning { get; set; }
 	public int CurrentPos { get; set; }
-	// public string Disassembly => rsseqFile.Disassembly;
+	public string Disassembly => rsseqFile.Disassembly;
 	public List<Instruction> Instructions { get; } = new List<Instruction>();
 
 	/// <summary>
@@ -21,7 +23,7 @@ public partial class RideVM
 	public VMFlags Flags { get; set; } = VMFlags.None;
 	public VMConfig Config { get; set; } = new VMConfig();
 	public List<Branch> Branches { get; set; } = new List<Branch>();
-	public byte[] FileData { get; set; }
+	public byte[] FileData { get; set; } = null!;
 
 	public List<int> Visitors { get; set; } = new();
 	public Queue<int> Stack { get; set; } = new();
@@ -29,12 +31,13 @@ public partial class RideVM
 	private Dictionary<Opcode, MethodInfo> OpcodeHandlers { get; } = Assembly.GetExecutingAssembly().GetTypes()
 		.SelectMany( t => t.GetMethods() )
 		.Where( x => x.GetCustomAttribute<OpcodeHandlerAttribute>() != null )
-		.Select( x => (x.GetCustomAttribute<OpcodeHandlerAttribute>().Opcode, x) )
+		.Select( x => (x.GetCustomAttribute<OpcodeHandlerAttribute>()!.Opcode, x) )
 		.ToDictionary( x => x.Opcode, x => x.x );
 
 	public RideVM( Stream stream )
 	{
-		// rsseqFile = new RideScriptFile( this, stream );
+		// Parse the .RSE script: populates Variables, Strings, Instructions, Branches.
+		rsseqFile = new RideScriptFile( this, stream );
 
 		// DEBUG: Log implemented opcode counts
 		var implementedOpcodes = OpcodeHandlers.Keys.ToList();
@@ -45,9 +48,22 @@ public partial class RideVM
 		Log.Info( $"Implemented {implementedCount} / {totalCount} ({totalPercent.CeilToInt()}%) opcodes" );
 
 		// Set up basic ride variables
+		EnsureCommonVariables();
 		Variables[(int)RideVariables.VAR_RIDECLOSED] = 1;
 		Variables[(int)RideVariables.VAR_CAPACITY] = 16;
 		Variables[(int)RideVariables.VAR_DURATION] = 30;
+	}
+
+	/// <summary>
+	/// All rides are expected to expose the common <see cref="RideVariables"/> set. Pad
+	/// the variable table if a script declares fewer (e.g. a minimal test script) so the
+	/// default initialization below cannot index out of range.
+	/// </summary>
+	private void EnsureCommonVariables()
+	{
+		var required = Enum.GetValues<RideVariables>().Length;
+		while ( Variables.Count < required )
+			Variables.Add( 0 );
 	}
 
 	public void Step()
@@ -82,22 +98,32 @@ public partial class RideVM
 		handlerAttribute?.Invoke( null, parameters );
 	}
 
+	// Maps an instruction's byte offset to its index in Instructions, so BranchTo is an
+	// O(1) lookup instead of an O(n) scan. Built lazily once the script is loaded.
+	private Dictionary<long, int>? offsetToIndex;
+
 	public void BranchTo( int value )
 	{
 		//
-		// HACK: Values are provided as offsets in terms of instruction size, i.e.
-		// an offset of 7 might be 3 opcodes and 4 operands.
-		// To get around this, we convert to a position in the file, and then locate
-		// that offset in the instruction list.
-		// This is super hacky (and probably slow) and could probably be avoided
-		// if the disassembler / file handler gets re-written.
+		// Branch targets are offsets in instruction-stream units (4 bytes each: one
+		// opcode or operand). Convert to the byte offset of the target instruction, then
+		// look up its index. (Previously an O(n) FindIndex scan per branch.)
 		//
+		offsetToIndex ??= Instructions
+			.Select( ( instruction, index ) => (instruction.offset, index) )
+			.ToDictionary( x => x.offset, x => x.index );
 
-		var fileOffset = value * 4; // Each opcode + operands is 4 bytes
-		fileOffset += (int)Instructions.First().offset;
+		var fileOffset = value * 4 + (int)Instructions.First().offset;
 
-		CurrentPos = Instructions.FindIndex( x => x.offset == fileOffset );
-		CurrentPos += 1; // Ignore NO-OP
+		if ( !offsetToIndex.TryGetValue( fileOffset, out var index ) )
+		{
+			// Unknown target: leave execution where it is rather than silently jumping to
+			// the start (the old FindIndex returned -1, then +1 -> position 0).
+			Log.Warning( $"Branch target {value} (offset {fileOffset}) not found; ignoring" );
+			return;
+		}
+
+		CurrentPos = index + 1; // Ignore the leading NO-OP, as before.
 
 		Log.Trace( $"Branching to .label_{value} / {fileOffset} (location: {CurrentPos})" );
 	}

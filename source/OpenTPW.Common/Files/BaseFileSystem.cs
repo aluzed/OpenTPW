@@ -5,7 +5,8 @@ namespace OpenTPW;
 public class BaseFileSystem
 {
 	private readonly string basePath;
-	private readonly Dictionary<string, Type> archiveHandlers = new();
+	// Case-insensitive so a ".WAD" file on disc matches a ".wad" handler (T-014).
+	private readonly Dictionary<string, Type> archiveHandlers = new( StringComparer.OrdinalIgnoreCase );
 	private readonly Dictionary<string, IArchive> archiveCache = new();
 
 	public BaseFileSystem( string relativePath )
@@ -60,7 +61,7 @@ public class BaseFileSystem
 
 		string? directoryName = Path.GetDirectoryName( absolutePath );
 		if ( !Directory.Exists( directoryName ) )
-			Directory.CreateDirectory( directoryName );
+			Directory.CreateDirectory( directoryName! );
 
 		return File.OpenWrite( absolutePath );
 	}
@@ -73,7 +74,7 @@ public class BaseFileSystem
 		if ( !string.IsNullOrEmpty( archivePath ) )
 		{
 			var archive = GetArchive( archivePath );
-			return archive?.OpenFile( internalPath );
+			return archive?.OpenFile( internalPath )!;
 		}
 
 		return File.Open( absolutePath, FileMode.Open, FileAccess.Read, FileShare.Read );
@@ -132,13 +133,13 @@ public class BaseFileSystem
 		if ( directories )
 		{
 			var fileSystemDirectories = Directory.GetDirectories( absolutePath );
-			var fileSystemArchives = Directory.GetFiles( absolutePath ).Where( x => archiveHandlers.Keys.Contains( Path.GetExtension( x ) ) ).Select( x => x[..x.LastIndexOf( "." )] );
+			var fileSystemArchives = Directory.GetFiles( absolutePath ).Where( x => archiveHandlers.ContainsKey( Path.GetExtension( x ) ) ).Select( x => x[..x.LastIndexOf( "." )] );
 
 			return fileSystemDirectories.Concat( fileSystemArchives ).ToArray();
 		}
 		else
 		{
-			return Directory.GetFiles( absolutePath ).Where( x => !archiveHandlers.Keys.Contains( Path.GetExtension( x ) ) ).ToArray();
+			return Directory.GetFiles( absolutePath ).Where( x => !archiveHandlers.ContainsKey( Path.GetExtension( x ) ) ).ToArray();
 		}
 	}
 
@@ -152,12 +153,13 @@ public class BaseFileSystem
 		var extension = Path.GetExtension( archivePath );
 		if ( archiveHandlers.TryGetValue( extension, out var handlerType ) )
 		{
-			archive = (IArchive)Activator.CreateInstance( handlerType, new[] { archivePath } );
+			archive = (IArchive)Activator.CreateInstance( handlerType, new[] { archivePath } )!;
 			archiveCache[archivePath] = archive;
 			return archive;
 		}
 
-		return null;
+		// No handler registered for this extension: signal "no archive" to the caller.
+		return null!;
 	}
 
 	private (string ArchivePath, string InternalPath) FindArchivePath( string path )
@@ -165,28 +167,31 @@ public class BaseFileSystem
 		var parts = path.Split( Path.DirectorySeparatorChar );
 		var currentPath = new StringBuilder();
 
-		foreach ( var part in parts )
+		for ( var i = 0; i < parts.Length; i++ )
 		{
-			if ( currentPath.Length > 0 )
+			// Append the separator before every part except the first, so an absolute
+			// path keeps its leading separator (parts[0] is "" for "/a/b").
+			if ( i > 0 )
 			{
 				currentPath.Append( Path.DirectorySeparatorChar );
 			}
 
-			currentPath.Append( part );
+			currentPath.Append( parts[i] );
 
 			foreach ( var handler in archiveHandlers )
 			{
-				var extension = handler.Key;
-				var potentialArchivePath = $"{currentPath}{extension}";
+				// Resolve case-insensitively so an archive on disk as "FONTS.WAD" is found
+				// for a lowercase request like "fonts" (see docs/tickets/T-014).
+				var potentialArchivePath = ResolveCaseInsensitive( $"{currentPath}{handler.Key}" );
 
-				if ( archiveHandlers.ContainsKey( extension ) && File.Exists( potentialArchivePath ) )
+				if ( File.Exists( potentialArchivePath ) )
 				{
 					var remainingPath = path.Substring( currentPath.Length );
 					return (potentialArchivePath, remainingPath.TrimStart( Path.DirectorySeparatorChar ));
 				}
 			}
 
-			if ( Directory.Exists( currentPath.ToString() ) )
+			if ( Directory.Exists( ResolveCaseInsensitive( currentPath.ToString() ) ) )
 			{
 				continue;
 			}
@@ -197,7 +202,58 @@ public class BaseFileSystem
 
 	public string GetAbsolutePath( string relativePath )
 	{
-		return Path.Combine( basePath, relativePath.TrimStart( '/' ) ).Replace( "/", "\\" );
+		// Normalize to the platform's native separator so paths resolve on every OS
+		// (the game's virtual paths use '/', Windows uses '\'). See docs/tickets/T-001.
+		var absolute = Path.Combine( basePath, relativePath.TrimStart( '/' ) )
+			.Replace( '/', Path.DirectorySeparatorChar )
+			.Replace( '\\', Path.DirectorySeparatorChar );
+
+		return ResolveCaseInsensitive( absolute );
+	}
+
+	/// <summary>
+	/// The game references assets in lowercase, but the original media stores them in
+	/// uppercase 8.3 names. On a case-sensitive filesystem (Linux) an exact path can miss;
+	/// when it does, resolve each path segment case-insensitively against the real
+	/// directory entries. See docs/tickets/T-014.
+	/// </summary>
+	private string ResolveCaseInsensitive( string fullPath )
+	{
+		// Fast path: exact hit (always true on Windows / a correctly-cased FS).
+		if ( File.Exists( fullPath ) || Directory.Exists( fullPath ) )
+			return fullPath;
+
+		if ( !fullPath.StartsWith( basePath, StringComparison.Ordinal ) )
+			return fullPath;
+
+		var relative = fullPath.Substring( basePath.Length ).TrimStart( Path.DirectorySeparatorChar );
+		if ( relative.Length == 0 )
+			return fullPath;
+
+		var current = basePath;
+		foreach ( var segment in relative.Split( Path.DirectorySeparatorChar ) )
+		{
+			var candidate = Path.Combine( current, segment );
+			if ( File.Exists( candidate ) || Directory.Exists( candidate ) )
+			{
+				current = candidate;
+				continue;
+			}
+
+			// No exact child: look for a case-insensitive match among the real entries.
+			string? match = null;
+			if ( Directory.Exists( current ) )
+			{
+				match = Directory.GetFileSystemEntries( current )
+					.FirstOrDefault( entry => string.Equals(
+						Path.GetFileName( entry ), segment, StringComparison.OrdinalIgnoreCase ) );
+			}
+
+			// Fall back to the requested name so downstream errors stay meaningful.
+			current = match ?? candidate;
+		}
+
+		return current;
 	}
 
 	public string GetRelativePath( string absolutePath )

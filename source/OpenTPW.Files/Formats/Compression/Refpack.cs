@@ -33,7 +33,7 @@ internal sealed partial class Refpack
 		{
 			if ( type.GetInterfaces().Contains( typeof( IRefpackCommand ) ) )
 			{
-				commands.Add( Activator.CreateInstance( type ) as IRefpackCommand );
+				commands.Add( (IRefpackCommand)Activator.CreateInstance( type )! );
 			}
 		}
 
