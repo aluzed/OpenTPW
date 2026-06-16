@@ -42,6 +42,8 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-020](T-020-lip-mouth-shapes.md) | 🟡 Feature | ☐ To do | `.LIP` mouth-shape semantics + lip-sync wiring |
 | [T-021](T-021-tqi-exact-dequant.md) | ⚪ Polish | ⏸️ Deferred | `.TQI`: float AAN IDCT confirmed (Ghidra); exact port deferred (decoder already renders correctly) |
 | [T-022](T-022-ea-adpcm-mono.md) | 🟡 Feature | ☐ To do | EA-ADPCM mono audio support |
+| [T-023](T-023-linux-vulkan-libdl.md) | 🔴 High | ✅ Done | Linux runtime: Vulkan `libdl` load fix — game now boots on Linux |
+| [T-024](T-024-linux-black-screen.md) | 🟠 Medium | ☐ To do | Linux: window renders black (scene not drawn) — interactive |
 
 Priority legend: 🔴 blocking · 🟠 important · 🟡 desirable/feature · ⚪ technical debt/polish.
 Status legend: ✅ done · ⚠️ partial · ☐ to do · 🗂️ split into focused tickets · ⏸️ deferred.

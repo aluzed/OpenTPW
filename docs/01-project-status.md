@@ -14,7 +14,9 @@ You therefore **need a legal copy of the game** to provide the assets — which 
 
 ## Maturity
 
-- **Stage: not playable** — an asset/format toolkit + VM, not yet a game loop.
+- **Stage: boots & runs on Linux** (window + Vulkan render loop), not yet playable. Verified by
+  running on an AMD Radeon (Mesa/Vulkan) after fixing the Vulkan `libdl` load ([T-023](tickets/T-023-linux-vulkan-libdl.md));
+  the scene currently renders black ([T-024](tickets/T-024-linux-black-screen.md)).
 - **Upstream** (`OpenTPW/OpenTPW`) is dormant (last real activity early 2025). **This fork**
   is under active development: full Linux portability, CI, and a large reverse-engineering
   push this session (see the Update below).
