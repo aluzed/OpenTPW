@@ -11,8 +11,16 @@ public sealed class LobbyIsland : Entity
 		var modelPrefix = themeName[0..3];
 		var modelFile = new ModelFile( $"lobby/terrain/{modelPrefix}_isle.md2" );
 
+		// Loading an island's meshes (each decompresses up to 16 textures + uploads a GPU buffer) is
+		// the bulk of the load. Report per mesh so the loading screen pumps events between meshes and
+		// the window stays responsive instead of freezing for the whole island. See T-030.
+		var meshCount = modelFile.Meshes.Count;
+		var meshIndex = 0;
+
 		foreach ( var mesh in modelFile.Meshes )
 		{
+			LoadProgress.Report( $"Loading island: {themeName}... ({++meshIndex}/{meshCount})" );
+
 			var material = new Material<ObjectUniformBuffer>( "content/shaders/test.shader" );
 			var textures = new List<Texture>();
 

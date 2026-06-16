@@ -2,7 +2,8 @@
 
 - **Priority**: 🟠 Medium (the window is frozen ~20-25s during load)
 - **Type**: Rendering / UX
-- **Status**: ⚠️ Partial — checkpoint progress reporting done; true background load still to do.
+- **Status**: ⚠️ Mostly — the load freeze is resolved (window stays responsive with per-step +
+  per-mesh progress); only the optional 60 fps animated/threaded load remains.
 - **Follow-up of**: [T-024](T-024-linux-black-screen.md) (promotes its informal follow-up to a ticket).
 
 ## Problem
@@ -17,11 +18,13 @@ loading screen is presented *before* the load, but it does not animate *during* 
 ## Done
 
 - ✅ **Checkpoint progress reporting** (synchronous, no threading). `LoadProgress.Report(status)` is
-  called at the major load steps in `Level` (settings, water, sky, each island, interface); each
-  call pumps events and re-presents the loading screen with the current step shown at the bottom
-  ("Loading island: Jungle…"). `Game.Run` wires `LoadProgress.OnReport` to `RenderLoadingScreen`.
-  The window now updates per step and stays responsive across them instead of showing a static
-  frame. (`source/OpenTPW/Global/LoadProgress.cs`, `Client/Game.cs`, `World/Level.cs`.)
+  called at the major load steps in `Level` (settings, water, sky, each island, interface) **and
+  per mesh inside `LobbyIsland`** (the bulk of the load — each island decompresses up to 16 textures
+  + uploads a GPU buffer per mesh). Each call pumps events and re-presents the loading screen with
+  the current step at the bottom ("Loading island: Hallow… (20/25)"). `Game.Run` wires
+  `LoadProgress.OnReport` to `RenderLoadingScreen`. Verified: the status strip changes ~every 0.4 s
+  through the whole load, so the window stays responsive — no more freeze / "not responding".
+  (`source/OpenTPW/Global/LoadProgress.cs`, `Client/Game.cs`, `World/Level.cs`, `World/Lobby/LobbyIsland.cs`.)
 
 ## To do
 
