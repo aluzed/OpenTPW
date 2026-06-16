@@ -21,8 +21,8 @@ Source: `source/OpenTPW.Files/Formats/`. Legend: ✅ done · ⚠️ partial · �
 | `.BFMU` strings | ✅ | `String/BFMUReader.cs` | — |
 | `.BFST` strings | ✅ | `String/BFSTReader.cs` | — |
 | `.BFUM` strings | ✅ | (BFMU variant) | — |
-| `.MD2` models | ⚠️ | `Model/ModelFile.cs` | Parses mesh models (verified: PAUSED.MD2 → readable 3D text); not robust to all variants yet (GARROW.MD2 crashes); render integration to finish. See T-012. |
-| `.MAP` | ⚠️ | `OpenTPW.Files/Public/MapFile.cs` | **Not terrain** — `.MAP` are audio category catalogs (CAT_*); leading category GUID decoded, entry layout raw. See T-012. (Demo terrain is hardcoded in `World/Terrain`.) |
+| `.MD2` models | ⚠️ | `Model/ModelFile.cs` | Parses animated mesh models (verified: PAUSED.MD2 → readable 3D text). The static variant (frameCount 0, e.g. GARROW.MD2) is **detected and rejected with a clear error** (different header layout — full decode pending). Render integration to finish. See T-012. |
+| `.MAP` | ⚠️ | `OpenTPW.Files/Public/MapFile.cs` | **Not terrain** — `.MAP` are audio category catalogs (CAT_*). Category GUID decoded; the **BANK variant's entry-name table is now decoded** (e.g. `Sound\Kids`, `Sound\UI` — verified on real `cat_*BANK.map`). Per-entry binary records + the SFX variant kept raw. See T-012. (Demo terrain is hardcoded in `World/Terrain`.) |
 | `.TPWS` saves | ⚠️ | `Save/SaveReader.cs` | Partial read; no write. |
 | `.RSE` ride scripts | ⚠️ | `source/OpenTPW/VM/` | Loader/disassembler restored & tested; **~13% of opcodes** implemented. See T-007. |
 | `.BF4` fonts | ✅ | `OpenTPW.Files/Formats/Font/BF4File.cs` | Fully reverse-engineered: char code, width/height, 1bpp bitmap, **bearings + advance** (verified — renders correctly-spaced text). Engine/UI wiring is separate. See T-008. |

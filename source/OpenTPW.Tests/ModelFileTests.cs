@@ -60,7 +60,7 @@ public class ModelFileTests
 		}
 
 		// Verified by rendering: a real PAUSED.MD2 reconstructs as the 3D "PAUSED" sign.
-		// Note: the parser is NOT robust to every .MD2 variant yet (e.g. the small
-		// GARROW.MD2 throws EndOfStreamException) — see docs/tickets/T-012.
+		// Note: the static .MD2 variant (frameCount 0, e.g. GARROW.MD2) is detected and
+		// rejected with a clear InvalidDataException; full decode is future work (T-012).
 	}
 }

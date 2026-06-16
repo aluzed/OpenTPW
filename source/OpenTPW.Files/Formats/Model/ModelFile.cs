@@ -98,6 +98,16 @@ public partial class ModelFile : BaseFormat
 			reader.BaseStream.Seek( 0x36, SeekOrigin.Begin );
 			ushort frameCount = reader.ReadUInt16();
 
+			// The static variant (frameCount 0, e.g. GARROW.MD2 / RARROW.MD2) stores its
+			// section offsets in a different header layout — the frame-list and mesh-table
+			// pointers the animated path reads at 0x54/0x70 hold unrelated data there. Reject
+			// it explicitly with a clear message instead of seeking to a bogus offset.
+			// Decoding this variant is future work (T-012).
+			if ( frameCount == 0 )
+				throw new InvalidDataException(
+					"MD2: static variant (frameCount 0, e.g. GARROW.MD2) uses a different " +
+					"header layout and is not yet supported." );
+
 			Require( off2 + (8L * frameCount), "texture list" );
 			reader.BaseStream.Seek( off2 + (8 * frameCount), SeekOrigin.Begin );
 

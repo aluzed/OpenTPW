@@ -30,7 +30,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-009](T-009-build-warnings.md) | ⚪ Debt | ✅ Done | build warnings (105 → 0: nullable, Dispose, dead code) |
 | [T-010](T-010-add-sub-flags.md) | 🟠 Medium | ✅ Done | ADD/SUB don't set arithmetic flags (branch correctness) |
 | [T-011](T-011-branchto-hardening.md) | 🟡 Feature | ✅ Done | Harden `RideVM.BranchTo` (O(1) map; verified by a compiled loop) |
-| [T-012](T-012-partial-formats.md) | 🟡 Feature | ⚠️ Partial | `.MD2` verified (renders); robustness + `.MAP`/`.TPWS` remain |
+| [T-012](T-012-partial-formats.md) | 🟡 Feature | ⚠️ Partial | `.MD2` animated verified + static variant detected; `.MAP` BANK entry names decoded; `.TPWS` remains |
 | [T-013](T-013-ci-pipeline.md) | 🟠 Medium | ✅ Done | Add CI (build + test on Linux) |
 | [T-014](T-014-case-insensitive-assets.md) | 🟠 Medium | ✅ Done | Case-insensitive asset path resolution (Linux) |
 
