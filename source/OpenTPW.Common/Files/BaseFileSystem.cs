@@ -5,7 +5,8 @@ namespace OpenTPW;
 public class BaseFileSystem
 {
 	private readonly string basePath;
-	private readonly Dictionary<string, Type> archiveHandlers = new();
+	// Case-insensitive so a ".WAD" file on disc matches a ".wad" handler (T-014).
+	private readonly Dictionary<string, Type> archiveHandlers = new( StringComparer.OrdinalIgnoreCase );
 	private readonly Dictionary<string, IArchive> archiveCache = new();
 
 	public BaseFileSystem( string relativePath )
@@ -132,13 +133,13 @@ public class BaseFileSystem
 		if ( directories )
 		{
 			var fileSystemDirectories = Directory.GetDirectories( absolutePath );
-			var fileSystemArchives = Directory.GetFiles( absolutePath ).Where( x => archiveHandlers.Keys.Contains( Path.GetExtension( x ) ) ).Select( x => x[..x.LastIndexOf( "." )] );
+			var fileSystemArchives = Directory.GetFiles( absolutePath ).Where( x => archiveHandlers.ContainsKey( Path.GetExtension( x ) ) ).Select( x => x[..x.LastIndexOf( "." )] );
 
 			return fileSystemDirectories.Concat( fileSystemArchives ).ToArray();
 		}
 		else
 		{
-			return Directory.GetFiles( absolutePath ).Where( x => !archiveHandlers.Keys.Contains( Path.GetExtension( x ) ) ).ToArray();
+			return Directory.GetFiles( absolutePath ).Where( x => !archiveHandlers.ContainsKey( Path.GetExtension( x ) ) ).ToArray();
 		}
 	}
 
@@ -165,28 +166,31 @@ public class BaseFileSystem
 		var parts = path.Split( Path.DirectorySeparatorChar );
 		var currentPath = new StringBuilder();
 
-		foreach ( var part in parts )
+		for ( var i = 0; i < parts.Length; i++ )
 		{
-			if ( currentPath.Length > 0 )
+			// Append the separator before every part except the first, so an absolute
+			// path keeps its leading separator (parts[0] is "" for "/a/b").
+			if ( i > 0 )
 			{
 				currentPath.Append( Path.DirectorySeparatorChar );
 			}
 
-			currentPath.Append( part );
+			currentPath.Append( parts[i] );
 
 			foreach ( var handler in archiveHandlers )
 			{
-				var extension = handler.Key;
-				var potentialArchivePath = $"{currentPath}{extension}";
+				// Resolve case-insensitively so an archive on disk as "FONTS.WAD" is found
+				// for a lowercase request like "fonts" (see docs/tickets/T-014).
+				var potentialArchivePath = ResolveCaseInsensitive( $"{currentPath}{handler.Key}" );
 
-				if ( archiveHandlers.ContainsKey( extension ) && File.Exists( potentialArchivePath ) )
+				if ( File.Exists( potentialArchivePath ) )
 				{
 					var remainingPath = path.Substring( currentPath.Length );
 					return (potentialArchivePath, remainingPath.TrimStart( Path.DirectorySeparatorChar ));
 				}
 			}
 
-			if ( Directory.Exists( currentPath.ToString() ) )
+			if ( Directory.Exists( ResolveCaseInsensitive( currentPath.ToString() ) ) )
 			{
 				continue;
 			}

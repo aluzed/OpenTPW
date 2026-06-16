@@ -10,7 +10,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 ## Build / test state (observed)
 
 - **Build**: ✅ `dotnet build OpenTPW.sln` → 6 projects, **0 errors**.
-- **Tests**: ✅ `dotnet test` → **0 failed, 20 passed, 13 inconclusive** on a clean Linux
+- **Tests**: ✅ `dotnet test` → **0 failed, 21 passed, 13 inconclusive** on a clean Linux
   machine (was 7/7 failing). The inconclusive ones are integration tests that need a game
   install (`OPENTPW_GAMEPATH`) or a real asset sample (`TPW_VIDEO_SAMPLE`,
   `TPW_FONT_SAMPLE`, `TPW_MODEL_SAMPLE`). See T-002 / T-008 / T-012.
@@ -32,7 +32,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-011](T-011-branchto-hardening.md) | 🟡 Feature | ✅ Done | Harden `RideVM.BranchTo` (O(1) map; verified by a compiled loop) |
 | [T-012](T-012-partial-formats.md) | 🟡 Feature | ⚠️ Partial | `.MD2` verified (renders); robustness + `.MAP`/`.TPWS` remain |
 | [T-013](T-013-ci-pipeline.md) | 🟠 Medium | ✅ Done | Add CI (build + test on Linux) |
-| [T-014](T-014-case-insensitive-assets.md) | 🟠 Medium | ⚠️ Partial | Case-insensitive asset path resolution (Linux) |
+| [T-014](T-014-case-insensitive-assets.md) | 🟠 Medium | ✅ Done | Case-insensitive asset path resolution (Linux) |
 
 Priority legend: 🔴 blocking · 🟠 important · 🟡 desirable/feature · ⚪ technical debt.
 Status legend: ✅ done · ⚠️ partial · ☐ to do.

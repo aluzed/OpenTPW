@@ -86,7 +86,7 @@ public class SdtArchive : IArchive
 
 	public ArchiveFile GetFile( string name )
 	{
-		int index = soundFiles.FindIndex( x => x.Name.StartsWith( name ) );
+		int index = soundFiles.FindIndex( x => x.Name.StartsWith( name, StringComparison.OrdinalIgnoreCase ) );
 		return soundFiles[index];
 	}
 
