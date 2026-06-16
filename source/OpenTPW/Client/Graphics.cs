@@ -46,8 +46,9 @@ internal static partial class Graphics
 		Quad( rectangle, new Rectangle( 0, 0, 1, 1 ), material );
 	}
 
-	// Reused per-quad scratch so a Quad draw allocates nothing on the heap (was new List<Vertex>,
-	// new List<uint> and two ToArray() per quad, ~20 quads/frame — T-027). Single-threaded render.
+	// Reused per-quad scratch so building a quad allocates nothing (was new List<Vertex>, new
+	// List<uint> + two ToArray() per quad — T-027). Single-threaded render; consumed immediately by
+	// AppendGeometry (which copies it into the batch), so it's safe to reuse for the next quad/glyph.
 	private static readonly Vertex[] _quadVertices = new Vertex[4];
 	private static readonly uint[] _quadIndices = { 3, 2, 1, 0, 1, 2 };
 
@@ -60,19 +61,6 @@ internal static partial class Graphics
 		_quadVertices[2] = new( new Vector3( rectangle.BottomLeft ) * screenMatrix, uvs.BottomLeft );
 		_quadVertices[3] = new( new Vector3( rectangle.BottomRight ) * screenMatrix, uvs.BottomRight );
 
-		var cmd = Render.CommandList;
-		cmd.UpdateBuffer( vertexBuffer, 0, _quadVertices );
-		cmd.UpdateBuffer( indexBuffer, 0, _quadIndices );
-
-		cmd.SetIndexBuffer( indexBuffer, IndexFormat.UInt32 );
-		cmd.SetVertexBuffer( 0, vertexBuffer );
-		cmd.SetPipeline( material.Pipeline );
-
-		var resourceSets = material.GetResourceSets();
-
-		for ( uint i = 0; i < resourceSets.Length; ++i )
-			cmd.SetGraphicsResourceSet( i, resourceSets[i] );
-
-		cmd.DrawIndexed( (uint)_quadIndices.Length );
+		AppendGeometry( material, _quadVertices, _quadIndices );
 	}
 }

@@ -2,8 +2,8 @@
 
 - **Priority**: 🟠 Medium (CPU/GC overhead per frame; lobby has ~22 UI draws)
 - **Type**: Rendering / performance
-- **Status**: ⚠️ Partial — per-quad allocations removed + UI resource-set churn fixed; draw-call
-  merging still to do.
+- **Status**: ✅ Done — per-quad allocations removed, UI resource-set churn fixed, and consecutive
+  same-texture UI draws merged into single `DrawIndexed` calls.
 - **Follow-up of**: [T-026](T-026-render-resource-churn.md).
 
 ## Problem
@@ -27,15 +27,17 @@ frame would clobber).
   distinct UI texture combination is built once and reused across frames; model materials (stable
   bindings) hit a single entry. Cleared + disposed on shader recompile. (`Render/Assets/Material.cs`.)
 
-## To do
+- ✅ **Draw merging.** `Graphics.Batch.cs` accumulates UI geometry into reusable vertex/index
+  arrays; `Quad`/`DrawText` append (allocation-free) via `AppendGeometry`, which flushes on
+  material/binding change or buffer overflow. `Renderer.PostRender` calls `Graphics.FlushBatch()`
+  after `OnRender` and before the MSAA resolve. Consecutive same-texture UI draws (e.g. a string's
+  glyphs, runs of same-texture quads) merge into one `DrawIndexed`; draw order (alpha) is preserved
+  by flushing on every state change. `DrawText` no longer allocates its `List`/`ToArray` per call.
+  Verified: lobby renders pixel-identical (logo, buttons + labels, cursor).
 
-1. ☐ Actually **merge** draws: accumulate consecutive same-texture quads/text into one growing
-   vertex/index buffer and flush in as few `DrawIndexed` as possible (currently each quad/string is
-   still its own `UpdateBuffer` + draw on the shared buffer). Add an end-of-frame `Graphics.FlushBatch()`
-   in `Renderer.PostRender` **after `OnRender?.Invoke()`** and **before** the MSAA resolve; flush on
-   texture/material change or overflow; preserve child draw order (alpha blending).
-2. ☐ `Graphics.DrawText` still allocates its vertex/index `List` + `.ToArray()` per call — fold into
-   the same batch buffers. Hoist `CreateScreenMatrix` to a cached value (recompute on resize only).
+## Possible later polish (not blocking)
+
+- Hoist `CreateScreenMatrix` to a value cached per screen size (negligible; recomputed per quad now).
 
 ## Acceptance
 

@@ -181,6 +181,7 @@ public partial class Renderer
 		// Render level to MSAA buffer
 		CommandList.PushDebugGroup( "Main Render" );
 		OnRender?.Invoke();
+		Graphics.FlushBatch(); // emit any accumulated UI batch before the resolve (T-027)
 		CommandList.PopDebugGroup();
 
 		// Resolve MSAA to non-MSAA texture
