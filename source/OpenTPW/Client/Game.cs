@@ -65,9 +65,12 @@ internal static class Game
 			if ( loadingFont == null )
 				return;
 
-			// originY is the top of the line; offset up by half the line so it's vertically centred.
-			var centerY = Screen.Size.Y / 2f + loadingFont.Atlas.LineHeight * loadingScale / 2f;
-			Graphics.DrawText( loadingFont, "LOADING...", Screen.Size.X / 2f, centerY, TextAlign.Center, loadingScale );
+			// Centre on the actual ink (the line box's descender space would push it high). DrawText's
+			// originY is the line top; place it so the ink midpoint lands on the screen centre.
+			const string text = "LOADING...";
+			var (inkTop, inkBottom) = loadingFont.Atlas.InkBounds( text );
+			var centerY = Screen.Size.Y / 2f + (inkTop + inkBottom) / 2f * loadingScale;
+			Graphics.DrawText( loadingFont, text, Screen.Size.X / 2f, centerY, TextAlign.Center, loadingScale );
 		}
 
 		// Show the loading screen for a brief minimum so it's actually visible (and keep the

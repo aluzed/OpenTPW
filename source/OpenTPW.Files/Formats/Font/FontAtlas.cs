@@ -117,6 +117,29 @@ public sealed class FontAtlas
 		LineHeight = glyphs.Values.Count == 0 ? 0 : glyphs.Values.Max( g => g.Height );
 	}
 
+	/// <summary>
+	/// Vertical extent of the actual <em>ink</em> of <paramref name="text"/>, as unscaled offsets
+	/// below the line top (the values <see cref="Layout"/> subtracts from the line top in its Y-up
+	/// space). <c>Top</c> is the smallest offset (the highest pixel, from the glyph with the least
+	/// <c>YBearing</c>) and <c>Bottom</c> the largest (the lowest pixel). Their midpoint is what to
+	/// align on a target Y for visually-centred text — unlike <see cref="LineHeight"/>, which spans
+	/// the whole ascender/descender box and leaves caps looking high. Returns (0,0) if no glyph inks.
+	/// </summary>
+	public (float Top, float Bottom) InkBounds( string text )
+	{
+		float top = float.MaxValue, bottom = float.MinValue;
+		foreach ( var c in text )
+		{
+			if ( !glyphs.TryGetValue( c, out var g ) || g.Width <= 0 || g.Height <= 0 )
+				continue;
+
+			top = Math.Min( top, g.YBearing );
+			bottom = Math.Max( bottom, g.YBearing + g.Height );
+		}
+
+		return top == float.MaxValue ? (0f, 0f) : (top, bottom);
+	}
+
 	/// <summary>Total advance width of <paramref name="text"/> in pixels (characters with no glyph are skipped).</summary>
 	public int Measure( string text )
 	{

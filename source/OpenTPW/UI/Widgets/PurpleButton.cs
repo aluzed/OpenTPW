@@ -68,8 +68,11 @@ internal class PurpleButton : Panel
 		{
 			var centerX = position.X - 255;
 			var centerY = position.Y - 80;
-			// originY is the top of the line; offset up by half the line so the text is centred.
-			var top = centerY + LabelFont.Atlas.LineHeight * LabelScale / 2f;
+			// Centre on the label's actual ink (caps don't fill the line box, so centring the box
+			// leaves text riding high). DrawText's originY is the line top; place it so the ink
+			// midpoint lands on centerY: the ink sits (Top+Bottom)/2 * scale below the line top.
+			var (inkTop, inkBottom) = LabelFont.Atlas.InkBounds( Text );
+			var top = centerY + (inkTop + inkBottom) / 2f * LabelScale;
 			Graphics.DrawText( LabelFont, Text, centerX, top, TextAlign.Center, LabelScale );
 		}
 	}

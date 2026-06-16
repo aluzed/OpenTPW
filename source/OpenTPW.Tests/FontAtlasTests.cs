@@ -124,6 +124,20 @@ public class FontAtlasTests
 		Assert.AreEqual( 91f, atlas.Layout( "LI", 100, 0, TextAlign.Right )[0].X, 1e-6 );
 	}
 
+	[TestMethod]
+	public void ReportsInkBoundsForCentring()
+	{
+		var atlas = BuildAtlas(); // 'L' and 'I' are both yBearing 2, height 5.
+
+		// Ink runs from yBearing 2 (top) to yBearing+height = 7 (bottom) below the line top.
+		var (top, bottom) = atlas.InkBounds( "LI" );
+		Assert.AreEqual( 2f, top, 1e-6 );
+		Assert.AreEqual( 7f, bottom, 1e-6 );
+
+		// No inking glyphs -> empty bounds.
+		Assert.AreEqual( (0f, 0f), atlas.InkBounds( "??" ) );
+	}
+
 	// Optional: build an atlas from a real font and sanity-check it. Set TPW_FONT_SAMPLE.
 	[TestMethod]
 	public void BuildsAtlasFromRealFont()
