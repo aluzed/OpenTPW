@@ -19,7 +19,7 @@ public sealed class LobbyIsland : Entity
 
 		foreach ( var mesh in modelFile.Meshes )
 		{
-			LoadProgress.Report( $"Loading island: {themeName}... ({++meshIndex}/{meshCount})" );
+			LoadProgress.ReportSub( $"Loading island: {themeName}... ({++meshIndex}/{meshCount})", (float)meshIndex / meshCount );
 
 			var material = new Material<ObjectUniformBuffer>( "content/shaders/test.shader" );
 			var textures = new List<Texture>();

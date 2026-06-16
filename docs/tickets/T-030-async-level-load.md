@@ -2,8 +2,8 @@
 
 - **Priority**: 🟠 Medium (the window is frozen ~20-25s during load)
 - **Type**: Rendering / UX
-- **Status**: ⚠️ Mostly — the load freeze is resolved (window stays responsive with per-step +
-  per-mesh progress); only the optional 60 fps animated/threaded load remains.
+- **Status**: ⚠️ Mostly — the load freeze is resolved (responsive, per-step + per-mesh progress with
+  a progress bar); only the optional 60 fps fully-threaded load remains.
 - **Follow-up of**: [T-024](T-024-linux-black-screen.md) (promotes its informal follow-up to a ticket).
 
 ## Problem
@@ -25,6 +25,10 @@ loading screen is presented *before* the load, but it does not animate *during* 
   `LoadProgress.OnReport` to `RenderLoadingScreen`. Verified: the status strip changes ~every 0.4 s
   through the whole load, so the window stays responsive — no more freeze / "not responding".
   (`source/OpenTPW/Global/LoadProgress.cs`, `Client/Game.cs`, `World/Level.cs`, `World/Lobby/LobbyIsland.cs`.)
+- ✅ **Progress bar.** `LoadProgress` also tracks a `Progress` fraction (`Report(status, fraction)` +
+  `BeginPhase`/`ReportSub`, so each island fills its slice of the bar by mesh). The loading screen
+  draws a track + fill bar (1×1 colour textures via the UI material) above the status line. Verified
+  on-screen: the bar fills as meshes load ("Loading island: Hallow… (18/25)" ≈ 63%).
 
 ## To do
 

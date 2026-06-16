@@ -57,6 +57,10 @@ internal static class Game
 		try { loadingFont = new Font( "Language/English/GAME12.bf4" ); }
 		catch ( Exception e ) { Log.Warning( $"Loading-screen font unavailable: {e.Message}" ); }
 
+		// 1x1 textures for the progress bar (the UI shader only samples a texture, no tint — T-030).
+		var barTrack = new Texture( [0, 0, 60, 200], 1, 1 );
+		var barFill = new Texture( [255, 255, 255, 255], 1, 1 );
+
 		Render.ClearColor = new RgbaFloat( 0.35f, 0.72f, 0.92f, 1f );
 
 		const float loadingScale = 4f;
@@ -74,7 +78,20 @@ internal static class Game
 			var centerY = Screen.Size.Y / 2f + (inkTop + inkBottom) / 2f * loadingScale;
 			Graphics.DrawText( loadingFont, text, Screen.Size.X / 2f, centerY, TextAlign.Center, loadingScale );
 
-			// Current load step, near the bottom of the screen (T-030).
+			// Progress bar (T-030): a track + a fill proportional to LoadProgress.Progress, centred
+			// horizontally above the status line.
+			const float barWidth = 600f, barHeight = 22f;
+			var barX = Screen.Size.X / 2f - barWidth / 2f;
+			var barY = 120f;
+			Material.UI.Set( "Color", barTrack );
+			Graphics.Quad( new Rectangle( barX, barY, barWidth, barHeight ), Material.UI );
+			if ( LoadProgress.Progress > 0f )
+			{
+				Material.UI.Set( "Color", barFill );
+				Graphics.Quad( new Rectangle( barX, barY, barWidth * LoadProgress.Progress, barHeight ), Material.UI );
+			}
+
+			// Current load step, near the bottom of the screen.
 			var status = LoadProgress.Status;
 			if ( !string.IsNullOrEmpty( status ) )
 			{
