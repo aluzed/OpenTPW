@@ -20,10 +20,33 @@ OpenTPW is a re-implementation: to make progress on the **undocumented** formats
 them. Ghidra is used to **disassemble/decompile the original binaries** and extract
 the parsing logic — the source of truth when documentation is missing.
 
-## ⚠️ Status: blocked by SafeDisc (verified 2026-06-16)
+## ✅ Status: UNBLOCKED via a no-CD build (2026-06-16)
 
-The disc image was imported into Ghidra 12.1.2 and analyzed. **Result: the game code —
-including every format loader — is SafeDisc-encrypted and cannot be read statically.**
+The disc binaries are SafeDisc-encrypted (analysis below), but an **unprotected no-CD
+`tp.exe`** (3.6 MB — the depacked `TP.ICD`; the title is abandonware, never re-licensed) was
+imported into Ghidra 12.1.2 and analyzes cleanly: `.text` entropy 6.68, the codec data
+sections (`idct_dat`, `grpoly_d`, `uva_data`) readable, and the format magics/strings present
+in clear (`0x1CD15D46`, `.md2`×43, `M3D2`, `.rse`, `lips`, `.plb`…).
+
+**Loaders reversed so far:**
+- **`.MD2`** — `FUN_0046d6d0`: load-and-relocate; gates on version fields at offsets 4/8
+  (current = `0xDD`/`0xCB`, legacy/static = `0x18`/`0x17`). Applied in `ModelFile` (T-015).
+
+Headless workflow used:
+```bash
+~/ghidra_12.1.2_PUBLIC/support/analyzeHeadless <proj> tpw -import tp.exe
+# then a GhidraScript (FindMagic.java) to locate functions referencing a magic constant
+~/.../analyzeHeadless <proj> tpw -process tp.exe -noanalysis \
+    -scriptPath <dir> -postScript FindMagic.java <outdir> 0x1CD15D46 0x2E5915AF
+```
+
+---
+
+## Appendix: the disc binaries are SafeDisc-encrypted (verified 2026-06-16)
+
+For the record — why the *disc's* `tp.exe`/`TP.ICD` can't be analyzed directly (use the no-CD
+build above instead). **The disc's game code is SafeDisc-encrypted and cannot be read
+statically.**
 
 Verified facts (from the disc's `tp.exe` + `TP.ICD`):
 

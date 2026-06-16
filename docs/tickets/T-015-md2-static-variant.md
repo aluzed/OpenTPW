@@ -2,7 +2,10 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Reverse engineering
-- **Status**: ☐ To do
+- **Status**: ⚠️ **Partial.** The real discriminator is now **confirmed via Ghidra** (the
+  no-CD `tp.exe` loader `FUN_0046d6d0`): it's the **version** fields at offsets 4/8, not
+  frameCount. `ModelFile` now gates on them exactly as the original does — rejecting the
+  legacy/static variant cleanly. **Decoding** that legacy layout still remains.
 - **Split from**: [T-012](T-012-partial-formats.md) (which is now closed as a record of the
   animated-`.MD2` work).
 
@@ -15,21 +18,41 @@ frame-list / mesh-table pointers the animated path reads at 0x54 / 0x70 hold unr
 `ModelFile` currently **detects `frameCount == 0` and throws a clear `InvalidDataException`**
 rather than seeking to a bogus offset.
 
-## Findings so far
+## Findings (Ghidra-confirmed)
 
-From `garrow.MD2` (1669 bytes) vs `paused.MD2`:
-- Header magic `0x1CD15D46` and the name (`garrow.MD2`) are at the same place.
-- `0x40` holds the file size (`0x685` = 1669); `0x44` = mesh count (1).
-- The real section pointers appear in the `0x40–0x78` block at different offsets than the
-  animated layout — observed values `0xC4 / 0x1C4 / 0x1E6 / 0x1F2 / 0x3B2 / 0x5F9 / 0x681`,
-  all < file size.
-- Floats (`1.0f` = `0x3F800000`) cluster around `0x272–0x615` (vertex / matrix data).
+The MD2 loader in the no-CD `tp.exe` is `FUN_0046d6d0`. It memory-maps the file then
+relocates a table of offsets to absolute pointers. The **version gate** is the key:
+
+```c
+if (*piVar8 == 0x1cd15d46) {            // magic @ 0x00
+    if ((uint)piVar8[1] < 0xde) {        // version @ 0x04
+        if ((uint)piVar8[1] < 0xdd && (flags & 1) == 0) { reject; }
+        else { /* main load; also requires piVar8[2] @ 0x08 == 0xcb */ } } }
+```
+
+So the shipping format is **exactly `(offset4 = 0xDD, offset8 = 0xCB)`**; the loader rejects
+anything else by default. Verified across samples:
+
+| file | off 4 | off 8 | frameCount @0x36 |
+|------|:-----:|:-----:|:----------------:|
+| paused / bankrupt / congrats | `0xDD` | `0xCB` | 1 |
+| garrow / rarrow (legacy/static) | `0x18` | `0x17` | 0 |
+
+`frameCount == 0` was a coincidental heuristic; the real discriminator is the version. The
+relocated header offset slots are `piVar8[0x13..0x1e]` (file 0x4c..0x78), `[0x1f]` (0x7c),
+`[0x26]` (0x98), `[0x2b]` (0xac); mesh count is `u16 @0x44`.
+
+## Done
+
+- `ModelFile` now reads the version fields at 4/8 and rejects any non-`(0xDD,0xCB)` file with
+  a clear message — matching the original loader exactly. Covered by
+  `ModelFileTests.RejectsLegacyVersion` (the GARROW `0x18`/`0x17` values).
 
 ## Remaining work
 
-1. Map the static-variant header (mesh-table offset, vertex/face/UV offsets and counts).
-2. Reuse the existing mesh-decode path once the offsets are known.
-3. Remove the `frameCount == 0` rejection and parse it; keep PAUSED/BANKRUPT/CONGRATS working.
+1. Trace the loader's legacy path (`flags & 1`, version `0x18`) to map the static-variant
+   header (mesh-table / vertex / face / UV offsets).
+2. Parse it and reuse the mesh-decode path; keep PAUSED/BANKRUPT/CONGRATS working.
 
 ## Acceptance criteria
 
@@ -38,7 +61,7 @@ From `garrow.MD2` (1669 bytes) vs `paused.MD2`:
 
 ## Reverse-engineering aid
 
-Best done with **Ghidra** on `TP.EXE`'s model loader — see [05-ghidra-reverse.md](../05-ghidra-reverse.md).
+The loader `FUN_0046d6d0` (no-CD `tp.exe`) — see [05-ghidra-reverse.md](../05-ghidra-reverse.md).
 
 ## Affected files
 

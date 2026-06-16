@@ -21,7 +21,7 @@ Source: `source/OpenTPW.Files/Formats/`. Legend: ✅ done · ⚠️ partial · �
 | `.BFMU` strings | ✅ | `String/BFMUReader.cs` | — |
 | `.BFST` strings | ✅ | `String/BFSTReader.cs` | — |
 | `.BFUM` strings | ✅ | (BFMU variant) | — |
-| `.MD2` models | ⚠️ | `Model/ModelFile.cs` | Parses animated mesh models (verified: PAUSED.MD2 → readable 3D text). The static variant (frameCount 0, e.g. GARROW.MD2) is **detected and rejected with a clear error** (different header layout — full decode pending). Render integration to finish. See T-012. |
+| `.MD2` models | ⚠️ | `Model/ModelFile.cs` | Parses the current mesh format (verified: PAUSED.MD2 → readable 3D text). Gates on the **version fields at offsets 4/8 (0xDD/0xCB)** — Ghidra-confirmed from the loader `FUN_0046d6d0` — rejecting legacy/static variants (GARROW.MD2 = 0x18/0x17) exactly as the original does. Static-variant decode + render integration remain. See T-015. |
 | `.MAP` | ⚠️ | `OpenTPW.Files/Public/MapFile.cs` | **Not terrain** — `.MAP` are audio category catalogs (CAT_*). GUID + **variant** (BANK/SFX) decoded; BANK **entry names** (e.g. `Sound\Kids`) and SFX **category header** (sound count + 3 float defaults 1.0/2.0/0.5) decoded and verified on real `cat_*`. Per-record mixing fields need Ghidra. See T-016. (Demo terrain is hardcoded in `World/Terrain`.) |
 | `.TPWS` saves | ⚠️ | `Save/SaveReader.cs` | Partial read; no write. |
 | `.RSE` ride scripts | ⚠️ | `source/OpenTPW/VM/` | Loader/disassembler restored & tested; **~13% of opcodes** implemented. See T-007. |

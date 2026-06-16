@@ -10,6 +10,12 @@ public partial class ModelFile : BaseFormat
 {
 	public List<Mesh> Meshes { get; private set; } = null!;
 
+	// The .MD2 format version this parser supports (header fields at offsets 4 and 8). The
+	// original loader accepts only these values; legacy variants (e.g. GARROW.MD2 = 0x18/0x17)
+	// use a different header and are rejected. See docs/tickets/T-015.
+	private const uint SupportedVersion = 0xDD;
+	private const uint SupportedSubVersion = 0xCB;
+
 	public ModelFile( Stream stream )
 	{
 		ReadFromStream( stream );
@@ -92,21 +98,25 @@ public partial class ModelFile : BaseFormat
 			if ( magic != 0x1CD15D46 )
 				throw new InvalidDataException( $"MD2: bad magic 0x{magic:X8}, expected 0x1CD15D46." );
 
+			// Two version fields follow the magic, at offsets 4 and 8. The original loader
+			// (FUN_0046d6d0 in tp.exe, recovered via Ghidra) accepts only the current format —
+			// it requires offset 4 == 0xDD and offset 8 == 0xCB — and rejects older/legacy
+			// variants. The static UI arrows (GARROW.MD2 / RARROW.MD2) carry 0x18 / 0x17 there
+			// and have a different header layout, so the animated parser below can't read them.
+			// Match the game and reject any non-current version with a clear message. See T-015.
+			var version = reader.ReadUInt32();      // offset 4 (observed 0xDD on all shipping models)
+			var subVersion = reader.ReadUInt32();   // offset 8 (observed 0xCB)
+			if ( version != SupportedVersion || subVersion != SupportedSubVersion )
+				throw new InvalidDataException(
+					$"MD2: unsupported version (0x{version:X}, 0x{subVersion:X}); this parser " +
+					$"handles the current format (0x{SupportedVersion:X}, 0x{SupportedSubVersion:X}). " +
+					"Legacy/static variants such as GARROW.MD2 (0x18, 0x17) are not supported. See T-015." );
+
 			reader.BaseStream.Seek( 0x50, SeekOrigin.Begin );
 			uint off2 = reader.ReadUInt32();
 
 			reader.BaseStream.Seek( 0x36, SeekOrigin.Begin );
 			ushort frameCount = reader.ReadUInt16();
-
-			// The static variant (frameCount 0, e.g. GARROW.MD2 / RARROW.MD2) stores its
-			// section offsets in a different header layout — the frame-list and mesh-table
-			// pointers the animated path reads at 0x54/0x70 hold unrelated data there. Reject
-			// it explicitly with a clear message instead of seeking to a bogus offset.
-			// Decoding this variant is future work (T-012).
-			if ( frameCount == 0 )
-				throw new InvalidDataException(
-					"MD2: static variant (frameCount 0, e.g. GARROW.MD2) uses a different " +
-					"header layout and is not yet supported." );
 
 			Require( off2 + (8L * frameCount), "texture list" );
 			reader.BaseStream.Seek( off2 + (8 * frameCount), SeekOrigin.Begin );
