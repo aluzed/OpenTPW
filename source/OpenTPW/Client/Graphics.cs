@@ -46,26 +46,23 @@ internal static partial class Graphics
 		Quad( rectangle, new Rectangle( 0, 0, 1, 1 ), material );
 	}
 
+	// Reused per-quad scratch so a Quad draw allocates nothing on the heap (was new List<Vertex>,
+	// new List<uint> and two ToArray() per quad, ~20 quads/frame — T-027). Single-threaded render.
+	private static readonly Vertex[] _quadVertices = new Vertex[4];
+	private static readonly uint[] _quadIndices = { 3, 2, 1, 0, 1, 2 };
+
 	public static void Quad( Rectangle rectangle, Rectangle uvs, Material material )
 	{
 		var screenMatrix = CreateScreenMatrix( BaseScreenSize );
 
-		var v0 = new Vector3( rectangle.TopLeft ) * screenMatrix;
-		var v1 = new Vector3( rectangle.TopRight ) * screenMatrix;
-		var v2 = new Vector3( rectangle.BottomLeft ) * screenMatrix;
-		var v3 = new Vector3( rectangle.BottomRight ) * screenMatrix;
-
-		var t0 = uvs.TopLeft;
-		var t1 = uvs.TopRight;
-		var t2 = uvs.BottomLeft;
-		var t3 = uvs.BottomRight;
-
-		var vertices = new List<Vertex>() { new( v0, t0 ), new( v1, t1 ), new( v2, t2 ), new( v3, t3 ) };
-		var indices = new List<uint>() { 3, 2, 1, 0, 1, 2 };
+		_quadVertices[0] = new( new Vector3( rectangle.TopLeft ) * screenMatrix, uvs.TopLeft );
+		_quadVertices[1] = new( new Vector3( rectangle.TopRight ) * screenMatrix, uvs.TopRight );
+		_quadVertices[2] = new( new Vector3( rectangle.BottomLeft ) * screenMatrix, uvs.BottomLeft );
+		_quadVertices[3] = new( new Vector3( rectangle.BottomRight ) * screenMatrix, uvs.BottomRight );
 
 		var cmd = Render.CommandList;
-		cmd.UpdateBuffer( vertexBuffer, 0, vertices.ToArray() );
-		cmd.UpdateBuffer( indexBuffer, 0, indices.ToArray() );
+		cmd.UpdateBuffer( vertexBuffer, 0, _quadVertices );
+		cmd.UpdateBuffer( indexBuffer, 0, _quadIndices );
 
 		cmd.SetIndexBuffer( indexBuffer, IndexFormat.UInt32 );
 		cmd.SetVertexBuffer( 0, vertexBuffer );
@@ -76,6 +73,6 @@ internal static partial class Graphics
 		for ( uint i = 0; i < resourceSets.Length; ++i )
 			cmd.SetGraphicsResourceSet( i, resourceSets[i] );
 
-		cmd.DrawIndexed( (uint)indices.Count );
+		cmd.DrawIndexed( (uint)_quadIndices.Length );
 	}
 }

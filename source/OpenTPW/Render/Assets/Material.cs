@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Veldrid;
 
@@ -26,15 +27,14 @@ public partial class Material : Asset
 
 	private ResourceLayout[] _resourceLayouts = null!;
 
-	// Resource sets are cached and reused across frames instead of being recreated every draw
-	// (the old per-draw "ephemeral" sets created+destroyed ~84 GPU descriptor sets per frame). The
-	// cache is rebuilt only when a binding actually changes: _resourceVersion is bumped by SetBound
-	// (a texture/buffer reference change) and by SetupResources (shader recompile). A per-frame
-	// uniform Set<T> updates the buffer contents but keeps the same buffer reference, so it does
-	// NOT invalidate the cache. See T-026.
-	private ResourceSet[]? _cachedResourceSets;
-	private int _resourceVersion;
-	private int _cachedVersion = -1;
+	// Resource sets are cached and reused across frames instead of being recreated every draw (the
+	// old per-draw "ephemeral" sets created+destroyed ~84 GPU descriptor sets per frame — T-026).
+	// Keyed by the identity of the currently bound resources, so a material that cycles bindings
+	// within a frame (e.g. the shared UI material rebinding "Color" per widget — T-027) reuses one
+	// set per distinct binding combination across frames instead of rebuilding. Materials with
+	// stable bindings (every model mesh) simply hit a single cached entry. Cleared on shader
+	// recompile (SetupResources), where the layout/buffer the sets reference is replaced.
+	private readonly Dictionary<int, ResourceSet[]> _resourceSetCache = new();
 
 	public Material( string shaderPath, MaterialFlags flags = MaterialFlags.None )
 	{
@@ -102,15 +102,12 @@ public partial class Material : Asset
 		return Device.ResourceFactory.CreateSampler( samplerDescription );
 	}
 
-	// Binds a resource by name, bumping the resource-set version only when the binding actually
-	// changes (so the cached resource set is rebuilt only when needed, not every frame).
+	// Binds a resource by name. The resource-set cache is keyed by the bound-resource identities,
+	// so changing a binding here naturally selects (or builds) a different cached set — no explicit
+	// invalidation needed.
 	private void SetBound( string name, BindableResource resource )
 	{
-		if ( _boundResources.TryGetValue( name, out var existing ) && ReferenceEquals( existing, resource ) )
-			return;
-
 		_boundResources[name] = resource;
-		_resourceVersion++;
 	}
 
 	public void Set<T>( string name, T obj ) where T : unmanaged
@@ -184,22 +181,30 @@ public partial class Material : Asset
 		return resourceSetDescriptions.Select( x => Device.ResourceFactory.CreateResourceSet( x ) ).ToArray();
 	}
 
-	// Returns the material's resource sets, rebuilding them only when a binding changed since the
-	// last build (tracked by _resourceVersion). Reused across frames otherwise — no per-draw GPU
-	// descriptor-set allocation. Old sets are disposed via the deletion queue so an in-flight frame
-	// isn't using a freed set.
+	// Returns the material's resource sets for the currently bound resources, building them once per
+	// distinct binding combination and reusing across frames — no per-draw GPU descriptor-set
+	// allocation. The key hashes the bound-resource identities (no per-draw allocation).
 	internal ResourceSet[] GetResourceSets()
 	{
-		if ( _cachedResourceSets != null && _cachedVersion == _resourceVersion )
-			return _cachedResourceSets;
+		var key = ComputeBindingKey();
+		if ( _resourceSetCache.TryGetValue( key, out var sets ) )
+			return sets;
 
-		var old = _cachedResourceSets;
-		if ( old != null )
-			Render.ScheduleDelete( () => DestroyResourceSets( old ) );
+		sets = CreateResourceSets();
+		_resourceSetCache[key] = sets;
+		return sets;
+	}
 
-		_cachedResourceSets = CreateResourceSets();
-		_cachedVersion = _resourceVersion;
-		return _cachedResourceSets;
+	// Identity hash of the resources currently bound to this shader's layout elements. Reference
+	// identity (not value) is what a ResourceSet captures, so this is the correct cache key.
+	private int ComputeBindingKey()
+	{
+		var hash = new HashCode();
+		foreach ( var layout in Shader.ResourceLayouts )
+			foreach ( var element in layout.Elements )
+				hash.Add( _boundResources.TryGetValue( element.Name, out var r ) ? RuntimeHelpers.GetHashCode( r ) : 0 );
+
+		return hash.ToHashCode();
 	}
 
 	private static void DestroyResourceSets( ResourceSet[] resourceSets )
@@ -261,13 +266,20 @@ public partial class Material : Asset
 		UniformBuffer = Device.ResourceFactory.CreateBuffer(
 			new BufferDescription( uniformSize, BufferUsage.UniformBuffer | BufferUsage.Dynamic ) );
 
-		// On a shader recompile the uniform buffer is replaced; force the resource-set cache to
-		// rebuild. Texture bindings in _boundResources are preserved (they're set once at init);
-		// the next Set<T> re-binds the new uniform buffer. Dispose the old buffer after the frame.
+		// On a shader recompile the uniform buffer is replaced and the cached sets reference the old
+		// layout/buffer — drop and dispose them (deferred so an in-flight frame isn't using one).
+		// Texture bindings in _boundResources are preserved (set once at init); the next Set<T>
+		// re-binds the new uniform buffer.
 		if ( oldBuffer != null )
 		{
 			Render.ScheduleDelete( oldBuffer.Dispose );
-			_resourceVersion++;
+
+			if ( _resourceSetCache.Count > 0 )
+			{
+				var old = _resourceSetCache.Values.ToArray();
+				Render.ScheduleDelete( () => { foreach ( var s in old ) DestroyResourceSets( s ); } );
+				_resourceSetCache.Clear();
+			}
 		}
 	}
 }

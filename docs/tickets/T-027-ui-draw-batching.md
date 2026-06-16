@@ -2,7 +2,8 @@
 
 - **Priority**: 🟠 Medium (CPU/GC overhead per frame; lobby has ~22 UI draws)
 - **Type**: Rendering / performance
-- **Status**: ☐ To do
+- **Status**: ⚠️ Partial — per-quad allocations removed + UI resource-set churn fixed; draw-call
+  merging still to do.
 - **Follow-up of**: [T-026](T-026-render-resource-churn.md).
 
 ## Problem
@@ -15,18 +16,26 @@ and many tiny draws. `Graphics.DrawText` already batches a string's glyphs into 
 rebinds its texture and reuses the same shared buffer (so interleaving `Quad` and `DrawText` in a
 frame would clobber).
 
+## Done
+
+- ✅ **Per-quad allocations removed.** `Graphics.Quad` reused a `new List<Vertex>` + `new List<uint>`
+  + two `.ToArray()` every call (~20 quads/frame). Now writes into static reusable 4-vertex / 6-index
+  arrays — zero heap allocation per quad. (`source/OpenTPW/Client/Graphics.cs`.)
+- ✅ **UI resource-set churn fixed.** After T-026 the shared UI material still rebuilt its `ResourceSet`
+  every draw because it rebinds `"Color"` per widget. `Material` now caches resource sets in a
+  dictionary keyed by the bound-resource identities (`ComputeBindingKey`, allocation-free), so each
+  distinct UI texture combination is built once and reused across frames; model materials (stable
+  bindings) hit a single entry. Cleared + disposed on shader recompile. (`Render/Assets/Material.cs`.)
+
 ## To do
 
-1. ☐ Give `Graphics` dedicated batch buffers (separate from model buffers). `Quad`/`DrawText`
-   **append** into reusable arrays (no `List`, no `.ToArray()`; grow with `ArrayPool`/`Array.Resize`,
-   bounded by `MaxVertexCount`/`MaxIndexCount`).
-2. ☐ Flush (`Graphics.FlushBatch()` → one `DrawIndexed`) when: the incoming draw uses a different
-   texture/material, the batch would overflow, or end-of-frame. Add the end-of-frame flush hook in
-   `Renderer.PostRender` **immediately after `OnRender?.Invoke()`** and **before** the MSAA resolve.
-3. ☐ Add a per-texture resource-set cache on `Material.UI` (it rebinds `"Color"` per widget), keyed
-   by the bound `TextureView`. Invalidate an entry when its texture is disposed.
-4. ☐ Preserve child draw order so alpha blending / overlap stays correct (flush-on-texture-change
-   already preserves order). Hoist `CreateScreenMatrix` to a cached value (recompute on resize only).
+1. ☐ Actually **merge** draws: accumulate consecutive same-texture quads/text into one growing
+   vertex/index buffer and flush in as few `DrawIndexed` as possible (currently each quad/string is
+   still its own `UpdateBuffer` + draw on the shared buffer). Add an end-of-frame `Graphics.FlushBatch()`
+   in `Renderer.PostRender` **after `OnRender?.Invoke()`** and **before** the MSAA resolve; flush on
+   texture/material change or overflow; preserve child draw order (alpha blending).
+2. ☐ `Graphics.DrawText` still allocates its vertex/index `List` + `.ToArray()` per call — fold into
+   the same batch buffers. Hoist `CreateScreenMatrix` to a cached value (recompute on resize only).
 
 ## Acceptance
 
