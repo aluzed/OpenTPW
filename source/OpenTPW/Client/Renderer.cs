@@ -10,6 +10,15 @@ public partial class Renderer
 	private double _lastFrameSeconds;
 	public CommandList CommandList = null!;
 
+	// Toggleable FPS overlay (F3). Smoothed over ~0.5s. The original game had an "FPS: %4g" counter
+	// too (see docs/07-ghidra-render.md).
+	public static bool ShowFps = true;
+	private double _fpsAccum;
+	private int _fpsFrames;
+	private float _fps;
+	private bool _fpsKeyWas;
+	private Font? _debugFont;
+
 	public Window Window;
 
 	public Action? PreUpdate;
@@ -127,6 +136,11 @@ public partial class Renderer
 		) );
 
 		OnWindowResized( Window.Size );
+
+		// Small bitmap font for the FPS overlay, loaded here (before any command list is open).
+		try { _debugFont = new Font( "Language/English/GAME12.bf4" ); }
+		catch ( Exception e ) { Log.Warning( $"FPS overlay font unavailable: {e.Message}" ); }
+
 		_presentReady = true;
 	}
 
@@ -181,6 +195,7 @@ public partial class Renderer
 		// Render level to MSAA buffer
 		CommandList.PushDebugGroup( "Main Render" );
 		OnRender?.Invoke();
+		DrawOverlay();         // FPS overlay on top of the scene
 		Graphics.FlushBatch(); // emit any accumulated UI batch before the resolve (T-027)
 		CommandList.PopDebugGroup();
 
@@ -198,7 +213,29 @@ public partial class Renderer
 		CommandList.End();
 
 		Device.SubmitCommands( CommandList );
-		Device.SwapBuffers();
+
+		try
+		{
+			Device.SwapBuffers();
+		}
+		catch ( VeldridException ) when ( Window.SdlWindow.Exists )
+		{
+			// Swapchain went out of date (resize/minimize). Recreate it and skip this frame's present.
+			OnWindowResized( Window.Size );
+		}
+		// If the window is gone (closing), the acquire/present fails harmlessly — Run() will exit.
+	}
+
+	// Draws the FPS overlay (top-left) when enabled. Uses the shared UI batch so it merges/flushes
+	// with the rest of the UI. Lazily loads a small bitmap font; any failure just disables it.
+	private void DrawOverlay()
+	{
+		// Gate on _fps > 0 so it doesn't flash "FPS 0" on the loading screen (Update, which measures
+		// fps, doesn't run during the load — only RenderLoadingScreen does).
+		if ( !ShowFps || _debugFont == null || _fps <= 0f )
+			return;
+
+		Graphics.DrawText( _debugFont, $"FPS {_fps:F0}", 16f, Screen.Size.Y - 16f, TextAlign.Left, 2f );
 	}
 
 	private void Update()
@@ -209,8 +246,27 @@ public partial class Renderer
 
 		InputSnapshot inputSnapshot = Window.SdlWindow.PumpEvents();
 
+		// The pump may have processed a window-close; don't render into a surface that's gone (it
+		// throws "could not acquire next image" in SwapBuffers). Run()'s while-condition then exits.
+		if ( !Window.SdlWindow.Exists )
+			return;
+
 		Time.Update( deltaTime );
 		Input.UpdateFrom( inputSnapshot );
+
+		// FPS overlay: measure (smoothed) and toggle on F3 rising-edge.
+		_fpsAccum += deltaTime;
+		_fpsFrames++;
+		if ( _fpsAccum >= 0.5 )
+		{
+			_fps = (float)(_fpsFrames / _fpsAccum);
+			_fpsAccum = 0;
+			_fpsFrames = 0;
+		}
+		var f3 = Input.Keyboard.KeysDown.Contains( Key.F3 );
+		if ( f3 && !_fpsKeyWas )
+			ShowFps = !ShowFps;
+		_fpsKeyWas = f3;
 
 		PreRender();
 		PreUpdate?.Invoke();
