@@ -35,6 +35,9 @@ in clear (`0x1CD15D46`, `.md2`×43, `M3D2`, `.rse`, `lips`, `.plb`…).
   (`0.382683` = sin π/8, `0.541196`, `1.306563`, `1/(2√2)`). Dequant is `coeff × Q16 matrix`
   at `DAT_00fb7820` (AAN-prescaled). Findings in [T-021](tickets/T-021-tqi-exact-dequant.md)
   (deferred — the current decoder already renders correctly).
+- **`.MTR`** — *no loader exists* (the magic `0x2E5915AF` and string `.mtr` are absent from
+  the runtime). Model textures bind from the `.MD2` itself (`.md2`/`.tga`/`.wct` strings are
+  present). So `.MTR` is a tool artifact, not a runtime format — [T-018](tickets/T-018-mtr-material-semantics.md).
 
 Headless workflow used:
 ```bash
@@ -107,7 +110,7 @@ confirmation** below is what Ghidra would add (on a GOG/decrypted build).
 | `.TQI`/`.TGQ` video | ✅ pixel-accurate | exact AAN dequant tables (`IDCT_DAT`/`UVA_DATA`) | [T-021](tickets/T-021-tqi-exact-dequant.md) |
 | `.BF4` fonts | ✅ done | — | — |
 | `.PLB` particles | ⚠️ names + colour ramp | the non-colour parameter fields | [T-019](tickets/T-019-plb-parameter-fields.md) |
-| `.MTR` materials | ⚠️ header + index array | per-element semantics + texture binding | [T-018](tickets/T-018-mtr-material-semantics.md) |
+| `.MTR` materials | ✅ resolved | *no runtime loader* — texture binding is in the `.MD2` | [T-018](tickets/T-018-mtr-material-semantics.md) |
 | `.LIP` lip-sync | ⚠️ timestamps (µs) | mouth-shape encoding | [T-020](tickets/T-020-lip-mouth-shapes.md) |
 | `.MD2` models | ⚠️ animated done | the static (frameCount-0) header | [T-015](tickets/T-015-md2-static-variant.md) |
 | `.MAP` catalogs | ⚠️ names + SFX header | BANK record fields + SFX per-sound list | [T-016](tickets/T-016-map-entry-records.md) |

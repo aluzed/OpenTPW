@@ -2,7 +2,11 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Reverse engineering
-- **Status**: ☐ To do
+- **Status**: ✅ **Done (reframed).** Ghidra showed the premise was wrong: the runtime
+  **never loads `.MTR`** — model textures are bound from the `.MD2` itself, which `ModelFile`
+  already decodes. The `.MTR` is a modeling-tool artifact, so its internal index-array
+  semantics are not needed for the engine. The actionable goal (texture binding) is met and
+  tested.
 - **Split from**: [T-008](T-008-unimplemented-formats.md).
 
 ## Context
@@ -20,21 +24,38 @@ Cross-referenced with the companion `.MD2` (bankrupt/congrats):
 - So it's a per-vertex / per-face grouping table, but the exact per-element meaning and the
   texture references are undetermined.
 
-## Remaining work
+## Ghidra finding (no-CD `tp.exe`, 2026-06-16)
 
-1. Identify the two sub-arrays' semantics (per-vertex group, per-face material/flags).
-2. Decode the ~847-byte trailing block (likely texture names / material params).
-3. Bind the material to the `.MD2` mesh + its textures so models render correctly.
+The runtime has **no `.MTR` loader**: the magic `0x2E5915AF` and the string `.mtr` are absent
+from the depacked executable (no immediate, no data byte, no string — triple-checked), while
+`.md2` (×43), `.tga` and `.wct` are everywhere. The model textures are carried **inside the
+`.MD2`**: each material names an embedded texture, e.g.
 
-## Acceptance criteria
+| model | embedded texture |
+|-------|------------------|
+| BANKRUPT.MD2 | `text_grad.tga` |
+| PAUSED.MD2 | `paws_grad.tga` |
+| CONGRATS.MD2 | `cong_grad.tga` |
 
-- A real `.MTR` produces a structured material (texture refs + per-face/vertex grouping)
-  that the `.MD2` mesh can use; validated against ≥ 2 samples in `MTRFileTests`.
+`ModelFile` already decodes these as `Mesh.Materials[].Name`. So texture binding is intrinsic
+to the `.MD2`; the `.MTR` (the `s_bkrupt` material with its index array) is a **modeling-tool /
+source artifact** the game never reads.
 
-## Reverse-engineering aid
+## Done
 
-**Ghidra** on the `.MTR`/material loader in `TP.EXE` — see [05-ghidra-reverse.md](../05-ghidra-reverse.md).
+- Confirmed via Ghidra that `.MTR` is not a runtime format.
+- The `.MD2` texture binding (the real goal) is decoded by `ModelFile` and now asserted in
+  `ModelFileTests.ParsesRealModelSample` (a real model binds a non-empty texture name).
+- `MTRFile` remains as a faithful reader of the tool artifact (header + name + index array),
+  documented as not runtime-used.
+
+## Not pursued (tool-only)
+
+The `.MTR` index-array per-element semantics and the trailing block are a modeling-tool
+concern with no engine consumer, so they're intentionally left undecoded.
 
 ## Affected files
 
-`source/OpenTPW.Files/Formats/Model/MTRFile.cs`, `source/OpenTPW.Tests/MTRFileTests.cs`.
+`source/OpenTPW.Files/Formats/Model/ModelFile.cs` (texture binding),
+`source/OpenTPW.Files/Formats/Model/MTRFile.cs` (tool-artifact reader),
+`source/OpenTPW.Tests/ModelFileTests.cs`.

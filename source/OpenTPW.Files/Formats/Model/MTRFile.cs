@@ -8,6 +8,12 @@ namespace OpenTPW;
 ///
 /// No published spec exists; reverse-engineered from samples. <c>.MTR</c> is the material
 /// companion to a same-named <c>.MD2</c> mesh (e.g. <c>BANKRUPT.MTR</c> ↔ <c>BANKRUPT.MD2</c>).
+///
+/// <para><b>Note (T-018):</b> the shipped game <b>never loads <c>.MTR</c></b> — Ghidra shows
+/// no <c>.mtr</c> loader (no magic, no extension string in the runtime). Model textures are
+/// bound from the <c>.MD2</c> itself (see <see cref="ModelFile"/>, <c>Mesh.Materials[].Name</c>).
+/// This reader is kept for the on-disc tool artifact; its index array is not needed by the
+/// engine.</para>
 /// Layout (confirmed):
 /// <code>
 ///   0  : 4   magic 0x2E5915AF

@@ -75,6 +75,13 @@ public class ModelFileTests
 				"vertex positions are finite" );
 		}
 
+		// The model carries its own texture binding (the runtime never loads the companion
+		// .MTR — Ghidra confirms no .mtr loader): each material names a texture embedded in
+		// the .MD2 (e.g. PAUSED.MD2 -> "paws_grad"). See T-018.
+		Assert.IsTrue(
+			model.Meshes.Any( m => m.Materials.Any( mat => !string.IsNullOrEmpty( mat.Name ) ) ),
+			"a model should bind at least one texture name from the .MD2 itself" );
+
 		// Verified by rendering: a real PAUSED.MD2 reconstructs as the 3D "PAUSED" sign.
 		// Note: legacy .MD2 versions (offset-4 != 0xDD, e.g. GARROW.MD2 = 0x18) are rejected
 		// with a clear InvalidDataException, matching the original loader; see T-015.

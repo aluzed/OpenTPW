@@ -36,7 +36,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-015](T-015-md2-static-variant.md) | 🟡 Feature | ⚠️ Partial | `.MD2` version gate (0xDD/0xCB) Ghidra-confirmed; legacy decode remains |
 | [T-016](T-016-map-entry-records.md) | 🟡 Feature | ⚠️ Partial | `.MAP`: variant detection + SFX category header done; record fields need Ghidra |
 | [T-017](T-017-tpws-saves.md) | 🟡 Feature | ☐ To do | `.TPWS` save files: complete read + implement write |
-| [T-018](T-018-mtr-material-semantics.md) | 🟡 Feature | ☐ To do | `.MTR` material semantics + `.MD2` texture binding |
+| [T-018](T-018-mtr-material-semantics.md) | 🟡 Feature | ✅ Done | `.MTR` not runtime-used (Ghidra); `.MD2` carries texture binding (decoded + tested) |
 | [T-019](T-019-plb-parameter-fields.md) | 🟡 Feature | ☐ To do | `.PLB` particle parameter fields (beyond the colour ramp) |
 | [T-020](T-020-lip-mouth-shapes.md) | 🟡 Feature | ☐ To do | `.LIP` mouth-shape semantics + lip-sync wiring |
 | [T-021](T-021-tqi-exact-dequant.md) | ⚪ Polish | ⏸️ Deferred | `.TQI`: float AAN IDCT confirmed (Ghidra); exact port deferred (decoder already renders correctly) |
