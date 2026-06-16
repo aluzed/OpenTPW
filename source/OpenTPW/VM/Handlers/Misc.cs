@@ -50,13 +50,6 @@ public partial class OpcodeHandlers
 			Log.Trace( "TODO: End slice" );
 		}
 
-		[OpcodeHandler( Opcode.GETTIME, "Gets the time the ride has been alive for" )]
-		public static void GetTime( ref RideVM vm, Operand dest )
-		{
-			dest.Value = 0; // TODO
-			Log.Trace( "TODO: Get time" );
-		}
-
 		[OpcodeHandler( Opcode.ADDOBJ, "Add an object" )]
 		public static void AddObj( ref RideVM vm, Operand type, Operand parameter, Operand id, Operand slot )
 		{

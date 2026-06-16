@@ -164,6 +164,46 @@ public class RideScriptTests
 		OpcodeHandlers.Logic.Return( ref vm );
 	}
 
+	// Date/time opcodes read the (injectable) wall clock and return raw C tm fields:
+	// year since 1900, month 0-11. Semantics recovered from the executor (T-007).
+	[TestMethod]
+	public void DateTimeOpcodes()
+	{
+		Log = new();
+		var vm = LoadTestVm();
+		vm.WallClock = () => new DateTime( 2001, 6, 15, 13, 30, 45 );
+		var dest = new Operand( vm, Operand.Type.Variable, 0, 0 );
+
+		OpcodeHandlers.Time.Year( ref vm, dest );   Assert.AreEqual( 101, dest.Value ); // 2001 - 1900
+		OpcodeHandlers.Time.Month( ref vm, dest );  Assert.AreEqual( 5, dest.Value );   // June -> 5
+		OpcodeHandlers.Time.Day( ref vm, dest );    Assert.AreEqual( 15, dest.Value );
+		OpcodeHandlers.Time.Hour( ref vm, dest );   Assert.AreEqual( 13, dest.Value );
+		OpcodeHandlers.Time.Minute( ref vm, dest ); Assert.AreEqual( 30, dest.Value );
+		OpcodeHandlers.Time.Second( ref vm, dest ); Assert.AreEqual( 45, dest.Value );
+	}
+
+	// GETTIME reports the ride clock; SETTIMER sets expiry = now + value; GETTIMER returns the
+	// remaining time, clamped to zero once elapsed (T-007).
+	[TestMethod]
+	public void TimerOpcodes()
+	{
+		Log = new();
+		var vm = LoadTestVm();
+		var dest = new Operand( vm, Operand.Type.Variable, 0, 0 );
+
+		vm.GameTime = 1000;
+		OpcodeHandlers.Time.GetTime( ref vm, dest );
+		Assert.AreEqual( 1000, dest.Value );
+
+		OpcodeHandlers.Time.SetTimer( ref vm, Lit( vm, 500 ) ); // expires at 1500
+		OpcodeHandlers.Time.GetTimer( ref vm, dest );
+		Assert.AreEqual( 500, dest.Value );
+
+		vm.GameTime = 1600; // past expiry
+		OpcodeHandlers.Time.GetTimer( ref vm, dest );
+		Assert.AreEqual( 0, dest.Value, "elapsed timer clamps to zero" );
+	}
+
 	private static RideVM LoadTestVm()
 	{
 		var path = Path.Combine( AppContext.BaseDirectory, "content", "testscripts", "Test.RSE" );

@@ -2,9 +2,9 @@
 
 The ride-script VM (`.RSE` / RSSEQ) has **exactly 106 opcodes (0–105)**. This table is the
 **ground truth**, extracted from the original `tp.exe` (no-CD) via Ghidra: a `(name, operandCount)`
-pointer-pair array at VA `0x765280` (the VM's opcode descriptor table; magic check `"RSSE"`
-= `0x45535352` in the loader `FUN_005587f0`). The old "210" figure double-counted the array's
-two pointers per opcode.
+pointer-pair array at VA `0x765280`, dispatched by the executor `FUN_00551cb0` (which checks the
+`0x80`-tagged opcode word, bounds `< 0x6A`, then jumps via the table at `0x5567d8`). The old
+"210" figure double-counted the descriptor array's two pointers per opcode.
 
 The **Operands** column is authoritative and is what the reflection dispatcher
 (`OpcodeHandlerAttribute`) must match — a handler with the wrong arity throws at runtime.
@@ -15,8 +15,9 @@ The **Operands** column is authoritative and is what the reflection dispatcher
   (objects, animations, sound, lights, walk/limbo, scream…) that needs engine subsystems that
   don't exist yet.
 
-Status: **34 / 106 implemented**; of the rest, **43 are `pure`** (the actionable batch) and
-**63 are `engine`** (blocked on the ride engine). See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md).
+Status: **42 / 106 implemented**. Of all 106, **43 are `pure`** and **63 are `engine`**. The
+date/time + timer opcodes (`YEAR`…`SEC`, `GETTIME`, `SETTIMER`, `GETTIMER`) were implemented
+from the executor's verified semantics — see [tickets/T-007](tickets/T-007-vm-opcodes-rse.md).
 
 | # | Opcode | Operands | Implemented | Kind |
 |---|--------|:--------:|:-----------:|------|
@@ -115,15 +116,15 @@ Status: **34 / 106 implemented**; of the rest, **43 are `pure`** (the actionable
 | 92 | `SETREMOTEVAR` | 3 | ☐ | engine |
 | 93 | `REPAIREFFECT` | 1 | ☐ | engine |
 | 94 | `GETCUSTPTCLCODE` | 2 | ☐ | engine |
-| 95 | `SETTIMER` | 1 | ☐ | pure |
-| 96 | `GETTIMER` | 1 | ☐ | pure |
-| 97 | `YEAR` | 1 | ☐ | pure |
-| 98 | `MONTH` | 1 | ☐ | pure |
-| 99 | `DAY` | 1 | ☐ | pure |
-| 100 | `HOUR` | 1 | ☐ | pure |
-| 101 | `MIN` | 1 | ☐ | pure |
-| 102 | `SEC` | 1 | ☐ | pure |
+| 95 | `SETTIMER` | 1 | ✅ | pure |
+| 96 | `GETTIMER` | 1 | ✅ | pure |
+| 97 | `YEAR` | 1 | ✅ | pure |
+| 98 | `MONTH` | 1 | ✅ | pure |
+| 99 | `DAY` | 1 | ✅ | pure |
+| 100 | `HOUR` | 1 | ✅ | pure |
+| 101 | `MIN` | 1 | ✅ | pure |
+| 102 | `SEC` | 1 | ✅ | pure |
 | 103 | `SETREVERB` | 1 | ☐ | engine |
 | 104 | `DIPMUSIC` | 1 | ☐ | engine |
 | 105 | `SPARK` | 4 | ☐ | engine |
-_Generated from the binary opcode table; see docs/05-ghidra-reverse.md for the method._
+_Generated from the binary opcode table; method in docs/05-ghidra-reverse.md._

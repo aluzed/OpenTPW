@@ -52,6 +52,13 @@ runtime). Classification: **43 `pure`** (VM-state only — implementable now) an
    `RideScriptTests.StackIsLifoAndGuarded`.
 7. ✅ Recovered the **opcode table from the binary** (106 opcodes + operand counts), corrected
    the total (`210 → 106`), and **fixed the `POP` arity** (1 operand, not 0).
+8. ✅ **Batch A (time) implemented** from the executor `FUN_00551cb0`: the date opcodes
+   `YEAR/MONTH/DAY/HOUR/MIN/SEC` read the wall clock and return raw C `tm` fields (year−1900,
+   month 0–11; offsets confirmed: sec@0, min@4, hour@8, mday@0xC, mon@0x10, year@0x14), and
+   `GETTIME`/`SETTIMER`/`GETTIMER` use the ride's game clock (`SETTIMER` expiry = now+value,
+   `GETTIMER` = max(0, expiry−now)). New `Handlers/Time.cs`; the VM gained an injectable
+   `WallClock`, `GameTime`, and `Timer`. Coverage **34 → 42 / 106**. Covered by
+   `RideScriptTests.DateTimeOpcodes` / `TimerOpcodes`.
 
 > Note: the instruction doc describes `CMP` as a *bitwise-AND* comparison, but the current
 > `Math.Compare` does equality/less-than. Left as-is for now (changing it could shift branch

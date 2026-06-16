@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System;
+using System.Reflection;
 
 namespace OpenTPW;
 
@@ -10,6 +11,18 @@ public partial class RideVM
 
 	public bool IsRunning { get; set; }
 	public int CurrentPos { get; set; }
+
+	// Wall clock used by the date/time opcodes (YEAR..SEC). The original calls the C runtime
+	// time()/localtime(); injectable here so scripts (and tests) are deterministic.
+	public Func<DateTime> WallClock { get; set; } = () => DateTime.Now;
+
+	// Ride-alive time in the game's clock units (the original reads a global ms counter); the
+	// engine advances this. GETTIME reports it; SETTIMER/GETTIMER work relative to it.
+	public int GameTime { get; set; }
+
+	// Single ride timer (the original keeps one per script). SETTIMER sets its expiry to
+	// GameTime + value; GETTIMER returns the remaining time (never negative).
+	public int Timer { get; set; }
 	public string Disassembly => rsseqFile.Disassembly;
 	public List<Instruction> Instructions { get; } = new List<Instruction>();
 
