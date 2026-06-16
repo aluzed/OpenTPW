@@ -1,5 +1,16 @@
 namespace OpenTPW;
 
+/// <summary>Horizontal anchoring of a text line relative to the layout origin.</summary>
+public enum TextAlign
+{
+	/// <summary>The line starts at the origin x.</summary>
+	Left,
+	/// <summary>The line is centred on the origin x.</summary>
+	Center,
+	/// <summary>The line ends at the origin x.</summary>
+	Right,
+}
+
 /// <summary>
 /// Packs a decoded <see cref="BF4File"/> into a single RGBA atlas (white pixels, alpha = the
 /// glyph mask) plus a per-character glyph table, and lays text out using the glyph metrics.
@@ -29,6 +40,9 @@ public sealed class FontAtlas
 
 	/// <summary>RGBA8 atlas pixels (row-major): white with alpha = the glyph coverage mask.</summary>
 	public byte[] Pixels { get; }
+
+	/// <summary>Vertical advance between text lines (the tallest glyph height); used for newlines.</summary>
+	public int LineHeight { get; private set; }
 
 	/// <summary>Packed glyphs keyed by character code (first occurrence wins for duplicates).</summary>
 	public IReadOnlyDictionary<int, Glyph> Glyphs => glyphs;
@@ -99,6 +113,8 @@ public sealed class FontAtlas
 				(float)(x + src.Width) / Width, (float)(y + src.Height) / Height,
 				src.XBearing, src.YBearing, src.Advance );
 		}
+
+		LineHeight = glyphs.Values.Count == 0 ? 0 : glyphs.Values.Max( g => g.Height );
 	}
 
 	/// <summary>Total advance width of <paramref name="text"/> in pixels (characters with no glyph are skipped).</summary>
@@ -117,25 +133,40 @@ public sealed class FontAtlas
 	/// <summary>
 	/// Lays <paramref name="text"/> out from a pen origin, returning one <see cref="PlacedGlyph"/>
 	/// per drawable character (its destination rect uses the bearings; the pen advances by Advance).
+	/// Honors <c>\n</c> line breaks (each line drops by <see cref="LineHeight"/>) and
+	/// <paramref name="align"/> anchors each line horizontally at <paramref name="originX"/>.
 	/// </summary>
-	public IReadOnlyList<PlacedGlyph> Layout( string text, float originX = 0, float originY = 0 )
+	public IReadOnlyList<PlacedGlyph> Layout( string text, float originX = 0, float originY = 0,
+		TextAlign align = TextAlign.Left )
 	{
 		var placed = new List<PlacedGlyph>();
-		var penX = originX;
+		var lineY = originY;
 
-		foreach ( var c in text )
+		foreach ( var line in text.Replace( "\r", "" ).Split( '\n' ) )
 		{
-			if ( !glyphs.TryGetValue( c, out var g ) )
-				continue;
-
-			if ( g.Width > 0 && g.Height > 0 )
+			var penX = originX;
+			if ( align != TextAlign.Left )
 			{
-				placed.Add( new PlacedGlyph(
-					penX + g.XBearing, originY + g.YBearing, g.Width, g.Height,
-					g.U0, g.V0, g.U1, g.V1 ) );
+				var width = Measure( line );
+				penX = align == TextAlign.Center ? originX - width / 2f : originX - width;
 			}
 
-			penX += g.Advance;
+			foreach ( var c in line )
+			{
+				if ( !glyphs.TryGetValue( c, out var g ) )
+					continue;
+
+				if ( g.Width > 0 && g.Height > 0 )
+				{
+					placed.Add( new PlacedGlyph(
+						penX + g.XBearing, lineY + g.YBearing, g.Width, g.Height,
+						g.U0, g.V0, g.U1, g.V1 ) );
+				}
+
+				penX += g.Advance;
+			}
+
+			lineY += LineHeight;
 		}
 
 		return placed;

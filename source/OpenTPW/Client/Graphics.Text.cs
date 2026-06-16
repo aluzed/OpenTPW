@@ -7,12 +7,12 @@ internal static partial class Graphics
 	/// atlas UVs and the BF4 advance/bearing metrics (via <see cref="FontAtlas.Layout"/>).
 	/// UI-space coordinates; <paramref name="x"/>/<paramref name="y"/> is the pen origin.
 	/// </summary>
-	public static void DrawText( Font font, string text, float x, float y )
+	public static void DrawText( Font font, string text, float x, float y, TextAlign align = TextAlign.Left )
 	{
 		var material = Material.UI;
 		material.Set( "Color", font.Texture );
 
-		foreach ( var g in font.Atlas.Layout( text, x, y ) )
+		foreach ( var g in font.Atlas.Layout( text, x, y, align ) )
 		{
 			Quad(
 				new Rectangle( g.X, g.Y, g.Width, g.Height ),

@@ -97,6 +97,32 @@ public class FontAtlasTests
 		Assert.AreEqual( atlas.Glyphs['L'].U0, placed[0].U0, 1e-6 );
 	}
 
+	[TestMethod]
+	public void LaysOutMultipleLines()
+	{
+		var atlas = BuildAtlas();
+		Assert.AreEqual( 5, atlas.LineHeight, "line height = tallest glyph" );
+
+		// "LI" on line 0, "L" on line 1 (drops by LineHeight).
+		var placed = atlas.Layout( "LI\nL" );
+		Assert.AreEqual( 3, placed.Count );
+		Assert.AreEqual( 2f, placed[0].Y, 1e-6 );      // line 0: originY 0 + yBearing 2
+		Assert.AreEqual( 5f + 2f, placed[2].Y, 1e-6 ); // line 1: + LineHeight 5
+		Assert.AreEqual( 1f, placed[2].X, 1e-6 );      // line 1 pen reset to origin
+	}
+
+	[TestMethod]
+	public void AlignsLinesHorizontally()
+	{
+		var atlas = BuildAtlas(); // "LI" measures 10 (6 + 4)
+
+		// Centered on x=100 -> line starts at 100 - 10/2 = 95; 'L' adds xbearing 1.
+		Assert.AreEqual( 96f, atlas.Layout( "LI", 100, 0, TextAlign.Center )[0].X, 1e-6 );
+
+		// Right-anchored at x=100 -> line starts at 100 - 10 = 90; 'L' -> 91.
+		Assert.AreEqual( 91f, atlas.Layout( "LI", 100, 0, TextAlign.Right )[0].X, 1e-6 );
+	}
+
 	// Optional: build an atlas from a real font and sanity-check it. Set TPW_FONT_SAMPLE.
 	[TestMethod]
 	public void BuildsAtlasFromRealFont()
