@@ -17,12 +17,15 @@ You therefore **need a legal copy of the game** to provide the assets — which 
 - **Stage: boots & runs on Linux** (window + Vulkan render loop), not yet playable. Verified by
   running on an AMD Radeon (Mesa/Vulkan) after fixing the Vulkan `libdl` load ([T-023](tickets/T-023-linux-vulkan-libdl.md)).
   The **lobby renders** — island, advisor model, water, sky, and the purple buttons with text
-  labels — behind a "LOADING…" screen during the (synchronous) level load
-  ([T-024](tickets/T-024-linux-black-screen.md), resolved). The lobby render loop is **not yet
-  smooth**: per-frame GPU resource churn (a synchronous queue submit per uniform bind, ephemeral
-  resource sets per draw) makes frames take seconds — being addressed in
-  [T-026](tickets/T-026-render-resource-churn.md)/[T-027](tickets/T-027-ui-draw-batching.md)/[T-028](tickets/T-028-frame-cpu-hygiene.md);
-  the load itself is still synchronous ([T-030](tickets/T-030-async-level-load.md)).
+  labels — behind a "LOADING…" screen during the level load
+  ([T-024](tickets/T-024-linux-black-screen.md), resolved). The lobby now runs at **vsync ~60 fps**:
+  the per-frame GPU resource churn (a synchronous queue submit per uniform bind, ephemeral resource
+  sets per draw) is fixed — resource sets are cached, uniforms recorded on the frame command list,
+  and UI draws batched ([T-026](tickets/T-026-render-resource-churn.md)/[T-027](tickets/T-027-ui-draw-batching.md)/[T-028](tickets/T-028-frame-cpu-hygiene.md)).
+  The level load is still synchronous but no longer freezes the window — it shows a per-step progress
+  bar ([T-030](tickets/T-030-async-level-load.md); fully-threaded load is the remaining optional bit).
+  The original engine's render loop was reverse-engineered for comparison
+  ([T-029](tickets/T-029-native-render-loop-re.md), [05](05-ghidra-reverse.md)/[07](07-ghidra-render.md)).
 - **Upstream** (`OpenTPW/OpenTPW`) is dormant (last real activity early 2025). **This fork**
   is under active development: full Linux portability, CI, and a large reverse-engineering
   push this session (see the Update below).
