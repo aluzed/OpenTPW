@@ -82,7 +82,11 @@ public class SoundFile : BaseFormat
 		// Unknown
 		_ = memoryStream.ReadInt32();
 
-		// Rest of Data
+		// The audio payload begins exactly `headerSize` bytes into the record. The field reads above
+		// are for metadata and do NOT necessarily sum to headerSize (observed: 40-byte headers), so
+		// reading soundData from the current cursor started ~6 bytes mid-frame — the MPEG decoder had
+		// to resync and dropped/garbled the first frame on every loop. Seek by headerSize instead.
+		memoryStream.Seek( offset + headerSize, SeekOrigin.Begin );
 		var soundData = memoryStream.ReadBytes( soundDataSize );
 
 		// Gather full byte data of file
