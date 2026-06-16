@@ -15,10 +15,9 @@
     waveform is coherent audio (a jingle), not noise. The **TQI video frame header** is
     parsed too (`GetVideoInfo()` → width/height; confirmed 320×352 on BF.TGQ, matching
     `ffprobe`). The video content was confirmed decodable via ffprobe/ffmpeg (BF.TGQ is the
-    Bullfrog frog logo). **Remaining**: the TQI pixel decoder — an MPEG-1-style intra DCT
-    codec (DC/AC VLC + IDCT + 4:2:0). It must be implemented **independently from the MPEG-1
-    spec** (do not port FFmpeg's LGPL decoder into this MIT project); that is a sizeable
-    separate effort. Mono-audio support also remains.
+    Bullfrog frog logo). **TQI pixel decoder — reverse-engineered (prototype works, sync
+    solved); remaining is the exact dequant.** See the detailed notes below. Mono-audio
+    support also remains.
   - `.BF4` **fonts** parsed (`OpenTPW.Files/Formats/Font/BF4File.cs`): magic "F4FB",
     glyph count, offset table (tiles exactly to the first glyph), per-glyph **char code**,
     and **width/height + 1bpp bitmap decoded** (block offsets 16/18 = width/height; bitmap
@@ -84,6 +83,33 @@ Each glyph block (≈24–32 bytes): `uint32 charCode`, then 12 bytes of fields
 down), then the **1bpp bitmap @24** (MSB-first, width bits/row, height rows). Width,
 height and bitmap are confirmed (atlas render). The two fields at @20–23 and the @4–15
 fields remain to be identified.
+
+## TQI pixel decoder — reverse-engineering notes (sync solved)
+
+A from-scratch decoder was prototyped (Python) and verified against an ffmpeg reference
+frame. The full frame decodes **in perfect sync** (consumes the whole bitstream, zero
+desyncs) and reconstructs the reference's structure and rough colors. It is an MPEG-1
+intra-style codec with EA-specific framing. Findings:
+
+- **Frame (pIQT) header (8 bytes)**: `uint16 width`, `uint16 height`, `byte quant` (@4),
+  3 unused bytes; the bitstream starts at offset **8**.
+- **Bitstream is byte-swapped in 32-bit words** before bit reading (the EA `bswap_buf`
+  step). This was the key blocker — without it everything desyncs. Reverse each aligned
+  4-byte group, then read MSB-first.
+- **Macroblocks**: row-major, **6 blocks each (4:2:0)** = Y0,Y1,Y2,Y3,Cb,Cr. No per-MB
+  header. DC predictors reset once at frame start.
+- **Block decode = MPEG-1 intra**: DC size VLC (luma/chroma) + differential DC, then the
+  MPEG-1 AC run/level VLC with `0xFFFF` escape and the `0x0001`/next-bit EOB rule. Tables
+  + tree-traversal taken from the **MIT-licensed jsmpeg** (so portable into this MIT repo;
+  the VLC values are ISO MPEG-1 facts anyway).
+- **Remaining (the only gap)**: the **dequantization must match EA's AAN qtable**, not the
+  plain MPEG-1 dequant — `qscale = (215 - 2*quant)*5` and
+  `intra_matrix[i] = (ff_inv_aanscales[i] * mpeg1_intra[i] * qscale + 32) >> 14`
+  (DC: `(ff_inv_aanscales[0] * mpeg1_intra[0]) >> 11`), feeding an AAN IDCT. Using the
+  plain dequant makes AC too small relative to DC (blocky) and chroma slightly off. Port
+  with `ff_inv_aanscales` + a matching AAN IDCT to get a pixel-accurate frame.
+- **Verification harness**: `ffmpeg -i movie.tgq -frames:v 1 -pix_fmt rgb24 ref.rgb`
+  (ffmpeg used only as an external reference, never linked/ported).
 
 ## Formats to handle
 
