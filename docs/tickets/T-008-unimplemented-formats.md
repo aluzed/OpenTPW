@@ -31,8 +31,13 @@
   - `.LIP`/`.LIPS` **lip-sync** parsed (`OpenTPW.Files/Formats/Sound/LipSyncFile.cs`):
     a flat list of little-endian uint32 mouth keyframe timestamps, terminated by
     `0xFFFFFFFF`, monotonically non-decreasing (verified on real EN/DANISH samples).
-    Validated by `LipSyncFileTests` (synthetic + real via `TPW_LIP_SAMPLE`). **Remaining**:
-    the timestamp unit and the mouth-shape semantics.
+    Validated by `LipSyncFileTests` (synthetic + real via `TPW_LIP_SAMPLE`). The **timestamp
+    unit is now pinned down: microseconds** — for every `sp_001.LIP` on the disc the last
+    keyframe (as µs) lands just under the companion `speechHD.SDT` clip's duration (jungle
+    28.58 s vs 28.63, fantasy 21.96 vs 22.15, hallow 26.53 vs 26.59, space 23.89 vs 23.93,
+    confirmed with ffprobe). `LipSyncFile` exposes `Duration`/`TimeOf`/`UnitsPerSecond`.
+    **Remaining**: the mouth-shape semantics (a keyframe currently carries only a timestamp;
+    whether a shape index is encoded elsewhere is unknown).
   - `.MTR` **materials** parsed (`OpenTPW.Files/Formats/Model/MTRFile.cs`): magic
     0x2E5915AF, version, and the material name (the header's name offset points to the
     embedded string, e.g. "s_bkrupt" — confirmed). `.MTR` is the material companion to the

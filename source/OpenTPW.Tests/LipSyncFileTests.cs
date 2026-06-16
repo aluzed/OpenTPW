@@ -27,6 +27,10 @@ public class LipSyncFileTests
 		var lip = new LipSyncFile( stream );
 
 		CollectionAssert.AreEqual( new uint[] { 0, 1378095, 4497959, 5268752 }, lip.Keyframes );
+
+		// Timestamps are microseconds: the last keyframe (5268752 µs) is ~5.27 s.
+		Assert.AreEqual( TimeSpan.FromMicroseconds( 5268752 ), lip.Duration );
+		Assert.AreEqual( 5.268752, lip.Duration.TotalSeconds, 1e-6 );
 	}
 
 	// Optional validation against a real .LIP. Set TPW_LIP_SAMPLE.
@@ -45,5 +49,9 @@ public class LipSyncFileTests
 		// Keyframe timestamps must be monotonically non-decreasing.
 		for ( var i = 1; i < lip.Keyframes.Count; i++ )
 			Assert.IsTrue( lip.Keyframes[i] >= lip.Keyframes[i - 1], $"keyframe {i} not monotonic" );
+
+		// Microsecond unit: a speech clip's duration is a few-to-tens of seconds.
+		Assert.IsTrue( lip.Duration > TimeSpan.Zero && lip.Duration < TimeSpan.FromMinutes( 5 ),
+			$"duration {lip.Duration} should be a plausible speech length" );
 	}
 }
