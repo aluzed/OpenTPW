@@ -293,6 +293,37 @@ public class RideScriptTests
 		Assert.AreEqual( 7, dest.Value );
 	}
 
+	// SPAWNCHILD resolves a string-named child script via the engine's ChildLoader, links it as
+	// the active child, and (once spawned) the child-variable opcodes operate on it (T-007).
+	[TestMethod]
+	public void SpawnChildLinksAndDrivesChildVars()
+	{
+		Log = new();
+		var parent = LoadTestVm();
+		var spawned = LoadTestVm();
+		parent.Strings[1000] = "carscript";
+		parent.ChildLoader = name => name == "carscript" ? spawned : null;
+
+		// No child yet: a child-var op is a guarded no-op.
+		OpcodeHandlers.Hierarchy.SetVarInChild( ref parent, Lit( parent, 0 ), Lit( parent, 5 ) );
+		Assert.AreNotEqual( 5, spawned.Variables[0] );
+
+		// Spawn it, then drive its variables.
+		var nameOperand = new Operand( parent, Operand.Type.String, 1000 );
+		OpcodeHandlers.Hierarchy.SpawnChild( ref parent, nameOperand );
+		Assert.AreSame( spawned, parent.ActiveChild );
+		Assert.AreSame( parent, spawned.Parent );
+		CollectionAssert.Contains( parent.Children, spawned );
+
+		OpcodeHandlers.Hierarchy.SetVarInChild( ref parent, Lit( parent, 2 ), Lit( parent, 42 ) );
+		Assert.AreEqual( 42, spawned.Variables[2] );
+
+		// An unknown script name spawns nothing (no throw).
+		parent.Strings[1001] = "missing";
+		OpcodeHandlers.Hierarchy.SpawnChild( ref parent, new Operand( parent, Operand.Type.String, 1001 ) );
+		Assert.AreEqual( 1, parent.Children.Count );
+	}
+
 	private static RideVM LoadTestVm()
 	{
 		var path = Path.Combine( AppContext.BaseDirectory, "content", "testscripts", "Test.RSE" );

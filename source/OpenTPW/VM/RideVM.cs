@@ -31,6 +31,16 @@ public partial class RideVM
 	public RideVM? Parent { get; set; }
 	public RideVM? ActiveChild { get; set; }
 
+	/// <summary>Child ride scripts spawned by this one (via SPAWNCHILD).</summary>
+	public List<RideVM> Children { get; } = new();
+
+	/// <summary>
+	/// How SPAWNCHILD turns a child-script name into a child VM. The engine sets this to load
+	/// the named <c>.RSE</c> from the VFS; left null, SPAWNCHILD is a no-op (and tests inject a
+	/// fake). The original builds a path from the name and calls the script loader (FUN_005587f0).
+	/// </summary>
+	public Func<string, RideVM?>? ChildLoader { get; set; }
+
 	// Set by WAIT/WAITABS: the game-time the script should resume at. While set, the WAIT
 	// instruction re-runs each tick (the original rewinds its PC) until GameTime reaches it.
 	// null = not waiting. See Handlers/Time.cs and docs/tickets/T-007.

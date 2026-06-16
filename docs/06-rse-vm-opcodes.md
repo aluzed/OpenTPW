@@ -1,23 +1,14 @@
 # 06 — RSE VM opcode table (ground truth from the binary)
 
-The ride-script VM (`.RSE` / RSSEQ) has **exactly 106 opcodes (0–105)**. This table is the
-**ground truth**, extracted from the original `tp.exe` (no-CD) via Ghidra: a `(name, operandCount)`
-pointer-pair array at VA `0x765280`, dispatched by the executor `FUN_00551cb0` (which checks the
-`0x80`-tagged opcode word, bounds `< 0x6A`, then jumps via the table at `0x5567d8`). The old
-"210" figure double-counted the descriptor array's two pointers per opcode.
+The ride-script VM (`.RSE` / RSSEQ) has **exactly 106 opcodes (0–105)**, extracted from the
+original `tp.exe` (no-CD) via Ghidra: a `(name, operandCount)` array at VA `0x765280`,
+dispatched by the executor `FUN_00551cb0` (opcode word tagged `0x80`, bounds `< 0x6A`, jump
+table at `0x5567d8`). The **Operands** column is authoritative (the reflection dispatcher must
+match it). **Kind**: `pure` = VM-state only (done); `engine` = needs the ride engine.
 
-The **Operands** column is authoritative and is what the reflection dispatcher
-(`OpcodeHandlerAttribute`) must match — a handler with the wrong arity throws at runtime.
-
-- **Implemented**: a handler exists in `source/OpenTPW/VM/Handlers/`.
-- **Kind**: `pure` = realizable with VM state only (arithmetic, flags, stack, variables,
-  timers, date, VM hierarchy, the wait scheduler, the secondary HUSH/HOP stack) — implemented
-  and unit-tested. `engine` = a ride-engine side effect (objects, animations, sound, lights,
-  walk/limbo, scream…) that needs engine subsystems that don't exist yet.
-
-Status: **50 / 106 implemented**. **Batch A (all 43 `pure` opcodes) is COMPLETE.** The
-remaining **63 are `engine`** (Batch B), blocked on the ride engine and on `SPAWNCHILD`.
-See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md).
+Status: **51 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus **SPAWNCHILD**
+(first Batch B opcode: its VM-level child-script linkage; the actual script load is injected by
+the engine). See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md).
 
 | # | Opcode | Operands | Implemented | Kind |
 |---|--------|:--------:|:-----------:|------|
@@ -84,7 +75,7 @@ See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md).
 | 60 | `FORCEUNLIMBO` | 1 | ☐ | engine |
 | 61 | `INLIMBO` | 1 | ☐ | engine |
 | 62 | `LIMBOSPACE` | 1 | ☐ | engine |
-| 63 | `SPAWNCHILD` | 1 | ☐ | engine |
+| 63 | `SPAWNCHILD` | 1 | ✅ | engine |
 | 64 | `SPAWNSOUND` | 1 | ☐ | engine |
 | 65 | `REMOVECHILD` | 0 | ☐ | engine |
 | 66 | `SETVARINCHILD` | 2 | ✅ | pure |

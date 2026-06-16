@@ -79,10 +79,21 @@ runtime). Classification: **43 `pure`** (VM-state only — implementable now) an
     pops into dest (underflow-guarded). Coverage **48 → 50 / 106**. Covered by
     `RideScriptTests.HushHopSecondaryStack`.
 
-**Batch A is COMPLETE** — all **43 `pure` opcodes** are implemented and unit-tested. What
-remains is **Batch B (63 `engine` opcodes)**: objects, animations, sound, lights, walk/limbo,
-scream, and `SPAWNCHILD` (which would let the child/parent-var opcodes run in real scripts).
-These are blocked on the ride engine, which is the next subsystem rather than a VM task.
+**Batch A is COMPLETE** — all **43 `pure` opcodes** are implemented and unit-tested.
+
+12. ✅ **SPAWNCHILD** (first Batch B opcode) — reversed from the executor: its operand is a
+    **string** naming a child `.RSE`; the original builds a path and calls the script loader
+    (`FUN_005587f0`) to create a child VM. Implemented at the VM level: it resolves the name and
+    defers the load to an injectable `RideVM.ChildLoader` (the engine supplies the VFS loader;
+    tests inject a fake), then links `Parent`/`ActiveChild`/`Children`. This makes the
+    child/parent-var opcodes usable in real scripts. Coverage **50 → 51 / 106**. Covered by
+    `RideScriptTests.SpawnChildLinksAndDrivesChildVars`.
+
+**Remaining: Batch B (the other 55 `engine` opcodes)** — objects (`ADDOBJ`…), animations,
+sound, lights, walk/limbo, scream. These create world entities / trigger render+audio, so they
+need the **ride engine** to build and verify (not a headless VM task). Reversed semantics are
+available; the engine is the next subsystem. The remaining wiring (e.g. setting `ChildLoader`
+to the real VFS loader where ride VMs are created) is engine glue done with the running engine.
 
 > Note: the instruction doc describes `CMP` as a *bitwise-AND* comparison, but the current
 > `Math.Compare` does equality/less-than. Left as-is for now (changing it could shift branch

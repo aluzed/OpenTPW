@@ -12,6 +12,30 @@ partial class OpcodeHandlers
 	/// </summary>
 	public static class Hierarchy
 	{
+		[OpcodeHandler( Opcode.SPAWNCHILD, "Spawn a child ride script by name and make it the active child." )]
+		public static void SpawnChild( ref RideVM vm, Operand scriptName )
+		{
+			// The operand is a string index naming the child .RSE (the original builds a path and
+			// calls the script loader). We resolve the name, then defer the actual load to the
+			// engine-supplied ChildLoader; the parent/child link is what the var opcodes use.
+			if ( !vm.Strings.TryGetValue( scriptName.Value, out var name ) )
+			{
+				Log.Warning( $"SPAWNCHILD: no string at {scriptName.Value}; ignoring" );
+				return;
+			}
+
+			var child = vm.ChildLoader?.Invoke( name );
+			if ( child == null )
+			{
+				Log.Warning( $"SPAWNCHILD: could not spawn child '{name}' (no loader or not found)" );
+				return;
+			}
+
+			child.Parent = vm;
+			vm.ActiveChild = child;
+			vm.Children.Add( child );
+		}
+
 		[OpcodeHandler( Opcode.SETVARINCHILD, "Set variable [index] in the active child VM to value." )]
 		public static void SetVarInChild( ref RideVM vm, Operand index, Operand value )
 			=> SetVar( vm.ActiveChild, index.Value, value.Value );
