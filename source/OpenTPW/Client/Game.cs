@@ -1,4 +1,6 @@
-﻿namespace OpenTPW;
+﻿using Veldrid;
+
+namespace OpenTPW;
 
 /// <summary>
 /// Handles the creation and management of various systems, including the game
@@ -47,9 +49,26 @@ internal static class Game
 		Render = new();
 
 		//
+		// Show a loading screen while the level loads synchronously (otherwise the window is
+		// black and the WM marks it "not responding"). A title font draws "LOADING…" over a
+		// sky-blue clear; if the font can't be loaded we still show the colour, never black.
+		//
+		Font? loadingFont = null;
+		try { loadingFont = new Font( "Language/English/GAME12.bf4" ); }
+		catch ( Exception e ) { Log.Warning( $"Loading-screen font unavailable: {e.Message}" ); }
+
+		Render.ClearColor = new RgbaFloat( 0.35f, 0.72f, 0.92f, 1f );
+		Render.RenderLoadingScreen( () =>
+		{
+			if ( loadingFont != null )
+				Graphics.DrawText( loadingFont, "LOADING...", Screen.Size.X / 2f, Screen.Size.Y / 2f, TextAlign.Center );
+		} );
+
+		//
 		// Create level
 		//
 		var level = new Level( "jungle" );
+		Render.ClearColor = RgbaFloat.Black;
 
 		//
 		// Run game loop

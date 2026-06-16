@@ -16,6 +16,11 @@ public partial class Renderer
 
 	public Action? OnRender;
 
+	/// <summary>Colour the main framebuffer is cleared to each frame (e.g. for the loading screen).</summary>
+	public RgbaFloat ClearColor = RgbaFloat.Black;
+
+	private bool _presentReady;
+
 	public Renderer()
 	{
 		Window = new( Settings.Default.GameWindowSize.X, Settings.Default.GameWindowSize.Y, "Theme Park World", true );
@@ -80,8 +85,13 @@ public partial class Renderer
 	private ResourceSet _blitResourceSet = null!;
 	private ResourceLayout _blitResourceLayout = null!;
 
-	public void Run()
+	// Sets up the blit pipeline that copies the resolved scene to the swapchain. Split out of
+	// Run() so a loading frame can be presented before the (synchronous) level load. Idempotent.
+	private void SetupPresent()
 	{
+		if ( _presentReady )
+			return;
+
 		var layoutDescription = new ResourceLayoutDescription(
 			new ResourceLayoutElementDescription( "g_tInput", ResourceKind.TextureReadOnly, ShaderStages.Fragment ),
 			new ResourceLayoutElementDescription( "g_sSampler", ResourceKind.Sampler, ShaderStages.Fragment )
@@ -115,11 +125,33 @@ public partial class Renderer
 		) );
 
 		OnWindowResized( Window.Size );
+		_presentReady = true;
+	}
+
+	public void Run()
+	{
+		SetupPresent();
 
 		while ( Window.SdlWindow.Exists )
 		{
 			Update();
 		}
+	}
+
+	/// <summary>
+	/// Presents a single frame using <paramref name="draw"/> as the scene (e.g. a loading
+	/// screen), so the window shows something during a long synchronous load instead of black.
+	/// </summary>
+	public void RenderLoadingScreen( Action draw )
+	{
+		SetupPresent();
+		Window.SdlWindow.PumpEvents();
+
+		var previous = OnRender;
+		OnRender = draw;
+		PreRender();
+		PostRender();
+		OnRender = previous;
 	}
 
 	private void PreRender()
@@ -139,7 +171,7 @@ public partial class Renderer
 		CommandList.SetFullViewports();
 		CommandList.SetFullScissorRects();
 		CommandList.ClearDepthStencil( 1 );
-		CommandList.ClearColorTarget( 0, RgbaFloat.Black );
+		CommandList.ClearColorTarget( 0, ClearColor );
 
 		// Render level to MSAA buffer
 		CommandList.PushDebugGroup( "Main Render" );
