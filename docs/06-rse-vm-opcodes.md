@@ -11,14 +11,13 @@ The **Operands** column is authoritative and is what the reflection dispatcher
 
 - **Implemented**: a handler exists in `source/OpenTPW/VM/Handlers/`.
 - **Kind**: `pure` = realizable with VM state only (arithmetic, flags, stack, variables,
-  timers, date, VM hierarchy, the wait scheduler) — implementable and unit-testable now.
-  `engine` = a ride-engine side effect (objects, animations, sound, lights, walk/limbo,
-  scream…) that needs engine subsystems that don't exist yet.
+  timers, date, VM hierarchy, the wait scheduler, the secondary HUSH/HOP stack) — implemented
+  and unit-tested. `engine` = a ride-engine side effect (objects, animations, sound, lights,
+  walk/limbo, scream…) that needs engine subsystems that don't exist yet.
 
-Status: **48 / 106 implemented**. Of all 106, **43 are `pure`** and **63 are `engine`**.
-**Batch A (pure) is essentially complete** — the only unimplemented `pure` opcodes are `HUSH`
-and `HOP`, whose semantics still need reading (and may turn out engine-coupled). The remaining
-work is Batch B (engine). See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md).
+Status: **50 / 106 implemented**. **Batch A (all 43 `pure` opcodes) is COMPLETE.** The
+remaining **63 are `engine`** (Batch B), blocked on the ride engine and on `SPAWNCHILD`.
+See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md).
 
 | # | Opcode | Operands | Implemented | Kind |
 |---|--------|:--------:|:-----------:|------|
@@ -64,8 +63,8 @@ work is Batch B (engine). See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md).
 | 39 | `CMP` | 2 | ✅ | pure |
 | 40 | `PUSH` | 1 | ✅ | pure |
 | 41 | `POP` | 1 | ✅ | pure |
-| 42 | `HUSH` | 1 | ☐ | pure |
-| 43 | `HOP` | 1 | ☐ | pure |
+| 42 | `HUSH` | 1 | ✅ | pure |
+| 43 | `HOP` | 1 | ✅ | pure |
 | 44 | `WAIT` | 1 | ✅ | pure |
 | 45 | `WAITABS` | 1 | ✅ | pure |
 | 46 | `WAIT4ANIM` | 0 | ☐ | engine |

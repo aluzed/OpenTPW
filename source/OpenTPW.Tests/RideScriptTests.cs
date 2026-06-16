@@ -267,6 +267,32 @@ public class RideScriptTests
 		Assert.AreEqual( 5, vm.CurrentPos );
 	}
 
+	// HUSH/HOP are a second LIFO stack, independent of PUSH/POP (T-007).
+	[TestMethod]
+	public void HushHopSecondaryStack()
+	{
+		Log = new();
+		var vm = LoadTestVm();
+		var dest = new Operand( vm, Operand.Type.Variable, 0, 0 );
+
+		OpcodeHandlers.Misc.Hush( ref vm, Lit( vm, 7 ) );
+		OpcodeHandlers.Misc.Hush( ref vm, Lit( vm, 9 ) );
+
+		// Independent of the PUSH/POP stack.
+		OpcodeHandlers.Misc.Push( ref vm, Lit( vm, 99 ) );
+		Assert.AreEqual( 2, vm.HushStack.Count );
+		Assert.AreEqual( 1, vm.Stack.Count );
+
+		OpcodeHandlers.Misc.Hop( ref vm, dest ); // LIFO -> 9
+		Assert.AreEqual( 9, dest.Value );
+		OpcodeHandlers.Misc.Hop( ref vm, dest ); // -> 7
+		Assert.AreEqual( 7, dest.Value );
+
+		// Underflow is a guarded no-op (dest keeps its value).
+		OpcodeHandlers.Misc.Hop( ref vm, dest );
+		Assert.AreEqual( 7, dest.Value );
+	}
+
 	private static RideVM LoadTestVm()
 	{
 		var path = Path.Combine( AppContext.BaseDirectory, "content", "testscripts", "Test.RSE" );

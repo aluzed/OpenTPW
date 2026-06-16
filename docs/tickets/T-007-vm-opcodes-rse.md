@@ -72,10 +72,17 @@ runtime). Classification: **43 `pure`** (VM-state only — implementable now) an
     factor in the original — same units here pending the engine clock.) Coverage **46 → 48 /
     106**. Covered by `RideScriptTests.WaitSuspendsUntilGameTime`.
 
-    **Batch A is now essentially complete** — the only unimplemented `pure` opcodes are `HUSH`
-    and `HOP` (semantics not yet read; likely sound/engine-coupled). What remains is **Batch B
-    (63 engine opcodes)**, blocked on the ride engine (objects, animations, sound, lights,
-    walk/limbo, scream) and on `SPAWNCHILD` to populate the VM hierarchy.
+11. ✅ **HUSH / HOP** — turned out **not** to be sound (the name misled). The executor shows a
+    **double-ended stack**: one backing buffer (`+0x20`, capacity `+0x54`) where PUSH/POP grow
+    down from the top (index `+0x40`) and HUSH/HOP grow up from the bottom (index `+0x44`) — two
+    independent LIFOs. Modelled with a second `RideVM.HushStack`: `HUSH` pushes a value, `HOP`
+    pops into dest (underflow-guarded). Coverage **48 → 50 / 106**. Covered by
+    `RideScriptTests.HushHopSecondaryStack`.
+
+**Batch A is COMPLETE** — all **43 `pure` opcodes** are implemented and unit-tested. What
+remains is **Batch B (63 `engine` opcodes)**: objects, animations, sound, lights, walk/limbo,
+scream, and `SPAWNCHILD` (which would let the child/parent-var opcodes run in real scripts).
+These are blocked on the ride engine, which is the next subsystem rather than a VM task.
 
 > Note: the instruction doc describes `CMP` as a *bitwise-AND* comparison, but the current
 > `Math.Compare` does equality/less-than. Left as-is for now (changing it could shift branch

@@ -104,5 +104,25 @@ public partial class OpcodeHandlers
 
 			dest.Value = vm.Stack.Pop();
 		}
+
+		[OpcodeHandler( Opcode.HUSH, "Push a value onto the secondary (HUSH/HOP) stack." )]
+		public static void Hush( ref RideVM vm, Operand value )
+		{
+			vm.HushStack.Push( value.Value );
+		}
+
+		[OpcodeHandler( Opcode.HOP, "Pop the secondary stack into the destination." )]
+		public static void Hop( ref RideVM vm, Operand dest )
+		{
+			// HUSH/HOP are a second LIFO (the bottom end of the original's double-ended stack),
+			// distinct from PUSH/POP. Guard against an underflow.
+			if ( vm.HushStack.Count == 0 )
+			{
+				Log.Warning( "HOP on an empty stack; ignoring" );
+				return;
+			}
+
+			dest.Value = vm.HushStack.Pop();
+		}
 	}
 }

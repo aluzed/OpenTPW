@@ -55,6 +55,11 @@ public partial class RideVM
 	// LIFO call/data stack, shared by JSR/RETURN and PUSH/POP (as on the original VM).
 	public Stack<int> Stack { get; set; } = new();
 
+	// Second LIFO stack for HUSH/HOP. The original keeps one backing buffer used as a
+	// double-ended stack: PUSH/POP grow down from the top (index +0x40), HUSH/HOP grow up from
+	// the bottom (index +0x44). Modelled here as an independent stack. See Handlers/Misc.cs.
+	public Stack<int> HushStack { get; set; } = new();
+
 	private Dictionary<Opcode, MethodInfo> OpcodeHandlers { get; } = Assembly.GetExecutingAssembly().GetTypes()
 		.SelectMany( t => t.GetMethods() )
 		.Where( x => x.GetCustomAttribute<OpcodeHandlerAttribute>() != null )
