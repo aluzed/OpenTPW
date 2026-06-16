@@ -1,16 +1,25 @@
-using NLayer;
+using System.Runtime.InteropServices;
 using Silk.NET.OpenAL;
 
 namespace OpenTPW;
 
 /// <summary>
-/// Game audio (T-031): decodes MPEG (.mp2) tracks with NLayer and plays them through OpenAL.
-/// Currently drives a single looping background-music source. A missing audio device (headless / CI)
-/// disables playback gracefully instead of throwing. The asset previewer in the ModKit uses the same
-/// NLayer + OpenAL stack (see [T-003]); this is the game-side, music-oriented counterpart.
+/// Game audio (T-031): decodes MPEG (.mp2) tracks with the bundled minimp3 native lib and plays them
+/// through OpenAL. Currently drives a single looping background-music source. A missing audio device
+/// or native decoder (headless / CI / unbuilt platform) disables playback gracefully instead of
+/// throwing. NLayer (used by the ModKit previewer) mis-decoded the game's MPEG-2 Layer II music —
+/// dropping ~12% of frames — so the game uses minimp3, which decodes it correctly.
 /// </summary>
 internal static unsafe class Audio
 {
+	// Bundled minimp3 wrapper (Audio/native/tpwmp3.c). Decodes a whole MPEG buffer to interleaved
+	// int16 PCM (malloc'd; freed with tpw_mp3_free).
+	[DllImport( "tpwmp3", CallingConvention = CallingConvention.Cdecl )]
+	private static extern int tpw_mp3_decode( byte[] data, int size, out nint outPcm, out int samples, out int channels, out int hz );
+
+	[DllImport( "tpwmp3", CallingConvention = CallingConvention.Cdecl )]
+	private static extern void tpw_mp3_free( nint p );
+
 	private static AL al = null!;
 	private static ALContext alc = null!;
 	private static Device* device;
@@ -89,30 +98,28 @@ internal static unsafe class Audio
 
 		try
 		{
-			using var ms = new MemoryStream( mpegData );
-			using var mpeg = new MpegFile( ms );
+			// minimp3 decodes MPEG-1/2 Layer I/II/III directly to interleaved int16 PCM.
+			if ( tpw_mp3_decode( mpegData, mpegData.Length, out var ptr, out var samples, out var ch, out var hz ) != 0
+				|| ptr == 0 || samples <= 0 )
+				return false;
 
-			sampleRate = mpeg.SampleRate;
-			channels = mpeg.Channels;
-
-			// NLayer yields normalized float samples (-1..1); convert to 16-bit PCM.
-			var samples = new List<float>();
-			var chunk = new float[16384];
-			int read;
-			while ( ( read = mpeg.ReadSamples( chunk, 0, chunk.Length ) ) > 0 )
+			try
 			{
-				for ( var i = 0; i < read; i++ )
-					samples.Add( chunk[i] );
+				pcm = new short[samples];
+				Marshal.Copy( ptr, pcm, 0, samples );
+			}
+			finally
+			{
+				tpw_mp3_free( ptr );
 			}
 
-			pcm = new short[samples.Count];
-			for ( var i = 0; i < samples.Count; i++ )
-				pcm[i] = (short)( Math.Clamp( samples[i], -1f, 1f ) * short.MaxValue );
-
+			sampleRate = hz;
+			channels = ch;
 			return true;
 		}
 		catch ( Exception e )
 		{
+			// DllNotFoundException on platforms without the native build, or any decode failure.
 			Log.Error( $"Failed to decode audio: {e.Message}" );
 			return false;
 		}

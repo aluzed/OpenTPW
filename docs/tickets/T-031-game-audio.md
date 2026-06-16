@@ -16,12 +16,19 @@ strings were unwired labels.
 ## Done
 
 - ✅ **Game audio service** `source/OpenTPW/Audio/Audio.cs`: lazy OpenAL init (graceful when there's
-  no device — headless/CI just disables playback), `PlayMusic(mp2Bytes, loop)` (NLayer-decode → one
-  OpenAL buffer, `AL_LOOPING`), `StopMusic`, and a `MusicVolume` gain. Audio deps added to
-  `OpenTPW.csproj` (NLayer, Silk.NET.OpenAL, .Soft.Native bundles libopenal).
+  no device — headless/CI just disables playback), `PlayMusic(mp2Bytes, loop)` (decode → one OpenAL
+  buffer, `AL_LOOPING`), `StopMusic`, and a `MusicVolume` gain. OpenAL via Silk.NET (+.Soft.Native).
 - ✅ **Lobby music**: `Game.Run` opens `data/global/sound/MusicHD.sdt`, takes the calm track
-  (`level4c.mp2`) and plays it looping. Verified: "OpenAL audio initialized.", track decoded, no
-  errors — music plays in the lobby.
+  (`level4c.mp2`) and plays it looping.
+- ✅ **Decoder fix — NLayer → minimp3.** NLayer mis-decoded the MPEG-2 Layer II music (22 kHz):
+  it dropped ~42 of 347 frames (~12%), producing a 15.9 s, time-desynced, glitchy stream
+  (correlation 0.078 vs a correct ffmpeg decode) — audible as "missing instruments / weird". Switched
+  to the public-domain **minimp3** decoder, bundled as a tiny native lib (`Audio/native/tpwmp3.c` +
+  `minimp3*.h`, built by `build.sh` → `linux-x64/libtpwmp3.so`, P/Invoked as `tpwmp3`). minimp3's
+  decode matches ffmpeg bit-for-bit (correlation **1.000**, full 18.1 s). The SDT payload offset was
+  also corrected (`headerSize`, not the field sum — see commit) so the stream starts on an MP2 frame.
+  Note: the source remains 22 kHz / 112 kb/s MP2 (the original asset); minimp3 just decodes it
+  correctly. The ModKit previewer still uses NLayer and has the same MPEG-2 bug (item 4).
 
 ## To do
 
@@ -32,7 +39,10 @@ strings were unwired labels.
    service; per-category gain.
 3. ☐ **Track selection** — pick music by context/level instead of hardcoding `level4c`
    (`MusicHD.sdt` ships `level4c`/`level4w` = calm/wild). The frontend may want a dedicated theme.
-4. ☐ Consider sharing the NLayer/OpenAL decode with the ModKit `AudioPlayer` to avoid duplication.
+4. ☐ Point the ModKit `AudioPlayer` at the same minimp3 decoder (it still uses NLayer → same
+   MPEG-2 Layer II bug when previewing 22 kHz sounds), and share one decode path.
+5. ☐ Build `libtpwmp3` for Windows (`.dll`) and macOS (`.dylib`) — currently only `linux-x64` is
+   committed; other platforms fall back to no audio (graceful) until built (`Audio/native/build.sh`).
 
 ## Affected files
 

@@ -22,9 +22,17 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<!-- Game audio (T-031): NLayer decodes MPEG (.mp2), OpenAL plays it; .Soft.Native bundles
-		     libopenal so the game ships its own. Same stack as the ModKit previewer (T-003). -->
-		<PackageReference Include="NLayer" Version="1.16.0" />
+		<!-- minimp3 native decoder (T-031), copied next to the app so DllImport("tpwmp3") finds it.
+		     Linux build committed; rebuild via Audio/native/build.sh. Windows/macOS builds: TODO. -->
+		<None Include="Audio/native/linux-x64/libtpwmp3.so" Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+			<Link>libtpwmp3.so</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Game audio (T-031): MPEG (.mp2) is decoded by the bundled minimp3 native lib (NLayer
+		     mis-decoded MPEG-2 Layer II), OpenAL plays it; .Soft.Native bundles libopenal. -->
 		<PackageReference Include="Silk.NET.OpenAL" Version="2.23.0" />
 		<PackageReference Include="Silk.NET.OpenAL.Soft.Native" Version="1.23.1" />
 		<PackageReference Include="ImGui.NET" Version="1.87.2" />

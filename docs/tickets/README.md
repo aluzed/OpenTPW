@@ -50,7 +50,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-028](T-028-frame-cpu-hygiene.md) | ⚪ Debt | ☐ To do | Renderer: per-frame CPU hygiene (dirty-shader registry, `Stopwatch`) |
 | [T-029](T-029-native-render-loop-re.md) | 🟢 Low | ✅ Done | Native render loop RE'd (DDraw + D3D execute buffers + MMX software); see docs/07 |
 | [T-030](T-030-async-level-load.md) | 🟠 Medium | ⚠️ Mostly | Level load: freeze resolved (per-step + per-mesh progress); only optional 60fps async remains |
-| [T-031](T-031-game-audio.md) | 🟡 Feature | ⚠️ Partial | Game audio: looping lobby music via OpenAL wired; SFX + volume UI remain |
+| [T-031](T-031-game-audio.md) | 🟡 Feature | ⚠️ Partial | Game audio: looping lobby music (minimp3 decode, fixed NLayer MPEG-2 bug); SFX + volume remain |
 
 Priority legend: 🔴 blocking · 🟠 important · 🟡 desirable/feature · ⚪ technical debt/polish.
 Status legend: ✅ done · ⚠️ partial · ☐ to do · 🗂️ split into focused tickets · ⏸️ deferred.
