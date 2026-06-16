@@ -14,11 +14,12 @@ You therefore **need a legal copy of the game** to provide the assets — which 
 
 ## Maturity
 
-- **Stage: very early, not playable** (as stated in the README).
-- Last commit: **2025-02-20**. Recent activity is mostly cosmetic (README, buttons).
-  The project appears **paused / dormant**.
-- No CI (`.github` was removed), few tests (2 files: shaders + filesystem), and they
-  currently **fail** (see tickets).
+- **Stage: not playable** — an asset/format toolkit + VM, not yet a game loop.
+- **Upstream** (`OpenTPW/OpenTPW`) is dormant (last real activity early 2025). **This fork**
+  is under active development: full Linux portability, CI, and a large reverse-engineering
+  push this session (see the Update below).
+- **Tests**: ~38 passing, 0 failing (was 7/7 failing) + ~9 inconclusive integration tests that
+  need a real asset (gated on `TPW_*_SAMPLE`/`OPENTPW_GAMEPATH`). Build: **0 warnings**.
 
 ## Architecture (`source/OpenTPW.sln`)
 
@@ -40,9 +41,15 @@ All targets are **`net8.0`**.
 - **ImGui.NET**: debug UI and ModKit.
 - `ShaderCompiler` cross-compiles shaders to the backend target.
 
-> **Update (2026-06-16):** large progress this session — full Linux portability + CI, the
-> ride-script VM loader restored, and **every file format now decodes at least partially**
-> (no more ❌). See the [file-format table](02-file-formats.md) and [tickets](tickets/).
+> **Update (2026-06-16):** major progress this session.
+> - Full Linux portability + CI; every file format decodes at least partially (no more ❌).
+> - **Reverse engineering unblocked via Ghidra.** The disc binaries are SafeDisc-encrypted, so
+>   an unprotected no-CD `tp.exe` (abandonware) was imported into Ghidra 12. From it: the `.MD2`
+>   loader (version gate), the confirmation that `.MTR` is **not** a runtime format, the TQI
+>   codec (float AAN IDCT), and — biggest — the **ride-VM opcode table** (106 opcodes + operand
+>   counts) and executor, which let **Batch A (all 43 pure VM opcodes) be implemented & tested**.
+>   See [05-ghidra-reverse.md](05-ghidra-reverse.md) and [06-rse-vm-opcodes.md](06-rse-vm-opcodes.md).
+> - Catch-all tickets T-008/T-012 were split into focused per-concern tickets (T-015…T-022).
 
 ## What works (✅)
 
@@ -51,21 +58,28 @@ All targets are **`net8.0`**.
 - **Virtual file system** over `data/`, mounting `.WAD`/`.SDT` archives; `WadTool` CLI.
 - **Decompression**: Refpack (EA/Bullfrog) and LZSS.
 - **Formats fully decoded**: `.WCT` textures, `.SAM`, strings (`.BFMU`/`.BFST`),
-  `.SDT`/`.MP2` sounds, **`.BF4` fonts** (glyphs + metrics), and **`.TQI`/`.TGQ` video**
-  (EA container + EA-ADPCM audio + TQI frames — verified pixel-accurate).
-- **`.RSE` ride VM**: loader/disassembler restored; branching verified.
+  `.SDT`/`.MP2` sounds, **`.BF4` fonts** (glyphs + metrics), **`.TQI`/`.TGQ` video**
+  (EA container + EA-ADPCM audio + TQI frames), and **`.PLB` particles** (effect names + colour
+  ramps). `.MTR` is a tool artifact the game never loads (texture binding lives in the `.MD2`).
+- **`.RSE` ride VM**: loader/disassembler restored; **50 / 106 opcodes — Batch A (all 43 pure
+  opcodes) complete** (arithmetic, flags, two stacks, branches/JSR/RETURN, date/time, timers,
+  cross-VM variables, the WAIT scheduler), all Ghidra-verified.
 - **Basic rendering**: window, demo terrain, ImGui UI.
 
 ## What is partial (⚠️)
 
-- **`.RSE` opcodes**: 30 / ~210 implemented (arithmetic, logic, branches). The rest are
-  ride-engine side-effects needing engine hooks. See [T-007](tickets/T-007-vm-opcodes-rse.md).
-- **`.MD2` models**: parses + verified-renders the localized mesh variant; not robust to
-  every variant (the static GARROW variant differs). [T-012](tickets/T-012-partial-formats.md).
-- **`.LIP` lip-sync**: keyframe timestamps decoded (unit not pinned). **`.MTR` materials**:
-  header + name decoded; the mesh-coupled index array is raw. [T-008](tickets/T-008-unimplemented-formats.md).
-- **`.MAP`**: identified as an audio category catalog (not terrain); GUID decoded, entries raw.
-- **`.TPWS` saves**: spec known, partial reader; no sample on the install disc to verify.
+- **`.RSE` opcodes**: 50 / 106. The remaining **63 are `engine`** side-effects (objects,
+  animations, sound, lights, walk/limbo, scream) + `SPAWNCHILD`, blocked on the ride engine.
+  See [T-007](tickets/T-007-vm-opcodes-rse.md).
+- **`.MD2` models**: parses + verified-renders the current format; the version gate (0xDD/0xCB)
+  is Ghidra-confirmed and rejects the legacy/static variant cleanly. Static-variant decode +
+  render integration remain. [T-015](tickets/T-015-md2-static-variant.md).
+- **`.LIP` lip-sync**: keyframe timestamps decoded; **unit confirmed = microseconds**. Mouth-shape
+  semantics remain. [T-020](tickets/T-020-lip-mouth-shapes.md).
+- **`.MAP`**: audio category catalog (not terrain). Variant (BANK/SFX) + BANK entry names + SFX
+  category header decoded; per-record mixing fields remain. [T-016](tickets/T-016-map-entry-records.md).
+- **`.PLB`**: names + colour ramp decoded; the other parameter fields remain. [T-019](tickets/T-019-plb-parameter-fields.md).
+- **`.TPWS` saves**: partial reader; no sample on the install disc to verify. [T-017](tickets/T-017-tpws-saves.md).
 
 ## What is not started (❌)
 
@@ -75,10 +89,17 @@ All targets are **`net8.0`**.
 
 ## Remaining work (see [tickets/](tickets/))
 
-1. **Engine wiring**: use the decoded fonts (`.BF4`), models (`.MD2`) and textures in the
-   renderer to draw a real UI/level (currently terrain is hardcoded).
-2. **Finish the ride VM** opcodes ([T-007](tickets/T-007-vm-opcodes-rse.md)) — needs the
-   ride-entity/animation engine to back the side-effecting opcodes.
-3. **Format polish**: `.MD2` variant robustness + `.MAP`/`.TPWS` ([T-012](tickets/T-012-partial-formats.md)),
-   `.MTR` index decode, mono-audio, exact-vs-ffmpeg TQI dequant.
-4. **Tech debt**: build warnings ([T-009](tickets/T-009-build-warnings.md)).
+The project has reached the **engine frontier**: the formats and the pure VM are done, and most
+of what's left needs the ride engine itself (which also lets further RE be verified).
+
+1. **Ride engine** — the biggest unlock: instantiate ride objects/animations/sound/lights in the
+   world. This backs **Batch B** of the VM (the 63 engine opcodes, incl. `SPAWNCHILD`) and lets
+   `.PLB` particles / `.LIP` lip-sync / `.MAP` mixing actually run.
+2. **Engine wiring**: draw a real UI/level from the decoded fonts (`.BF4`), models (`.MD2`) and
+   textures (currently terrain is hardcoded).
+3. **Format tails** (each now its own ticket): `.MD2` static variant [T-015], `.MAP` records
+   [T-016], `.TPWS` [T-017], `.PLB` params [T-019], `.LIP` shapes [T-020], exact TQI dequant
+   [T-021], mono EA-ADPCM [T-022]. Several need the engine or Ghidra on the spawn/render paths.
+
+Done this project so far: Linux portability + CI (T-001…T-006, T-013, T-014), build warnings
+→ 0 (T-009), VM correctness (T-010, T-011), and the format/VM RE above.
