@@ -38,6 +38,9 @@ in clear (`0x1CD15D46`, `.md2`×43, `M3D2`, `.rse`, `lips`, `.plb`…).
 - **`.MTR`** — *no loader exists* (the magic `0x2E5915AF` and string `.mtr` are absent from
   the runtime). Model textures bind from the `.MD2` itself (`.md2`/`.tga`/`.wct` strings are
   present). So `.MTR` is a tool artifact, not a runtime format — [T-018](tickets/T-018-mtr-material-semantics.md).
+- **`.RSE` VM** — loader `FUN_005587f0` (magic `"RSSE"` = `0x45535352`). The opcode descriptor
+  table is at VA `0x765280` (`(name, operandCount)` pairs): **106 opcodes** with authoritative
+  operand counts → [06-rse-vm-opcodes.md](06-rse-vm-opcodes.md), [T-007](tickets/T-007-vm-opcodes-rse.md).
 
 Headless workflow used:
 ```bash
@@ -114,7 +117,7 @@ confirmation** below is what Ghidra would add (on a GOG/decrypted build).
 | `.LIP` lip-sync | ⚠️ timestamps (µs) | mouth-shape encoding | [T-020](tickets/T-020-lip-mouth-shapes.md) |
 | `.MD2` models | ⚠️ animated done | the static (frameCount-0) header | [T-015](tickets/T-015-md2-static-variant.md) |
 | `.MAP` catalogs | ⚠️ names + SFX header | BANK record fields + SFX per-sound list | [T-016](tickets/T-016-map-entry-records.md) |
-| `.RSE` VM opcodes | ⚠️ 34/210 | the unimplemented opcodes' semantics | [T-007](tickets/T-007-vm-opcodes-rse.md) |
+| `.RSE` VM opcodes | ⚠️ 34/106 | per-opcode semantics (table + arities recovered) | [T-007](tickets/T-007-vm-opcodes-rse.md) |
 
 ## Legal framing
 

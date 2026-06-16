@@ -44,7 +44,10 @@ public partial class RideVM
 		// DEBUG: Log implemented opcode counts
 		var implementedOpcodes = OpcodeHandlers.Keys.ToList();
 		var implementedCount = implementedOpcodes.Count;
-		var totalCount = 210; // Total number, see https://opentpw.gu3.me/formats/rsse-vm-instructions.html
+		// The VM has exactly 106 opcodes (0..105), confirmed from the original's opcode table
+		// in tp.exe (a name/operand-count array at VA 0x765280). The old "210" double-counted
+		// that array's (name, operandCount) pointer pairs. See docs/tickets/T-007.
+		var totalCount = 106;
 		var totalPercent = (float)implementedCount / totalCount * 100;
 
 		Log.Info( $"Implemented {implementedCount} / {totalCount} ({totalPercent.CeilToInt()}%) opcodes" );

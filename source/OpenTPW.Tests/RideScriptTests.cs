@@ -133,18 +133,20 @@ public class RideScriptTests
 
 		var vm = LoadTestVm();
 
-		// PUSH / POP round-trip.
+		// PUSH / POP round-trip. POP writes the popped value into its destination operand.
+		var dest = new Operand( vm, Operand.Type.Variable, 0, 0 );
 		OpcodeHandlers.Misc.Push( ref vm, Lit( vm, 11 ) );
 		OpcodeHandlers.Misc.Push( ref vm, Lit( vm, 22 ) );
 		Assert.AreEqual( 2, vm.Stack.Count );
 
-		OpcodeHandlers.Misc.Pop( ref vm ); // discards 22 (top)
+		OpcodeHandlers.Misc.Pop( ref vm, dest ); // pops 22 (top) into dest
+		Assert.AreEqual( 22, dest.Value );
 		Assert.AreEqual( 1, vm.Stack.Count );
 		Assert.AreEqual( 11, vm.Stack.Peek() );
 
 		// POP underflow is ignored rather than throwing.
-		OpcodeHandlers.Misc.Pop( ref vm );
-		OpcodeHandlers.Misc.Pop( ref vm );
+		OpcodeHandlers.Misc.Pop( ref vm, dest );
+		OpcodeHandlers.Misc.Pop( ref vm, dest );
 		Assert.AreEqual( 0, vm.Stack.Count );
 
 		// Nested JSR/RETURN unwind LIFO (the old Queue did not).

@@ -98,18 +98,18 @@ public partial class OpcodeHandlers
 			vm.Stack.Push( value.Value );
 		}
 
-		[OpcodeHandler( Opcode.POP, "Pop (and discard) the top value from the stack." )]
-		public static void Pop( ref RideVM vm )
+		[OpcodeHandler( Opcode.POP, "Pop the top stack value into the destination." )]
+		public static void Pop( ref RideVM vm, Operand dest )
 		{
-			// The instruction takes no destination operand: it just removes the top entry
-			// (used to balance the stack). Guard against an underflow.
+			// POP takes one operand (confirmed from the binary's opcode table): it writes the
+			// popped value into the destination. Guard against an underflow.
 			if ( vm.Stack.Count == 0 )
 			{
 				Log.Warning( "POP on an empty stack; ignoring" );
 				return;
 			}
 
-			vm.Stack.Pop();
+			dest.Value = vm.Stack.Pop();
 		}
 	}
 }
