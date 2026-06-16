@@ -1,8 +1,13 @@
-# T-012 — Complete the partially-implemented formats (.MD2, .MAP, .TPWS)
+# T-012 — Partially-implemented formats (.MD2, .MAP, .TPWS) (umbrella — closed)
 
 - **Priority**: 🟡 Feature
 - **Type**: Feature / reverse engineering
-- **Status**: ⚠️ **In progress.** `.MD2` parser **verified against a real model**: a
+- **Status**: 🗂️ **Closed as an umbrella.** This ticket was a catch-all; the work it
+  delivered is recorded below, and the **remaining** work is split into focused tickets:
+  - `.MD2` static variant (frameCount 0) → **[T-015](T-015-md2-static-variant.md)**
+  - `.MAP` per-entry records + SFX variant → **[T-016](T-016-map-entry-records.md)**
+  - `.TPWS` save read + write → **[T-017](T-017-tpws-saves.md)**
+- **What was delivered:** `.MD2` parser **verified against a real model**: a
   real `ENGLISH/MESHES/ENGLISH/PAUSED.MD2` parses and reconstructs as the 3D "PAUSED"
   sign (rendered top-view from the parsed vertices/faces). Added the regression test
   `ModelFileTests.ParsesRealModelSample` (gated on `TPW_MODEL_SAMPLE`; asserts meshes,

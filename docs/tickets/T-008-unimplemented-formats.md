@@ -1,8 +1,17 @@
-# T-008 — Unimplemented file formats
+# T-008 — Unimplemented file formats (umbrella — closed)
 
 - **Priority**: 🟡 Feature
 - **Type**: Feature / reverse engineering
-- **Status**: ⚠️ **In progress.**
+- **Status**: 🗂️ **Closed as an umbrella.** This ticket was a catch-all; the parsers it
+  delivered are recorded below, and each piece of **remaining** work now has its own focused
+  ticket:
+  - `.MTR` material semantics + `.MD2` texture binding → **[T-018](T-018-mtr-material-semantics.md)**
+  - `.PLB` parameter fields (beyond the colour ramp) → **[T-019](T-019-plb-parameter-fields.md)**
+  - `.LIP` mouth-shape semantics + wiring → **[T-020](T-020-lip-mouth-shapes.md)**
+  - `.TQI` exact (AAN) dequantization → **[T-021](T-021-tqi-exact-dequant.md)**
+  - EA-ADPCM mono audio → **[T-022](T-022-ea-adpcm-mono.md)**
+
+  `.BF4` is fully done (only engine/UI wiring remains). What was delivered:
   - `.TQI`/`.TGQ` **video container** parsed (`OpenTPW.Files/Formats/Video/VideoFile.cs`):
     the EA FourCC block layout — chunk index, `pIQT` frame count, EA audio detection.
     Validated by `VideoFileTests` (synthesized container + a real movie via
@@ -18,7 +27,7 @@
     Bullfrog frog logo). **TQI pixel decoder — DONE** (`Video/TqiDecoder.cs`,
     `VideoFile.DecodeFrame()`): full from-scratch decode, **verified pixel-accurate** vs
     ffmpeg (frame 120 of BF.TGQ reconstructs the Bullfrog logo). See the notes below.
-    Mono-audio support remains.
+    (Exact AAN dequant → [T-021](T-021-tqi-exact-dequant.md); mono audio → [T-022](T-022-ea-adpcm-mono.md).)
   - `.BF4` **fonts** parsed (`OpenTPW.Files/Formats/Font/BF4File.cs`): magic "F4FB",
     glyph count, offset table (tiles exactly to the first glyph), per-glyph **char code**,
     and **width/height + 1bpp bitmap decoded** (block offsets 16/18 = width/height; bitmap
@@ -36,14 +45,15 @@
     keyframe (as µs) lands just under the companion `speechHD.SDT` clip's duration (jungle
     28.58 s vs 28.63, fantasy 21.96 vs 22.15, hallow 26.53 vs 26.59, space 23.89 vs 23.93,
     confirmed with ffprobe). `LipSyncFile` exposes `Duration`/`TimeOf`/`UnitsPerSecond`.
-    **Remaining**: the mouth-shape semantics (a keyframe currently carries only a timestamp;
-    whether a shape index is encoded elsewhere is unknown).
+    **Remaining → [T-020](T-020-lip-mouth-shapes.md)**: the mouth-shape semantics (a keyframe
+    currently carries only a timestamp; whether a shape index is encoded elsewhere is unknown).
   - `.MTR` **materials** parsed (`OpenTPW.Files/Formats/Model/MTRFile.cs`): magic
     0x2E5915AF, version, and the material name (the header's name offset points to the
     embedded string, e.g. "s_bkrupt" — confirmed). `.MTR` is the material companion to the
     same-named `.MD2`; the mesh-coupled material/index array is kept raw. Validated by
-    `MTRFileTests` (synthetic + real BANKRUPT.MTR via `TPW_MTR_SAMPLE`). **Remaining**:
-    decode the index array and bind it to the `.MD2` mesh + textures.
+    `MTRFileTests` (synthetic + real BANKRUPT.MTR via `TPW_MTR_SAMPLE`). **Remaining →
+    [T-018](T-018-mtr-material-semantics.md)**: per-element semantics + binding to the `.MD2`
+    mesh + textures.
   - `.PLB` **particle libraries** parsed (`OpenTPW.Files/Formats/Particle/ParticleLibraryFile.cs`):
     16-byte header (`uint32 count`, `uint32 recordSize`, 8 reserved), then `count`
     fixed-size records (`recordSize` bytes = a raw parameter block + a 48-byte null-padded
@@ -53,9 +63,10 @@
     decoded**: the last 64 bytes of each record are 16 D3DCOLOR (`0xAARRGGBB`) stops, exposed
     as `ParticleEffect.ColorRamp`. Verified semantically (Fire ramps dark-red→bright, Sparks
     is yellow-orange, Smoke is white with an alpha fade in/out). The rest of the parameter
-    block is kept raw. **Remaining**: decode the other parameter fields (lifetime, spawn rate,
-    velocity, sprite ref) and the trailing shared block.
-  - `.MD2` and `.MAP` tracked in T-012.
+    block is kept raw. **Remaining → [T-019](T-019-plb-parameter-fields.md)**: the other
+    parameter fields (lifetime, spawn rate, velocity, sprite ref) and the trailing shared block.
+  - `.MD2` (incl. the static variant → [T-015](T-015-md2-static-variant.md)) and `.MAP`
+    (→ [T-016](T-016-map-entry-records.md)) are tracked under [T-012](T-012-partial-formats.md).
 
 ## Tooling: WAD extractor
 
@@ -136,15 +147,15 @@ intra-style codec with EA-specific framing. Findings:
 
 ## Formats to handle
 
-| Format | Status | Samples (on the CD) | Notes |
-|--------|:------:|---------------------|-------|
-| `.BF4` fonts | ❌ | `DATA/FONTS.WAD` | — |
-| `.MTR` materials | ❌ | inside the `.WAD`s | Needed for correct model rendering. |
-| `.LIPS` lip-sync | ❌ | `DATA/GLOBAL/SPEECH` | — |
-| `.TQI`/`.TGQ` video | ❌ | `DATA/MOVIES/*.TGQ` | Bullfrog video codec. |
-| `.PLB` particles | ✅ | `DATA/PARTICLE/Tp2.plb` | Header + records + names decoded; `par_lib.h` gives the effect **names** (the binary struct was reversed from the sample). Param fields remain raw. |
-| `.MD2` models | ⚠️ | `.WAD`s | `ModelFile.cs` partial — to finish. |
-| `.MAP` maps | ⚠️ | `DATA/LEVELS/...` | parsing to generalize (terrain currently hardcoded). |
+| Format | Status | Follow-up ticket |
+|--------|:------:|------------------|
+| `.BF4` fonts | ✅ done | — (only engine/UI wiring) |
+| `.TQI`/`.TGQ` video | ✅ done | exact dequant [T-021](T-021-tqi-exact-dequant.md), mono audio [T-022](T-022-ea-adpcm-mono.md) |
+| `.PLB` particles | ⚠️ names + colour ramp | params [T-019](T-019-plb-parameter-fields.md) |
+| `.MTR` materials | ⚠️ header + name + index array | [T-018](T-018-mtr-material-semantics.md) |
+| `.LIP` lip-sync | ⚠️ timestamps + unit (µs) | mouth shapes [T-020](T-020-lip-mouth-shapes.md) |
+| `.MD2` models | ⚠️ animated done | static variant [T-015](T-015-md2-static-variant.md) |
+| `.MAP` maps | ⚠️ GUID + BANK names | records [T-016](T-016-map-entry-records.md) |
 
 ## Recommended approach
 
