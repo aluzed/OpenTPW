@@ -1,0 +1,38 @@
+# T-030 — Renderer: asynchronous / threaded level load
+
+- **Priority**: 🟠 Medium (the window is frozen ~20-25s during load)
+- **Type**: Rendering / UX
+- **Status**: ☐ To do
+- **Follow-up of**: [T-024](T-024-linux-black-screen.md) (promotes its informal follow-up to a ticket).
+
+## Problem
+
+This is the *other* "not responding" cause, distinct from the lobby stutter
+([T-026](T-026-render-resource-churn.md)). `Game.Run` constructs `new Level( "jungle" )`
+**synchronously on the main thread** (`source/OpenTPW/Client/Game.cs`), which takes ~20-25s
+(textures/models). During that window the render loop isn't running, so the window can't pump
+events — it sits frozen on the last "LOADING…" frame and the WM marks it "not responding". A
+loading screen is presented *before* the load, but it does not animate *during* it.
+
+## To do
+
+1. ☐ Run the level construction off the main thread (Task/worker) while the main thread keeps
+   pumping events and re-presenting an (ideally animated) loading screen. Veldrid GPU resource
+   creation must happen on the render thread — marshal uploads back, or split asset *decode* (CPU,
+   threadable) from GPU *upload* (main thread), draining an upload queue per frame.
+2. ☐ Swap to the level once loading completes; keep `Render.ClearColor`/loading-screen teardown.
+
+## Risks
+
+- Veldrid `GraphicsDevice`/`ResourceFactory` calls are generally not free-threaded — keep GPU
+  resource creation on the render thread; only parallelize file reads + CPU decode.
+
+## Acceptance
+
+The window stays responsive (no "not responding") during the level load; the loading screen
+animates or at least re-presents; the lobby appears when ready.
+
+## Affected files
+
+`source/OpenTPW/Client/Game.cs`, `source/OpenTPW/Client/Renderer.cs`, `source/OpenTPW/World/Level.cs`,
+asset upload paths under `source/OpenTPW/Render/Assets/`.

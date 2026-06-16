@@ -18,7 +18,11 @@ You therefore **need a legal copy of the game** to provide the assets — which 
   running on an AMD Radeon (Mesa/Vulkan) after fixing the Vulkan `libdl` load ([T-023](tickets/T-023-linux-vulkan-libdl.md)).
   The **lobby renders** — island, advisor model, water, sky, and the purple buttons with text
   labels — behind a "LOADING…" screen during the (synchronous) level load
-  ([T-024](tickets/T-024-linux-black-screen.md), resolved).
+  ([T-024](tickets/T-024-linux-black-screen.md), resolved). The lobby render loop is **not yet
+  smooth**: per-frame GPU resource churn (a synchronous queue submit per uniform bind, ephemeral
+  resource sets per draw) makes frames take seconds — being addressed in
+  [T-026](tickets/T-026-render-resource-churn.md)/[T-027](tickets/T-027-ui-draw-batching.md)/[T-028](tickets/T-028-frame-cpu-hygiene.md);
+  the load itself is still synchronous ([T-030](tickets/T-030-async-level-load.md)).
 - **Upstream** (`OpenTPW/OpenTPW`) is dormant (last real activity early 2025). **This fork**
   is under active development: full Linux portability, CI, and a large reverse-engineering
   push this session (see the Update below).

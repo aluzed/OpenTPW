@@ -5,7 +5,9 @@ namespace OpenTPW;
 
 public partial class Renderer
 {
-	private DateTime _lastFrame;
+	// Monotonic frame clock (cheaper and jump-free vs DateTime.Now). See T-028.
+	private readonly System.Diagnostics.Stopwatch _frameClock = System.Diagnostics.Stopwatch.StartNew();
+	private double _lastFrameSeconds;
 	public CommandList CommandList = null!;
 
 	public Window Window;
@@ -33,7 +35,7 @@ public partial class Renderer
 		CreateMultisampledFramebuffer();
 
 		CommandList = Device.ResourceFactory.CreateCommandList();
-		_lastFrame = DateTime.Now;
+		_lastFrameSeconds = _frameClock.Elapsed.TotalSeconds;
 	}
 
 	private void CreateMultisampledFramebuffer()
@@ -156,10 +158,13 @@ public partial class Renderer
 
 	private void PreRender()
 	{
-		foreach ( var shader in Asset.All.OfType<Shader>().Where( x => x.IsDirty ) )
-		{
+		// Recompile any hot-reloaded shaders. Draining a queue avoids scanning every loaded asset
+		// (Asset.All.OfType<Shader>()) each frame — see T-028. Bounded to the count present at entry
+		// so a watcher firing on another thread can never feed this loop indefinitely within a frame.
+		for ( int remaining = Shader.DirtyShaders.Count;
+			  remaining > 0 && Shader.DirtyShaders.TryDequeue( out var shader );
+			  remaining-- )
 			shader.Recompile();
-		}
 
 		CommandList.Begin();
 	}
@@ -197,8 +202,9 @@ public partial class Renderer
 
 	private void Update()
 	{
-		float deltaTime = (float)(DateTime.Now - _lastFrame).TotalSeconds;
-		_lastFrame = DateTime.Now;
+		var nowSeconds = _frameClock.Elapsed.TotalSeconds;
+		float deltaTime = (float)(nowSeconds - _lastFrameSeconds);
+		_lastFrameSeconds = nowSeconds;
 
 		InputSnapshot inputSnapshot = Window.SdlWindow.PumpEvents();
 
