@@ -11,6 +11,8 @@ public class Ride : Entity
 {
 	public RideVM VM { get; private set; }
 
+	private readonly RideEngine engine = new();
+
 	public Ride( string rideArchive, Vector3 position )
 	{
 		Position = position;
@@ -18,7 +20,7 @@ public class Ride : Entity
 
 		// Script (the VFS resolves the path into the .wad; matching is case-insensitive — T-014).
 		VM = new RideVM( FileSystem.OpenRead( $"{rideArchive}/{rideName}.rse" ) );
-		VM.Engine = new RideEngine( this );
+		VM.Engine = engine;
 
 		// SPAWNCHILD loads sibling child scripts from the same WAD, sharing this ride's engine.
 		VM.ChildLoader = name =>
@@ -61,6 +63,7 @@ public class Ride : Entity
 			var modelFile = new ModelFile( md2Path );
 			Log.Info( $"[ride] model {md2Path}: {modelFile.Meshes.Count} mesh(es)" );
 
+			var bodyParts = new List<ModelEntity>();
 			foreach ( var mesh in modelFile.Meshes )
 			{
 				var material = new Material<ObjectUniformBuffer>( "content/shaders/test.shader" );
@@ -94,14 +97,18 @@ public class Ride : Entity
 				var model = new Model( [.. vertices], mesh.Indices, material );
 				Matrix4x4.Decompose( mesh.TransformMatrix, out var scl, out var rot, out var pos );
 
-				_ = new ModelEntity
+				bodyParts.Add( new ModelEntity
 				{
 					Model = model,
 					Scale = new Vector3( scl.X, scl.Z, scl.Y ),
 					Rotation = new Quaternion( rot.X, rot.Z, rot.Y, -rot.W ),
 					Position = new Vector3( pos.X, pos.Z, pos.Y ) + Position,
-				};
+				} );
 			}
+
+			// Register the meshes as the ride body so the engine can animate them (it starts a looping
+			// idle so the model visibly moves and is easy to pick out).
+			engine.RegisterBody( bodyParts );
 		}
 		catch ( Exception e )
 		{
@@ -114,5 +121,6 @@ public class Ride : Entity
 		// Null-guarded: the Entity base ctor registers this in Entity.All before the ctor body runs,
 		// so a ride that failed to load (VM never assigned) would otherwise crash the update loop.
 		VM?.Update();
+		engine.Update( Time.Now );
 	}
 }

@@ -15,10 +15,20 @@ public class RideEngineTests
 		public List<(int type, int param, int id, int slot)> Spawns = new();
 		public List<int> Sounds = new();
 		public List<int> Kills = new();
+		public List<(int id, int param, int value)> Params = new();
+		public List<(int id, int anim, bool loop)> Anims = new();
+		public bool Animating; // controls IsAnimating / AnyAnimating
 
 		public void SpawnObject( int type, int parameter, int id, int slot ) => Spawns.Add( (type, parameter, id, slot) );
 		public void PlaySound( int sound ) => Sounds.Add( sound );
 		public void KillObject( int id ) => Kills.Add( id );
+		public void SetObjectParam( int id, int param, int value ) => Params.Add( (id, param, value) );
+		public void TriggerAnim( int id, int anim, bool loop ) => Anims.Add( (id, anim, loop) );
+		public void SetAnimSpeed( int id, float speed ) { }
+		public void FlushAnims( int id ) { }
+		public int GetAnim( int id ) => 0;
+		public bool IsAnimating( int id, int anim ) => Animating;
+		public bool AnyAnimating() => Animating;
 	}
 
 	private static RideVM NewVm()
@@ -45,6 +55,38 @@ public class RideEngineTests
 		Assert.AreEqual( (3, 42, 7, 1), fake.Spawns[0] );
 		CollectionAssert.AreEqual( new[] { 9 }, fake.Sounds );
 		CollectionAssert.AreEqual( new[] { 7 }, fake.Kills );
+	}
+
+	[TestMethod]
+	public void AnimationOpcodesRouteToEngine()
+	{
+		var vm = NewVm();
+		var fake = new FakeEngine();
+		vm.Engine = fake;
+
+		vm.CallOpcodeHandler( Opcode.TRIGANIM, Lit( vm, 5 ), Lit( vm, 2 ), Lit( vm, 0 ) );
+		vm.CallOpcodeHandler( Opcode.LOOPANIM, Lit( vm, 5 ), Lit( vm, 3 ) );
+		vm.CallOpcodeHandler( Opcode.SETOBJPARAM, Lit( vm, 5 ), Lit( vm, 1 ), Lit( vm, 99 ) );
+
+		Assert.AreEqual( (5, 2, false), fake.Anims[0] );
+		Assert.AreEqual( (5, 3, true), fake.Anims[1] );
+		Assert.AreEqual( (5, 1, 99), fake.Params[0] );
+	}
+
+	[TestMethod]
+	public void WaitAnimSuspendsWhileAnimating()
+	{
+		var vm = NewVm();
+		var fake = new FakeEngine { Animating = true };
+		vm.Engine = fake;
+
+		vm.CurrentPos = 10;
+		vm.CallOpcodeHandler( Opcode.WAITANIM, Lit( vm, 5 ), Lit( vm, 2 ) );
+		Assert.AreEqual( 9, vm.CurrentPos, "WAITANIM should rewind the PC while still animating" );
+
+		fake.Animating = false;
+		vm.CallOpcodeHandler( Opcode.WAITANIM, Lit( vm, 5 ), Lit( vm, 2 ) );
+		Assert.AreEqual( 9, vm.CurrentPos, "WAITANIM should fall through once the animation is done" );
 	}
 
 	[TestMethod]

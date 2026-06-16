@@ -4,29 +4,120 @@ partial class OpcodeHandlers
 {
 	/// <summary>
 	/// Engine "object" opcodes — they don't change VM state, they ask the ride engine to do something
-	/// in the world (spawn objects, play sounds, …). Each routes to <see cref="RideVM.Engine"/>; when
-	/// no engine is attached (unit tests / headless) the null-conditional call is a no-op, identical
-	/// to the previous "no handler" behaviour. Operand counts match docs/06-rse-vm-opcodes.md. See the
-	/// ride-engine plan / T-007. (More engine families — animation, lights, … — land in later stages.)
+	/// in the world (spawn objects, play sounds, animate, …). Each routes to <see cref="RideVM.Engine"/>;
+	/// with no engine attached (unit tests / headless) the null-conditional call is a no-op, identical
+	/// to the previous "no handler" behaviour. Operand counts match docs/06-rse-vm-opcodes.md. The
+	/// WAIT* opcodes suspend the script with the same PC-rewind trick as WAIT (Handlers/Time.cs). The
+	/// `_CH` variants target the active child's objects; the child shares this VM's engine, so they
+	/// route to the same registry for now. See docs/tickets/T-032 / T-007.
 	/// </summary>
 	public static class Objects
 	{
 		[OpcodeHandler( Opcode.ADDOBJ, "Spawn a ride object (sound / particle / …) under a handle." )]
 		public static void AddObj( ref RideVM vm, Operand type, Operand parameter, Operand id, Operand slot )
-		{
-			vm.Engine?.SpawnObject( type.Value, parameter.Value, id.Value, slot.Value );
-		}
+			=> vm.Engine?.SpawnObject( type.Value, parameter.Value, id.Value, slot.Value );
 
 		[OpcodeHandler( Opcode.SPAWNSOUND, "Play a sound." )]
 		public static void SpawnSound( ref RideVM vm, Operand sound )
-		{
-			vm.Engine?.PlaySound( sound.Value );
-		}
+			=> vm.Engine?.PlaySound( sound.Value );
 
 		[OpcodeHandler( Opcode.KILLOBJ, "Remove a spawned object by its handle." )]
 		public static void KillObj( ref RideVM vm, Operand id )
+			=> vm.Engine?.KillObject( id.Value );
+
+		[OpcodeHandler( Opcode.FADEOBJ, "Fade out and remove an object (stage 1: remove)." )]
+		public static void FadeObj( ref RideVM vm, Operand id )
+			=> vm.Engine?.KillObject( id.Value );
+
+		[OpcodeHandler( Opcode.SETOBJPARAM, "Set an object parameter." )]
+		public static void SetObjParam( ref RideVM vm, Operand id, Operand param, Operand value )
+			=> vm.Engine?.SetObjectParam( id.Value, param.Value, value.Value );
+
+		[OpcodeHandler( Opcode.TRIGANIM, "Trigger an animation on an object (once)." )]
+		public static void TrigAnim( ref RideVM vm, Operand id, Operand anim, Operand _ )
+			=> vm.Engine?.TriggerAnim( id.Value, anim.Value, loop: false );
+
+		[OpcodeHandler( Opcode.LOOPANIM, "Loop an animation on an object." )]
+		public static void LoopAnim( ref RideVM vm, Operand id, Operand anim )
+			=> vm.Engine?.TriggerAnim( id.Value, anim.Value, loop: true );
+
+		[OpcodeHandler( Opcode.TRIGANIMSPEED, "Trigger an animation at a given speed." )]
+		public static void TrigAnimSpeed( ref RideVM vm, Operand id, Operand anim, Operand speed, Operand _ )
 		{
-			vm.Engine?.KillObject( id.Value );
+			vm.Engine?.TriggerAnim( id.Value, anim.Value, loop: false );
+			vm.Engine?.SetAnimSpeed( id.Value, speed.Value );
+		}
+
+		[OpcodeHandler( Opcode.WAITANIM, "Suspend the script until the object's animation finishes." )]
+		public static void WaitAnim( ref RideVM vm, Operand id, Operand anim )
+		{
+			if ( vm.Engine?.IsAnimating( id.Value, anim.Value ) == true )
+				vm.CurrentPos--; // still animating: re-run this instruction next tick
+		}
+
+		[OpcodeHandler( Opcode.TRIGWAITANIM, "Trigger an animation and suspend until it finishes." )]
+		public static void TrigWaitAnim( ref RideVM vm, Operand id, Operand anim, Operand _ )
+		{
+			vm.Engine?.TriggerAnim( id.Value, anim.Value, loop: false ); // idempotent re-trigger
+			if ( vm.Engine?.IsAnimating( id.Value, anim.Value ) == true )
+				vm.CurrentPos--;
+		}
+
+		[OpcodeHandler( Opcode.WAIT4ANIM, "Suspend the script until all animations finish." )]
+		public static void Wait4Anim( ref RideVM vm )
+		{
+			if ( vm.Engine?.AnyAnimating() == true )
+				vm.CurrentPos--;
+		}
+
+		[OpcodeHandler( Opcode.FLUSHANIM, "Stop all animations." )]
+		public static void FlushAnim( ref RideVM vm )
+			=> vm.Engine?.FlushAnims( -1 );
+
+		[OpcodeHandler( Opcode.GETANIM, "Read the current animation of an object into dest." )]
+		public static void GetAnim( ref RideVM vm, Operand dest )
+		{
+			if ( vm.Engine != null )
+				dest.Value = vm.Engine.GetAnim( dest.Value );
+		}
+
+		//
+		// _CH variants — same actions, targeting the active child's objects (shared engine for now).
+		// They carry one extra leading operand (the child handle) that we don't distinguish yet.
+		//
+
+		[OpcodeHandler( Opcode.TRIGANIM_CH, "Trigger an animation on a child's object." )]
+		public static void TrigAnimCh( ref RideVM vm, Operand _, Operand id, Operand anim, Operand __ )
+			=> vm.ActiveChild?.Engine?.TriggerAnim( id.Value, anim.Value, loop: false );
+
+		[OpcodeHandler( Opcode.LOOPANIM_CH, "Loop an animation on a child's object." )]
+		public static void LoopAnimCh( ref RideVM vm, Operand _, Operand id, Operand anim )
+			=> vm.ActiveChild?.Engine?.TriggerAnim( id.Value, anim.Value, loop: true );
+
+		[OpcodeHandler( Opcode.WAITANIM_CH, "Suspend until a child's object animation finishes." )]
+		public static void WaitAnimCh( ref RideVM vm, Operand _, Operand id, Operand anim )
+		{
+			if ( vm.ActiveChild?.Engine?.IsAnimating( id.Value, anim.Value ) == true )
+				vm.CurrentPos--;
+		}
+
+		[OpcodeHandler( Opcode.TRIGWAITANIM_CH, "Trigger + suspend on a child's object animation." )]
+		public static void TrigWaitAnimCh( ref RideVM vm, Operand _, Operand id, Operand anim, Operand __ )
+		{
+			vm.ActiveChild?.Engine?.TriggerAnim( id.Value, anim.Value, loop: false );
+			if ( vm.ActiveChild?.Engine?.IsAnimating( id.Value, anim.Value ) == true )
+				vm.CurrentPos--;
+		}
+
+		[OpcodeHandler( Opcode.FLUSHANIM_CH, "Stop a child's animations." )]
+		public static void FlushAnimCh( ref RideVM vm, Operand _ )
+			=> vm.ActiveChild?.Engine?.FlushAnims( -1 );
+
+		[OpcodeHandler( Opcode.GETANIM_CH, "Read a child's object current animation into dest." )]
+		public static void GetAnimCh( ref RideVM vm, Operand _, Operand dest )
+		{
+			if ( vm.ActiveChild?.Engine != null )
+				dest.Value = vm.ActiveChild.Engine.GetAnim( dest.Value );
 		}
 	}
 }
