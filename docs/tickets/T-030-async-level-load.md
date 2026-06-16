@@ -2,7 +2,7 @@
 
 - **Priority**: 🟠 Medium (the window is frozen ~20-25s during load)
 - **Type**: Rendering / UX
-- **Status**: ☐ To do
+- **Status**: ⚠️ Partial — checkpoint progress reporting done; true background load still to do.
 - **Follow-up of**: [T-024](T-024-linux-black-screen.md) (promotes its informal follow-up to a ticket).
 
 ## Problem
@@ -14,12 +14,23 @@ This is the *other* "not responding" cause, distinct from the lobby stutter
 events — it sits frozen on the last "LOADING…" frame and the WM marks it "not responding". A
 loading screen is presented *before* the load, but it does not animate *during* it.
 
+## Done
+
+- ✅ **Checkpoint progress reporting** (synchronous, no threading). `LoadProgress.Report(status)` is
+  called at the major load steps in `Level` (settings, water, sky, each island, interface); each
+  call pumps events and re-presents the loading screen with the current step shown at the bottom
+  ("Loading island: Jungle…"). `Game.Run` wires `LoadProgress.OnReport` to `RenderLoadingScreen`.
+  The window now updates per step and stays responsive across them instead of showing a static
+  frame. (`source/OpenTPW/Global/LoadProgress.cs`, `Client/Game.cs`, `World/Level.cs`.)
+
 ## To do
 
 1. ☐ Run the level construction off the main thread (Task/worker) while the main thread keeps
-   pumping events and re-presenting an (ideally animated) loading screen. Veldrid GPU resource
-   creation must happen on the render thread — marshal uploads back, or split asset *decode* (CPU,
-   threadable) from GPU *upload* (main thread), draining an upload queue per frame.
+   pumping events and re-presenting an (ideally animated) loading screen at 60 fps. Veldrid GPU
+   resource creation must happen on the render thread — marshal uploads back, or split asset
+   *decode* (CPU, threadable) from GPU *upload* (main thread), draining an upload queue per frame.
+   (Until then, a *single* long step — e.g. one island ~several seconds — can still briefly stall
+   between checkpoints; add finer per-mesh/texture checkpoints if needed.)
 2. ☐ Swap to the level once loading completes; keep `Render.ClearColor`/loading-screen teardown.
 
 ## Risks

@@ -60,21 +60,36 @@ internal static class Game
 		Render.ClearColor = new RgbaFloat( 0.35f, 0.72f, 0.92f, 1f );
 
 		const float loadingScale = 4f;
+		const float statusScale = 2f;
 		void DrawLoading()
 		{
 			if ( loadingFont == null )
 				return;
 
-			// Centre on the actual ink (the line box's descender space would push it high). DrawText's
-			// originY is the line top; place it so the ink midpoint lands on the screen centre.
+			// Centre "LOADING..." on the actual ink (the line box's descender space would push it
+			// high). DrawText's originY is the line top; place it so the ink midpoint lands on the
+			// screen centre.
 			const string text = "LOADING...";
 			var (inkTop, inkBottom) = loadingFont.Atlas.InkBounds( text );
 			var centerY = Screen.Size.Y / 2f + (inkTop + inkBottom) / 2f * loadingScale;
 			Graphics.DrawText( loadingFont, text, Screen.Size.X / 2f, centerY, TextAlign.Center, loadingScale );
+
+			// Current load step, near the bottom of the screen (T-030).
+			var status = LoadProgress.Status;
+			if ( !string.IsNullOrEmpty( status ) )
+			{
+				var (sTop, sBottom) = loadingFont.Atlas.InkBounds( status );
+				var statusY = 60f + (sTop + sBottom) / 2f * statusScale;
+				Graphics.DrawText( loadingFont, status, Screen.Size.X / 2f, statusY, TextAlign.Center, statusScale );
+			}
 		}
 
-		// Show the loading screen for a brief minimum so it's actually visible (and keep the
-		// window responsive by re-presenting/pumping each iteration).
+		// While the level loads (synchronously, on this thread), each LoadProgress.Report checkpoint
+		// pumps events and re-presents this screen — so the window updates with the current step and
+		// stays responsive instead of freezing on a static frame. See T-030.
+		LoadProgress.OnReport = () => Render.RenderLoadingScreen( DrawLoading );
+
+		// Show the loading screen for a brief minimum so it's actually visible before the heavy work.
 		var loadingStart = System.Diagnostics.Stopwatch.StartNew();
 		do
 		{
@@ -86,6 +101,8 @@ internal static class Game
 		// Create level
 		//
 		var level = new Level( "jungle" );
+
+		LoadProgress.Done();
 		Render.ClearColor = RgbaFloat.Black;
 
 		//
