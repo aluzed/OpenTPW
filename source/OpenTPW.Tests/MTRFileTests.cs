@@ -30,6 +30,9 @@ public class MTRFileTests
 		Assert.AreEqual( 6u, mtr.Version );
 		Assert.AreEqual( "s_test", mtr.Name );
 		Assert.AreEqual( dataLen, mtr.Data.Length );
+
+		// The body decodes as whole uint32s: bytes 1..8 -> {0x04030201, 0x08070605}.
+		CollectionAssert.AreEqual( new uint[] { 0x04030201, 0x08070605 }, mtr.Indices );
 	}
 
 	[TestMethod]
@@ -53,5 +56,9 @@ public class MTRFileTests
 		Assert.IsTrue( mtr.Name.Length > 0, "should read a material name" );
 		StringAssert.StartsWith( mtr.Name, "s_" ); // observed naming, e.g. s_bkrupt
 		Assert.IsTrue( mtr.Data.Length > 0 );
+
+		// The body is a whole-uint32 index array.
+		Assert.AreEqual( mtr.Data.Length / 4, mtr.Indices.Length );
+		Assert.IsTrue( mtr.Indices.Length > 0, "should decode an index array" );
 	}
 }

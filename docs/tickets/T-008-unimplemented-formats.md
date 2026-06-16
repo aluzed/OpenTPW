@@ -83,9 +83,13 @@ extraction.
   embedded ASCII name (e.g. `s_bkrupt`, `s_congrats`).
 
 **Update**: the header field at offset 20 is a **name offset** (confirmed: points exactly
-to the embedded string, e.g. "s_bkrupt"). `MTRFile` now decodes magic + version + name
-and keeps the mesh-coupled index array raw. The full index/material layout (binding to the
-`.MD2` mesh + textures) still needs cross-referencing with the companion `.MD2`.
+to the embedded string, e.g. "s_bkrupt"). `MTRFile` decodes magic + version + name, and now
+also exposes the mesh-coupled body as a `uint32[]` (`Indices`) plus the constant trailing
+block (`TrailingData`, ~847 bytes on real samples). **Cross-referenced with the companion
+`.MD2`** (bankrupt/congrats): the array starts with a per-vertex ramp up to roughly the mesh's
+face count (bankrupt: ramps to 410, MD2 faceCount 411), then a block of small values
+(0/1/2 grouping). The exact per-element semantics and the texture binding are still
+undetermined (would benefit from Ghidra on the loader). Decoded faithfully for now.
 
 ## `.BF4` glyph-block notes
 
