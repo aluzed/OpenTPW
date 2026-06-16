@@ -50,26 +50,9 @@ public partial class OpcodeHandlers
 			Log.Trace( "TODO: End slice" );
 		}
 
-		[OpcodeHandler( Opcode.ADDOBJ, "Add an object" )]
-		public static void AddObj( ref RideVM vm, Operand type, Operand parameter, Operand id, Operand slot )
-		{
-			switch ( (ScriptDefs.Effects)type.Value )
-			{
-				//case ScriptDefs.OBJ_PTCL:
-				//case ScriptDefs.OBJ_SOUND_LOC_AMB:
-				//case ScriptDefs.OBJ_PTCL_D:
-				//case ScriptDefs.OBJ_SOUND_LOC_RID:
-				//case ScriptDefs.OBJ_SOUND_GLO_RID:
-				//case ScriptDefs.OBJ_SOUND_GLO_KID:
-				//case ScriptDefs.OBJ_SOUND_GLO_STA:
-				//case ScriptDefs.OBJ_SOUND_GLO_AMB:
-				//case ScriptDefs.OBJ_SOUND_GLO_UI:
-				//case ScriptDefs.OBJ_SOUND_GLO_BMP:
-				//	break;
-				default:
-					break;
-			}
-		}
+		// ADDOBJ now lives in Handlers/Objects.cs (routes to the ride engine). It must exist in
+		// exactly one place — duplicate [OpcodeHandler] attributes make the reflection registration's
+		// ToDictionary throw on the duplicate opcode key.
 
 		[OpcodeHandler( Opcode.DBGMSG, "Debug Message" )]
 		public static void DbgMsg( ref RideVM vm, Operand value )

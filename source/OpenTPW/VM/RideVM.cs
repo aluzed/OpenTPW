@@ -41,6 +41,13 @@ public partial class RideVM
 	/// </summary>
 	public Func<string, RideVM?>? ChildLoader { get; set; }
 
+	/// <summary>
+	/// The ride engine the "engine" opcodes (ADDOBJ, SPAWNSOUND, …) drive. The running game sets this
+	/// to a <see cref="RideEngine"/>; left null (unit tests, headless tools) those opcodes are guarded
+	/// no-ops, identical to having no handler. See the ride-engine plan / docs/tickets/T-007.
+	/// </summary>
+	public IRideEngine? Engine { get; set; }
+
 	// Set by WAIT/WAITABS: the game-time the script should resume at. While set, the WAIT
 	// instruction re-runs each tick (the original rewinds its PC) until GameTime reaches it.
 	// null = not waiting. See Handlers/Time.cs and docs/tickets/T-007.
