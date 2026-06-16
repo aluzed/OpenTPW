@@ -4,6 +4,12 @@ using System.Text;
 namespace OpenTPW;
 
 /// <summary>
+/// An 8-bit-per-channel colour from a particle colour ramp. Decoded from the original
+/// D3DCOLOR packing (a little-endian <c>0xAARRGGBB</c> word).
+/// </summary>
+public readonly record struct ParticleColor( byte R, byte G, byte B, byte A );
+
+/// <summary>
 /// A single particle effect within a <see cref="ParticleLibraryFile"/>.
 /// </summary>
 public sealed class ParticleEffect
@@ -17,8 +23,16 @@ public sealed class ParticleEffect
 	public string Name { get; init; } = "";
 
 	/// <summary>
-	/// The raw per-effect parameter block (everything in the record before the name field).
-	/// The individual fields (lifetime, spawn rate, colour ramp, …) are not yet decoded.
+	/// The per-particle colour gradient over its lifetime: 16 RGBA stops at the end of the
+	/// record. Decoded and verified to be semantically correct (Fire ramps dark-red→bright,
+	/// Smoke is white with an alpha fade in/out, …).
+	/// </summary>
+	public IReadOnlyList<ParticleColor> ColorRamp { get; init; } = Array.Empty<ParticleColor>();
+
+	/// <summary>
+	/// The raw per-effect parameter block (everything in the record before the name field,
+	/// including the <see cref="ColorRamp"/> bytes). The remaining fields (lifetime, spawn
+	/// rate, velocity, …) are not yet decoded.
 	/// </summary>
 	public byte[] Parameters { get; init; } = Array.Empty<byte>();
 }
@@ -39,8 +53,9 @@ public sealed class ParticleEffect
 ///     recordSize-48: 48             null-padded ASCII effect name
 ///   Trailing data after the records (a shared block, kept raw).
 /// </code>
-/// The effect names decode exactly to par_lib.h (NULL, Sparks, Smoke, …). The per-effect
-/// parameters are exposed raw, like the mesh data in <see cref="MTRFile"/>.
+/// The effect names decode exactly to par_lib.h (NULL, Sparks, Smoke, …). Each record also
+/// ends (just before the name) with a 16-stop RGBA colour ramp, which is decoded; the rest of
+/// the parameter block is exposed raw, like the mesh data in <see cref="MTRFile"/>.
 /// See docs/tickets/T-008.
 /// </summary>
 public sealed class ParticleLibraryFile : BaseFormat
@@ -49,6 +64,10 @@ public sealed class ParticleLibraryFile : BaseFormat
 
 	// The effect name occupies the final 48 bytes of each record (confirmed from the sample).
 	private const int NameFieldLength = 48;
+
+	// The colour ramp is the 16 RGBA stops immediately before the name (confirmed from the sample).
+	private const int ColorRampStops = 16;
+	private const int ColorRampBytes = ColorRampStops * 4;
 
 	/// <summary>Size in bytes of a single effect record (observed: 320).</summary>
 	public int RecordSize { get; private set; }
@@ -91,16 +110,44 @@ public sealed class ParticleLibraryFile : BaseFormat
 			var recordStart = HeaderSize + i * RecordSize;
 			var nameStart = recordStart + paramLength;
 
+			var parameters = bytes[recordStart..(recordStart + paramLength)];
+
 			effects[i] = new ParticleEffect
 			{
 				Index = i,
 				Name = ReadFixedString( bytes, nameStart, NameFieldLength ),
-				Parameters = bytes[recordStart..(recordStart + paramLength)],
+				ColorRamp = ReadColorRamp( parameters ),
+				Parameters = parameters,
 			};
 		}
 
 		Effects = effects;
 		TrailingData = bytes[(int)recordsEnd..];
+	}
+
+	/// <summary>
+	/// Reads the 16-stop colour ramp from the tail of a parameter block. Each stop is a
+	/// little-endian D3DCOLOR word (<c>0xAARRGGBB</c>). Returns empty if the block is too small.
+	/// </summary>
+	private static IReadOnlyList<ParticleColor> ReadColorRamp( byte[] parameters )
+	{
+		if ( parameters.Length < ColorRampBytes )
+			return Array.Empty<ParticleColor>();
+
+		var start = parameters.Length - ColorRampBytes;
+		var ramp = new ParticleColor[ColorRampStops];
+
+		for ( var i = 0; i < ColorRampStops; i++ )
+		{
+			var argb = BinaryPrimitives.ReadUInt32LittleEndian( parameters.AsSpan( start + i * 4, 4 ) );
+			ramp[i] = new ParticleColor(
+				R: (byte)(argb >> 16),
+				G: (byte)(argb >> 8),
+				B: (byte)argb,
+				A: (byte)(argb >> 24) );
+		}
+
+		return ramp;
 	}
 
 	private static string ReadFixedString( byte[] bytes, int offset, int maxLength )

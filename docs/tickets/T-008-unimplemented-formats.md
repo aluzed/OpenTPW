@@ -44,9 +44,12 @@
     fixed-size records (`recordSize` bytes = a raw parameter block + a 48-byte null-padded
     name). On `Tp2.plb`: 105 records of 320 bytes; the **names decode exactly to the disc's
     `par_lib.h`** `P_EFFECT_*` list in order (NULL, Sparks, Smoke, … Test2D — verified by
-    `ParticleLibraryFileTests.ParsesRealPlbSample`). The per-effect parameter fields
-    (lifetime/spawn/colour ramp) are kept raw for now. **Remaining**: decode the parameter
-    block and the trailing shared block.
+    `ParticleLibraryFileTests.ParsesRealPlbSample`). The **per-effect colour ramp is now
+    decoded**: the last 64 bytes of each record are 16 D3DCOLOR (`0xAARRGGBB`) stops, exposed
+    as `ParticleEffect.ColorRamp`. Verified semantically (Fire ramps dark-red→bright, Sparks
+    is yellow-orange, Smoke is white with an alpha fade in/out). The rest of the parameter
+    block is kept raw. **Remaining**: decode the other parameter fields (lifetime, spawn rate,
+    velocity, sprite ref) and the trailing shared block.
   - `.MD2` and `.MAP` tracked in T-012.
 
 ## Tooling: WAD extractor

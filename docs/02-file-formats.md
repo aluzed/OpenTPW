@@ -29,7 +29,7 @@ Source: `source/OpenTPW.Files/Formats/`. Legend: ✅ done · ⚠️ partial · �
 | `.LIP`/`.LIPS` lip-sync | ⚠️ | `OpenTPW.Files/Formats/Sound/LipSyncFile.cs` | Reverse-engineered: a list of uint32 mouth keyframe timestamps terminated by 0xFFFFFFFF (verified monotonic on real files). Timestamp unit + renderer wiring remain. See T-008. |
 | `.MTR` materials | ⚠️ | `OpenTPW.Files/Formats/Model/MTRFile.cs` | Reverse-engineered: magic 0x2E5915AF, version, name (companion to same-named `.MD2`); mesh-coupled material/index array kept raw. See T-008. |
 | `.TQI` / `.TGQ` video | ✅ | `Video/VideoFile.cs`, `Video/TqiDecoder.cs` | Container + **EA-ADPCM audio** (`DecodeAudio()`) + **TQI video frames** (`DecodeFrame()`) fully decoded — verified pixel-accurate against ffmpeg (the Bullfrog logo). See T-008. |
-| `.PLB` particle libs | ✅ | `Particle/ParticleLibraryFile.cs` | Reverse-engineered from `Tp2.plb` + the disc's `par_lib.h`: 16-byte header (count, record size), then fixed 320-byte records (raw param block + 48-byte name). The 105 effect names decode **exactly** to par_lib.h's `P_EFFECT_*` order (NULL, Sparks, … Test2D). Per-effect params kept raw. See T-008. |
+| `.PLB` particle libs | ✅ | `Particle/ParticleLibraryFile.cs` | Reverse-engineered from `Tp2.plb` + the disc's `par_lib.h`: 16-byte header (count, record size), then fixed 320-byte records (raw param block + 48-byte name). The 105 effect names decode **exactly** to par_lib.h's `P_EFFECT_*` order (NULL, Sparks, … Test2D). Each effect's **16-stop RGBA colour ramp is decoded** (verified: Fire dark-red→bright, Smoke white w/ alpha fade); other params kept raw. See T-008. |
 
 ## Focus: the ride-script VM (`.RSE`)
 
