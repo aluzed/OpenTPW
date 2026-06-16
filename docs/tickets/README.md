@@ -26,7 +26,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-005](T-005-vulnerable-dependencies.md) | 🟠 Medium | ✅ Done | Vulnerable dependencies (direct + transitive) |
 | [T-006](T-006-gamepath-config.md) | 🟡 Low | ✅ Done | Windows default `GamePath` + no portable override |
 | [T-007](T-007-vm-opcodes-rse.md) | 🟡 Feature | ⚠️ Partial | Ride VM: `.RSE` loader restored; 34/210 opcodes (LIFO stack + END/PUSH/POP) |
-| [T-008](T-008-unimplemented-formats.md) | 🟡 Feature | ⚠️ Partial | Formats: `.BF4` ✅, `.TQI/.TGQ` (container+audio+video) ✅, `.LIP` ⚠️, `.MTR` ⚠️ |
+| [T-008](T-008-unimplemented-formats.md) | 🟡 Feature | ⚠️ Partial | Formats: `.BF4` ✅, `.TQI/.TGQ` ✅, `.PLB` ✅, `.LIP` ⚠️, `.MTR` ⚠️ |
 | [T-009](T-009-build-warnings.md) | ⚪ Debt | ✅ Done | build warnings (105 → 0: nullable, Dispose, dead code) |
 | [T-010](T-010-add-sub-flags.md) | 🟠 Medium | ✅ Done | ADD/SUB don't set arithmetic flags (branch correctness) |
 | [T-011](T-011-branchto-hardening.md) | 🟡 Feature | ✅ Done | Harden `RideVM.BranchTo` (O(1) map; verified by a compiled loop) |

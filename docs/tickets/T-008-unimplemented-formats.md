@@ -39,6 +39,14 @@
     same-named `.MD2`; the mesh-coupled material/index array is kept raw. Validated by
     `MTRFileTests` (synthetic + real BANKRUPT.MTR via `TPW_MTR_SAMPLE`). **Remaining**:
     decode the index array and bind it to the `.MD2` mesh + textures.
+  - `.PLB` **particle libraries** parsed (`OpenTPW.Files/Formats/Particle/ParticleLibraryFile.cs`):
+    16-byte header (`uint32 count`, `uint32 recordSize`, 8 reserved), then `count`
+    fixed-size records (`recordSize` bytes = a raw parameter block + a 48-byte null-padded
+    name). On `Tp2.plb`: 105 records of 320 bytes; the **names decode exactly to the disc's
+    `par_lib.h`** `P_EFFECT_*` list in order (NULL, Sparks, Smoke, … Test2D — verified by
+    `ParticleLibraryFileTests.ParsesRealPlbSample`). The per-effect parameter fields
+    (lifetime/spawn/colour ramp) are kept raw for now. **Remaining**: decode the parameter
+    block and the trailing shared block.
   - `.MD2` and `.MAP` tracked in T-012.
 
 ## Tooling: WAD extractor
@@ -122,7 +130,7 @@ intra-style codec with EA-specific framing. Findings:
 | `.MTR` materials | ❌ | inside the `.WAD`s | Needed for correct model rendering. |
 | `.LIPS` lip-sync | ❌ | `DATA/GLOBAL/SPEECH` | — |
 | `.TQI`/`.TGQ` video | ❌ | `DATA/MOVIES/*.TGQ` | Bullfrog video codec. |
-| `.PLB` particles | (not listed) | `DATA/PARTICLE/TP2.PLB` | **`PAR_LIB.H` on the CD documents the format!** |
+| `.PLB` particles | ✅ | `DATA/PARTICLE/Tp2.plb` | Header + records + names decoded; `par_lib.h` gives the effect **names** (the binary struct was reversed from the sample). Param fields remain raw. |
 | `.MD2` models | ⚠️ | `.WAD`s | `ModelFile.cs` partial — to finish. |
 | `.MAP` maps | ⚠️ | `DATA/LEVELS/...` | parsing to generalize (terrain currently hardcoded). |
 
@@ -135,10 +143,12 @@ intra-style codec with EA-specific framing. Findings:
    pattern: `BaseStream`, `*Reader`).
 4. Add a test with a fixture.
 
-## Quick win
+## Quick win — ✅ done
 
-`DATA/PARTICLE/PAR_LIB.H` is an **original C header**: it likely describes the `.PLB`
-particle format without any reversing — tackle it first.
+`DATA/PARTICLE/par_lib.h` is an **original C header**. It turned out to list the effect
+**catalogue** (`P_EFFECT_*` ids 0–100 + `E_EFFECT_*` emitters), not the binary struct, so
+the `.PLB` layout itself was reversed from `Tp2.plb` and cross-checked against those names
+(they line up exactly). Parser + tests landed (`ParticleLibraryFile`).
 
 ## Affected files
 
