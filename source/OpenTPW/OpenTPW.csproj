@@ -22,10 +22,23 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<!-- minimp3 native decoder (T-031), copied next to the app so DllImport("tpwmp3") finds it.
-		     Linux build committed; rebuild via Audio/native/build.sh. Windows/macOS builds: TODO. -->
-		<None Include="Audio/native/linux-x64/libtpwmp3.so" Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+		<!-- minimp3 native decoder (T-031), copied next to the app so DllImport("tpwmp3") finds it
+		     (.NET adds the lib/.so/.dll/.dylib affix per platform). Build via Audio/native/build.sh
+		     or the native-audio CI workflow. The Exists() guards let the build succeed on a platform
+		     whose binary hasn't been produced yet (audio then falls back to silence gracefully). -->
+		<None Include="Audio/native/linux-x64/libtpwmp3.so"
+			  Condition="$([MSBuild]::IsOSPlatform('Linux')) And Exists('Audio/native/linux-x64/libtpwmp3.so')">
 			<Link>libtpwmp3.so</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Include="Audio/native/win-x64/tpwmp3.dll"
+			  Condition="$([MSBuild]::IsOSPlatform('Windows')) And Exists('Audio/native/win-x64/tpwmp3.dll')">
+			<Link>tpwmp3.dll</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Include="Audio/native/osx/libtpwmp3.dylib"
+			  Condition="$([MSBuild]::IsOSPlatform('OSX')) And Exists('Audio/native/osx/libtpwmp3.dylib')">
+			<Link>libtpwmp3.dylib</Link>
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 	</ItemGroup>

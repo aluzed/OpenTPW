@@ -1,0 +1,45 @@
+name: native-audio
+
+# Builds the minimp3 audio decoder wrapper (tpwmp3) for each platform and uploads the libs as
+# artifacts. Run on demand, or when the native sources change. Download the artifacts and commit
+# them under source/OpenTPW/Audio/native/<rid>/ so the game ships a decoder on every OS. See
+# docs/tickets/T-031-game-audio.md. (The Linux .so is committed; Windows/macOS come from here.)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'source/OpenTPW/Audio/native/**'
+
+defaults:
+  run:
+    working-directory: source/OpenTPW/Audio/native
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            outdir: linux-x64
+            cmd: gcc -O2 -fPIC -shared tpwmp3.c -o linux-x64/libtpwmp3.so -lm
+          - os: windows-latest
+            outdir: win-x64
+            cmd: gcc -O2 -shared tpwmp3.c -o win-x64/tpwmp3.dll
+          - os: macos-latest
+            outdir: osx
+            cmd: clang -O2 -dynamiclib tpwmp3.c -o osx/libtpwmp3.dylib
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build native decoder
+        shell: bash
+        run: |
+          mkdir -p "${{ matrix.outdir }}"
+          ${{ matrix.cmd }}
+          ls -la "${{ matrix.outdir }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tpwmp3-${{ matrix.outdir }}
+          path: source/OpenTPW/Audio/native/${{ matrix.outdir }}/*

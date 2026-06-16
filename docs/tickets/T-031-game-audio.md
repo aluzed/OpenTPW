@@ -28,23 +28,34 @@ strings were unwired labels.
   decode matches ffmpeg bit-for-bit (correlation **1.000**, full 18.1 s). The SDT payload offset was
   also corrected (`headerSize`, not the field sum — see commit) so the stream starts on an MP2 frame.
   Note: the source remains 22 kHz / 112 kb/s MP2 (the original asset); minimp3 just decodes it
-  correctly. The ModKit previewer still uses NLayer and has the same MPEG-2 bug (item 4).
+  correctly. The ModKit previewer still uses NLayer and has the same MPEG-2 bug (item 3).
+- ✅ **SFX (UI clicks).** `Audio.PlaySfx(key, mp2)` decodes via minimp3, caches the buffer per key,
+  and plays on a round-robin pool of 8 non-looping sources. `PurpleButton.OnUpdate` hit-tests the
+  cursor against the visible pill (`Input.MouseLeftPressed` rising-edge) and plays the original
+  `textclick` (`sfUiHD.sdt`). Verified on-machine.
+- ✅ **Volume.** Separate `MusicVolume` (0.5) / `SfxVolume` (0.8) gains; `-`/`+` adjust music volume
+  live (edge-detected, logged). Persistent settings UI still TODO (item 2).
+- ✅ **Cross-platform build infra.** `Audio/native/build.sh` builds per-OS (gcc/mingw/clang),
+  `.github/workflows/native-audio.yml` produces `linux/win/macOS` libs as CI artifacts, and the
+  csproj copies the matching lib per OS (Exists-guarded). Linux `.so` is committed; the
+  Windows `.dll` / macOS `.dylib` come from CI (this dev box has no Win/Mac toolchain) — until then
+  those platforms fall back to silence gracefully.
 
 ## To do
 
-1. ☐ **SFX** — UI click sounds (`UIHD`/`sfUiHD.sdt`) on button interactions, ambience
-   (`AmbientHD.sdt`). Needs a multi-source/voice path (the current service has one music source) and
-   button click events wired.
-2. ☐ **Volume / mixing** — connect the settings (`MusicVolume`, `SoundEffectsVolume`) UI to the
-   service; per-category gain.
-3. ☐ **Track selection** — pick music by context/level instead of hardcoding `level4c`
-   (`MusicHD.sdt` ships `level4c`/`level4w` = calm/wild). The frontend may want a dedicated theme.
-4. ☐ Point the ModKit `AudioPlayer` at the same minimp3 decoder (it still uses NLayer → same
+1. ☐ **Ambient SFX** — ambience (`AmbientHD.sdt`) and more UI/event sounds beyond the click.
+2. ☐ **Volume settings UI** — persist `MusicVolume`/`SoundEffectsVolume` and expose in a menu
+   (currently runtime keys only); per-category mixing.
+3. ☐ Point the ModKit `AudioPlayer` at the same minimp3 decoder (it still uses NLayer → same
    MPEG-2 Layer II bug when previewing 22 kHz sounds), and share one decode path.
-5. ☐ Build `libtpwmp3` for Windows (`.dll`) and macOS (`.dylib`) — currently only `linux-x64` is
-   committed; other platforms fall back to no audio (graceful) until built (`Audio/native/build.sh`).
+4. ☐ **Track selection** — pick music by context/level instead of hardcoding `level4c`
+   (`MusicHD.sdt` ships `level4c`/`level4w` = calm/wild). The frontend may want a dedicated theme.
+5. ☐ Commit the CI-built Windows/macOS `libtpwmp3` binaries so those platforms ship audio.
 
 ## Affected files
 
-`source/OpenTPW/Audio/Audio.cs` (new), `source/OpenTPW/Client/Game.cs` (lobby music),
-`source/OpenTPW/OpenTPW.csproj` (audio packages).
+`source/OpenTPW/Audio/Audio.cs` (music + SFX), `source/OpenTPW/Audio/native/*` (minimp3 wrapper +
+build script + Linux lib), `source/OpenTPW/Client/Game.cs` (lobby music),
+`source/OpenTPW/Client/Renderer.cs` (volume keys), `source/OpenTPW/Global/Input.cs` (mouse edge),
+`source/OpenTPW/UI/Widgets/PurpleButton.cs` (click SFX), `source/OpenTPW/OpenTPW.csproj` (packages +
+native libs), `.github/workflows/native-audio.yml` (cross-platform native build).
