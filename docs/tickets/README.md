@@ -34,7 +34,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-013](T-013-ci-pipeline.md) | 🟠 Medium | ✅ Done | Add CI (build + test on Linux) |
 | [T-014](T-014-case-insensitive-assets.md) | 🟠 Medium | ✅ Done | Case-insensitive asset path resolution (Linux) |
 | [T-015](T-015-md2-static-variant.md) | 🟡 Feature | ☐ To do | Decode the static `.MD2` variant (frameCount 0, e.g. GARROW) |
-| [T-016](T-016-map-entry-records.md) | 🟡 Feature | ☐ To do | `.MAP`: decode BANK per-entry records + the SFX variant |
+| [T-016](T-016-map-entry-records.md) | 🟡 Feature | ⚠️ Partial | `.MAP`: variant detection + SFX category header done; record fields need Ghidra |
 | [T-017](T-017-tpws-saves.md) | 🟡 Feature | ☐ To do | `.TPWS` save files: complete read + implement write |
 | [T-018](T-018-mtr-material-semantics.md) | 🟡 Feature | ☐ To do | `.MTR` material semantics + `.MD2` texture binding |
 | [T-019](T-019-plb-parameter-fields.md) | 🟡 Feature | ☐ To do | `.PLB` particle parameter fields (beyond the colour ramp) |

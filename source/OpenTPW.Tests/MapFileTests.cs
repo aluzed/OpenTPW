@@ -52,26 +52,36 @@ public class MapFileTests
 		ms.Position = 0;
 		var map = new MapFile( ms );
 
+		Assert.AreEqual( MapVariant.Bank, map.Variant );
 		Assert.AreEqual( 2, map.EntryCount );
 		CollectionAssert.AreEqual( names, map.Entries.ToArray() );
 	}
 
-	// The SFX variant has no name table: Entries stays empty (no false positives).
+	// The SFX variant has a category header (sound count + 3 default params), no name table.
 	[TestMethod]
-	public void SfxVariantHasNoEntryNames()
+	public void DecodesSfxCategoryHeader()
 	{
 		var guid = new Guid( "e9612c00-31d0-11d2-b409-00b0c993f203" );
 
 		using var ms = new MemoryStream();
-		ms.Write( guid.ToByteArray() );
-		ms.Write( new byte[8] );
-		ms.Write( BitConverter.GetBytes( 1 ) );   // count = 1
-		ms.Write( new byte[] { 0x19, 0, 0, 0, 1, 0, 0, 0, 0, 0 } ); // non-string binary body
+		ms.Write( guid.ToByteArray() );                  // 16
+		ms.Write( new byte[8] );                         // reserved @0x10
+		ms.Write( BitConverter.GetBytes( 1 ) );          // categoryCount @0x18 = 1
+		ms.Write( BitConverter.GetBytes( 25 ) );         // soundEntryCount @0x1c = 25
+		ms.Write( BitConverter.GetBytes( 0 ) );          // pad @0x20
+		ms.Write( BitConverter.GetBytes( 0x10009 ) );    // flags @0x24
+		ms.Write( BitConverter.GetBytes( 1.0f ) );       // params @0x28
+		ms.Write( BitConverter.GetBytes( 2.0f ) );
+		ms.Write( BitConverter.GetBytes( 0.5f ) );
+		ms.Write( new byte[] { 0xAA, 0xBB } );           // start of the (raw) per-sound list
 
 		ms.Position = 0;
 		var map = new MapFile( ms );
 
-		Assert.AreEqual( 0, map.Entries.Count );
+		Assert.AreEqual( MapVariant.Sfx, map.Variant );
+		Assert.AreEqual( 25, map.SoundEntryCount );
+		Assert.AreEqual( 0, map.Entries.Count, "SFX has no name table" );
+		CollectionAssert.AreEqual( new[] { 1.0f, 2.0f, 0.5f }, map.CategoryParameters.ToArray() );
 	}
 
 	// Optional validation against a real .MAP (CAT_*) file. Set TPW_MAP_SAMPLE.
@@ -90,11 +100,17 @@ public class MapFileTests
 		StringAssert.Contains( map.CategoryType.ToString(), "-31d0-11d2-b409-" );
 		Assert.IsTrue( map.Data.Length > 0 );
 
-		// A BANK catalog exposes its entry names; every decoded name must be non-empty.
-		if ( map.Entries.Count > 0 )
+		// A BANK catalog exposes its entry names; an SFX catalog exposes its sound-entry
+		// count and three category default parameters.
+		if ( map.Variant == MapVariant.Bank )
 		{
 			Assert.AreEqual( map.EntryCount, map.Entries.Count );
 			Assert.IsTrue( map.Entries.All( n => n.Length > 0 ) );
+		}
+		else if ( map.Variant == MapVariant.Sfx )
+		{
+			Assert.IsTrue( map.SoundEntryCount > 0, "SFX should have sound entries" );
+			Assert.AreEqual( 3, map.CategoryParameters.Count );
 		}
 	}
 }
