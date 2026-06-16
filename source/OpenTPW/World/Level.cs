@@ -43,6 +43,19 @@ public class Level
 		_ = new LobbyIsland( new Vector3( 600, 600, 0 ), "Fantasy" );
 		// _ = new LobbyIsland( new Vector3( 400, 600, 0 ), "Space" );
 
+		// Dev test (ride engine slice 1): instantiate one real ride — render its model + run its VM.
+		// Guarded so a load failure never breaks the lobby. No park yet, so placement is approximate.
+		try
+		{
+			// Path omits the .wad extension — the VFS mounts "<path>.wad" when a segment matches.
+			// Dev placement (no park/grid to site rides yet — that's roadmap stage 7).
+			_ = new Ride( "levels/jungle/rides/tourride", new Vector3( 500, 500, 30 ) );
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( $"dev ride failed to load: {e.Message}" );
+		}
+
 		Camera.SetCameraMode<LobbyCameraMode>();
 	}
 

@@ -38,7 +38,7 @@ public partial class Material : Asset
 
 	public Material( string shaderPath, MaterialFlags flags = MaterialFlags.None )
 	{
-		Shader = new Shader( shaderPath );
+		Shader = Shader.Load( shaderPath );
 		Shader.OnRecompile += () => SetupResources( flags );
 
 		All.Add( this );
@@ -47,7 +47,7 @@ public partial class Material : Asset
 
 	protected Material( string shaderPath, Type uniformBufferType, MaterialFlags flags = MaterialFlags.None )
 	{
-		Shader = new Shader( shaderPath );
+		Shader = Shader.Load( shaderPath );
 		Shader.OnRecompile += () => SetupResources( flags );
 		UniformBufferType = uniformBufferType;
 

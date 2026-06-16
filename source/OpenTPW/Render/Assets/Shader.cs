@@ -19,7 +19,22 @@ public class Shader : Asset
 	public bool IsDirty { get; private set; }
 	public Action OnRecompile { get; set; } = null!;
 
-	private FileSystemWatcher watcher;
+	private FileSystemWatcher? watcher;
+
+	// Shaders are shared by path: every Material that uses the same shader file gets the same Shader
+	// instance — one compile, one hot-reload FileSystemWatcher (the lobby has ~60 materials on
+	// test.shader; one watcher each exhausted the inotify instance limit and blocked ride models).
+	private static readonly Dictionary<string, Shader> cache = new();
+
+	internal static Shader Load( string path )
+	{
+		if ( cache.TryGetValue( path, out var shader ) )
+			return shader;
+
+		shader = new Shader( path );
+		cache[path] = shader;
+		return shader;
+	}
 
 	internal Shader( string path )
 	{
@@ -28,18 +43,29 @@ public class Shader : Asset
 
 		Recompile();
 
-		var directoryName = System.IO.Path.GetDirectoryName( Path );
-		var fileName = System.IO.Path.GetFileName( Path );
+		// Hot-reload is a dev convenience. Setting up the watcher can fail when the OS inotify
+		// instance limit is reached (Linux, many watchers / a busy desktop) — that must not crash the
+		// game, so it degrades to "no hot-reload for this shader". Shaders are shared by path (Load),
+		// keeping the watcher count to a handful.
+		try
+		{
+			var directoryName = System.IO.Path.GetDirectoryName( Path );
+			var fileName = System.IO.Path.GetFileName( Path );
 
-		watcher = new FileSystemWatcher( directoryName!, fileName );
+			watcher = new FileSystemWatcher( directoryName!, fileName );
 
-		// Only react to actual edits (write/size). Crucially NOT LastAccess: Recompile() opens the
-		// shader file for reading, which updates LastAccess — watching it would re-fire OnWatcherChanged
-		// after every recompile and re-enqueue the shader forever (an infinite recompile loop). See T-028.
-		watcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size;
+			// Only react to actual edits (write/size). Crucially NOT LastAccess: Recompile() opens the
+			// shader file for reading, which updates LastAccess — watching it would re-fire OnWatcherChanged
+			// after every recompile and re-enqueue the shader forever (an infinite recompile loop). See T-028.
+			watcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size;
 
-		watcher.EnableRaisingEvents = true;
-		watcher.Changed += OnWatcherChanged;
+			watcher.EnableRaisingEvents = true;
+			watcher.Changed += OnWatcherChanged;
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( $"Shader hot-reload disabled for {Path}: {e.Message}" );
+		}
 	}
 
 	public static bool IsFileReady( string path )
