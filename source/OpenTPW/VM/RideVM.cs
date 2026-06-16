@@ -30,6 +30,11 @@ public partial class RideVM
 	// child ride script. SET/GETVARIN{CHILD,PARENT} read/write the linked VM's Variables.
 	public RideVM? Parent { get; set; }
 	public RideVM? ActiveChild { get; set; }
+
+	// Set by WAIT/WAITABS: the game-time the script should resume at. While set, the WAIT
+	// instruction re-runs each tick (the original rewinds its PC) until GameTime reaches it.
+	// null = not waiting. See Handlers/Time.cs and docs/tickets/T-007.
+	public int? WaitUntil { get; set; }
 	public string Disassembly => rsseqFile.Disassembly;
 	public List<Instruction> Instructions { get; } = new List<Instruction>();
 

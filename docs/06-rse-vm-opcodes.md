@@ -11,13 +11,14 @@ The **Operands** column is authoritative and is what the reflection dispatcher
 
 - **Implemented**: a handler exists in `source/OpenTPW/VM/Handlers/`.
 - **Kind**: `pure` = realizable with VM state only (arithmetic, flags, stack, variables,
-  timers, date, VM hierarchy) — implementable and unit-testable now. `engine` = a ride-engine
-  side effect (objects, animations, sound, lights, walk/limbo, scream…) that needs engine
-  subsystems that don't exist yet.
+  timers, date, VM hierarchy, the wait scheduler) — implementable and unit-testable now.
+  `engine` = a ride-engine side effect (objects, animations, sound, lights, walk/limbo,
+  scream…) that needs engine subsystems that don't exist yet.
 
-Status: **46 / 106 implemented**. Of all 106, **43 are `pure`** and **63 are `engine`**. The
-remaining `pure` opcodes (`WAIT`/`WAITABS` need a scheduler; `HUSH`/`HOP`/`SETLV` need their
-semantics read) are the tail of Batch A. See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md).
+Status: **48 / 106 implemented**. Of all 106, **43 are `pure`** and **63 are `engine`**.
+**Batch A (pure) is essentially complete** — the only unimplemented `pure` opcodes are `HUSH`
+and `HOP`, whose semantics still need reading (and may turn out engine-coupled). The remaining
+work is Batch B (engine). See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md).
 
 | # | Opcode | Operands | Implemented | Kind |
 |---|--------|:--------:|:-----------:|------|
@@ -65,8 +66,8 @@ semantics read) are the tail of Batch A. See [tickets/T-007](tickets/T-007-vm-op
 | 41 | `POP` | 1 | ✅ | pure |
 | 42 | `HUSH` | 1 | ☐ | pure |
 | 43 | `HOP` | 1 | ☐ | pure |
-| 44 | `WAIT` | 1 | ☐ | pure |
-| 45 | `WAITABS` | 1 | ☐ | pure |
+| 44 | `WAIT` | 1 | ✅ | pure |
+| 45 | `WAITABS` | 1 | ✅ | pure |
 | 46 | `WAIT4ANIM` | 0 | ☐ | engine |
 | 47 | `ADD` | 2 | ✅ | pure |
 | 48 | `MULT` | 3 | ✅ | pure |

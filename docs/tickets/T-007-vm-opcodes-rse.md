@@ -65,6 +65,17 @@ runtime). Classification: **43 `pure`** (VM-state only — implementable now) an
    a clean VM hierarchy (`RideVM.Parent` / `RideVM.ActiveChild`), which `SPAWNCHILD` will
    populate. Operand order confirmed: `SET(index, value)`, `GET(dest, index)`. Coverage
    **42 → 46 / 106**. Covered by `RideScriptTests.ChildParentVariableOpcodes`.
+10. ✅ **WAIT / WAITABS** (the wait scheduler) from the executor: each arms a wake time
+    (`struct +0xa0 = now + duration`) and **rewinds the PC** so the instruction re-runs every
+    tick until the game clock reaches it, then falls through. Modelled with `RideVM.WaitUntil`
+    and `CurrentPos--`. (`WAITABS` adds the operand raw; `WAIT` scales it by a runtime framerate
+    factor in the original — same units here pending the engine clock.) Coverage **46 → 48 /
+    106**. Covered by `RideScriptTests.WaitSuspendsUntilGameTime`.
+
+    **Batch A is now essentially complete** — the only unimplemented `pure` opcodes are `HUSH`
+    and `HOP` (semantics not yet read; likely sound/engine-coupled). What remains is **Batch B
+    (63 engine opcodes)**, blocked on the ride engine (objects, animations, sound, lights,
+    walk/limbo, scream) and on `SPAWNCHILD` to populate the VM hierarchy.
 
 > Note: the instruction doc describes `CMP` as a *bitwise-AND* comparison, but the current
 > `Math.Compare` does equality/less-than. Left as-is for now (changing it could shift branch

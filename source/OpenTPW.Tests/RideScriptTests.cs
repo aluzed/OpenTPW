@@ -236,6 +236,37 @@ public class RideScriptTests
 		OpcodeHandlers.Hierarchy.SetVarInChild( ref parent, Lit( parent, 99999 ), Lit( parent, 1 ) );
 	}
 
+	// WAIT/WAITABS suspend the script: they arm a wake time and rewind so the instruction
+	// re-runs each tick until the game clock reaches it, then fall through (T-007).
+	[TestMethod]
+	public void WaitSuspendsUntilGameTime()
+	{
+		Log = new();
+		var vm = LoadTestVm();
+		vm.GameTime = 100;
+
+		// Step() advances CurrentPos past the WAIT before the handler runs; emulate that.
+		// First hit: arm wake = 100 + 50 = 150 and rewind to re-run.
+		vm.CurrentPos = 5;
+		OpcodeHandlers.Time.WaitAbs( ref vm, Lit( vm, 50 ) );
+		Assert.AreEqual( 150, vm.WaitUntil );
+		Assert.AreEqual( 4, vm.CurrentPos );
+
+		// Still before the wake time: keep waiting (rewind again, wake unchanged).
+		vm.GameTime = 120;
+		vm.CurrentPos = 5;
+		OpcodeHandlers.Time.WaitAbs( ref vm, Lit( vm, 50 ) );
+		Assert.AreEqual( 150, vm.WaitUntil );
+		Assert.AreEqual( 4, vm.CurrentPos );
+
+		// Reached the wake time: clear the wait and proceed (no rewind).
+		vm.GameTime = 150;
+		vm.CurrentPos = 5;
+		OpcodeHandlers.Time.WaitAbs( ref vm, Lit( vm, 50 ) );
+		Assert.IsNull( vm.WaitUntil );
+		Assert.AreEqual( 5, vm.CurrentPos );
+	}
+
 	private static RideVM LoadTestVm()
 	{
 		var path = Path.Combine( AppContext.BaseDirectory, "content", "testscripts", "Test.RSE" );
