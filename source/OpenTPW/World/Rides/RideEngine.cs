@@ -12,7 +12,7 @@ public sealed class RideEngine : IRideEngine
 {
 	private const int SelfId = -1;     // the ride body's handle (script object ids are >= 0)
 	private const float AnimDuration = 2f;   // procedural one-shot animation length, seconds
-	private const float BobAmplitude = 4f;
+	private const float BobAmplitude = 12f;
 
 	private readonly Dictionary<int, RideObject> objects = new();
 	private SdtArchive? rideSounds;
