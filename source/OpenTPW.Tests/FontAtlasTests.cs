@@ -90,7 +90,8 @@ public class FontAtlasTests
 
 		// 'L' at penX 0 + xbearing 1; 'I' at penX 6 (after L's advance) + xbearing 0.
 		Assert.AreEqual( 1f, placed[0].X, 1e-6 );
-		Assert.AreEqual( 2f, placed[0].Y, 1e-6 );
+		// Y is the glyph's bottom in a Y-up space: lineTop 0 - (yBearing 2 + height 5) = -7.
+		Assert.AreEqual( -7f, placed[0].Y, 1e-6 );
 		Assert.AreEqual( 6f, placed[1].X, 1e-6 );
 
 		// Layout UVs match the packed glyph.
@@ -103,12 +104,12 @@ public class FontAtlasTests
 		var atlas = BuildAtlas();
 		Assert.AreEqual( 5, atlas.LineHeight, "line height = tallest glyph" );
 
-		// "LI" on line 0, "L" on line 1 (drops by LineHeight).
+		// "LI" on line 0, "L" on line 1 (drops by LineHeight). Y is the glyph bottom, Y-up.
 		var placed = atlas.Layout( "LI\nL" );
 		Assert.AreEqual( 3, placed.Count );
-		Assert.AreEqual( 2f, placed[0].Y, 1e-6 );      // line 0: originY 0 + yBearing 2
-		Assert.AreEqual( 5f + 2f, placed[2].Y, 1e-6 ); // line 1: + LineHeight 5
-		Assert.AreEqual( 1f, placed[2].X, 1e-6 );      // line 1 pen reset to origin
+		Assert.AreEqual( -7f, placed[0].Y, 1e-6 );  // line 0: lineTop 0 - (yBearing 2 + height 5)
+		Assert.AreEqual( -12f, placed[2].Y, 1e-6 ); // line 1: lineTop -5 - (yBearing 2 + height 5)
+		Assert.AreEqual( 1f, placed[2].X, 1e-6 );   // line 1 pen reset to origin
 	}
 
 	[TestMethod]

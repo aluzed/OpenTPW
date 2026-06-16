@@ -5,6 +5,15 @@ namespace OpenTPW;
 
 internal class PurpleButton : Panel
 {
+	// Shared across every button so we only build the atlas/texture once. GAME12 is used (not the
+	// menu fonts) because it is a 1bpp font the decoder reads cleanly; MENU*/*AA are antialiased
+	// (multi-bit) and that format isn't decoded yet, so they render as noise.
+	private static Font? labelFont;
+	private static Font LabelFont => labelFont ??= new Font( "Language/English/GAME12.bf4" );
+
+	// How big the label is drawn relative to its native glyph size.
+	private const float LabelScale = 2f;
+
 	private Texture ButtonText1;
 	private Texture ButtonText2;
 
@@ -49,5 +58,19 @@ internal class PurpleButton : Panel
 		rect.X += 200;
 		material.Set( "Color", ButtonText2 );
 		Graphics.Quad( rect, uvs.Shift( new Vector2( 0f, 0.50f ) ), material );
+
+		//
+		// Label — centred on the button face. The three quads above span roughly
+		// [position.X - 550, position.X + 40] horizontally; their centre is at
+		// position.X - 255, and the face sits vertically around position.Y - 80.
+		//
+		if ( !string.IsNullOrEmpty( Text ) )
+		{
+			var centerX = position.X - 255;
+			var centerY = position.Y - 80;
+			// originY is the top of the line; offset up by half the line so the text is centred.
+			var top = centerY + LabelFont.Atlas.LineHeight * LabelScale / 2f;
+			Graphics.DrawText( LabelFont, Text, centerX, top, TextAlign.Center, LabelScale );
+		}
 	}
 }

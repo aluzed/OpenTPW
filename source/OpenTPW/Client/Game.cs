@@ -59,10 +59,15 @@ internal static class Game
 
 		Render.ClearColor = new RgbaFloat( 0.35f, 0.72f, 0.92f, 1f );
 
+		const float loadingScale = 4f;
 		void DrawLoading()
 		{
-			if ( loadingFont != null )
-				Graphics.DrawText( loadingFont, "LOADING...", Screen.Size.X / 2f, Screen.Size.Y / 2f, TextAlign.Center, scale: 4f );
+			if ( loadingFont == null )
+				return;
+
+			// originY is the top of the line; offset up by half the line so it's vertically centred.
+			var centerY = Screen.Size.Y / 2f + loadingFont.Atlas.LineHeight * loadingScale / 2f;
+			Graphics.DrawText( loadingFont, "LOADING...", Screen.Size.X / 2f, centerY, TextAlign.Center, loadingScale );
 		}
 
 		// Show the loading screen for a brief minimum so it's actually visible (and keep the

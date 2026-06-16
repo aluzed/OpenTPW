@@ -133,14 +133,15 @@ public sealed class FontAtlas
 	/// <summary>
 	/// Lays <paramref name="text"/> out from a pen origin, returning one <see cref="PlacedGlyph"/>
 	/// per drawable character (its destination rect uses the bearings; the pen advances by Advance).
-	/// Honors <c>\n</c> line breaks (each line drops by <see cref="LineHeight"/>) and
-	/// <paramref name="align"/> anchors each line horizontally at <paramref name="originX"/>.
+	/// Honors <c>\n</c> line breaks and <paramref name="align"/> anchors each line horizontally at
+	/// <paramref name="originX"/>. <paramref name="originY"/> is the <em>top</em> of the first line;
+	/// the render space is Y-up so glyphs hang downward (toward smaller Y) and lines stack downward.
 	/// </summary>
 	public IReadOnlyList<PlacedGlyph> Layout( string text, float originX = 0, float originY = 0,
 		TextAlign align = TextAlign.Left, float scale = 1f )
 	{
 		var placed = new List<PlacedGlyph>();
-		var lineY = originY;
+		var lineTop = originY;
 
 		foreach ( var line in text.Replace( "\r", "" ).Split( '\n' ) )
 		{
@@ -158,8 +159,13 @@ public sealed class FontAtlas
 
 				if ( g.Width > 0 && g.Height > 0 )
 				{
+					// Font metrics are Y-down (YBearing = distance from the line's top down to the
+					// glyph top), but the render space is Y-up. Convert by placing the glyph's bottom
+					// edge (YBearing + Height) below the line top, so every glyph shares a baseline —
+					// otherwise low glyphs like '.' float to the top of the line.
+					var glyphBottom = lineTop - (g.YBearing + g.Height) * scale;
 					placed.Add( new PlacedGlyph(
-						penX + g.XBearing * scale, lineY + g.YBearing * scale,
+						penX + g.XBearing * scale, glyphBottom,
 						(int)(g.Width * scale), (int)(g.Height * scale),
 						g.U0, g.V0, g.U1, g.V1 ) );
 				}
@@ -167,7 +173,7 @@ public sealed class FontAtlas
 				penX += g.Advance * scale;
 			}
 
-			lineY += LineHeight * scale;
+			lineTop -= LineHeight * scale; // next line is below (smaller Y in a Y-up space)
 		}
 
 		return placed;
