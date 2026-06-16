@@ -2,7 +2,8 @@
 
 - **Priority**: 🔴 High (the lobby is unusable — frames take seconds, WM shows "not responding")
 - **Type**: Rendering / performance
-- **Status**: ☐ To do
+- **Status**: ✅ Done — `Set<T>` records on the frame command list (no per-bind submit) and resource
+  sets are cached; the lobby runs at vsync ~60 fps.
 - **Follow-up of**: [T-024](T-024-linux-black-screen.md) (the lobby *renders*; this is about it not running).
 
 ## Symptom

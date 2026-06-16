@@ -45,9 +45,9 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-023](T-023-linux-vulkan-libdl.md) | 🔴 High | ✅ Done | Linux runtime: Vulkan `libdl` load fix — game now boots on Linux |
 | [T-024](T-024-linux-black-screen.md) | 🟠 Medium | ✅ Done | Linux "black screen" was the synchronous load; lobby renders (loading screen + text) |
 | [T-025](T-025-bf4-antialiased-fonts.md) | 🟢 Low | ☐ To do | `.BF4`: decode the antialiased (multi-bit) font variant (`MENU*`/`TITLE*`/`*AA`) |
-| [T-026](T-026-render-resource-churn.md) | 🔴 High | ☐ To do | Renderer: per-frame GPU resource churn freezes the lobby (sync submit + ephemeral sets) |
+| [T-026](T-026-render-resource-churn.md) | 🔴 High | ✅ Done | Renderer: killed per-frame GPU resource churn (sync submit + ephemeral sets) → lobby at 60fps |
 | [T-027](T-027-ui-draw-batching.md) | 🟠 Medium | ✅ Done | Renderer: UI draws batched (merge same-texture), per-quad allocs + set-churn removed |
-| [T-028](T-028-frame-cpu-hygiene.md) | ⚪ Debt | ☐ To do | Renderer: per-frame CPU hygiene (dirty-shader registry, `Stopwatch`) |
+| [T-028](T-028-frame-cpu-hygiene.md) | ⚪ Debt | ✅ Done | Renderer: per-frame CPU hygiene (dirty-shader registry, `Stopwatch`) |
 | [T-029](T-029-native-render-loop-re.md) | 🟢 Low | ✅ Done | Native render loop RE'd (DDraw + D3D execute buffers + MMX software); see docs/07 |
 | [T-030](T-030-async-level-load.md) | 🟠 Medium | ⚠️ Mostly | Level load: freeze resolved (per-step + per-mesh progress); only optional 60fps async remains |
 | [T-031](T-031-game-audio.md) | 🟡 Feature | ⚠️ Mostly | Game audio: lobby music (minimp3), UI click SFX, music volume keys, cross-platform build; ambience/settings-UI remain |

@@ -2,7 +2,8 @@
 
 - **Priority**: ⚪ Technical debt (cheap wins; lands with [T-026](T-026-render-resource-churn.md))
 - **Type**: Code quality / performance
-- **Status**: ☐ To do
+- **Status**: ✅ Done — dirty-shader queue drains in `PreRender` (no per-frame `Asset.All` scan), and
+  frame timing uses a `Stopwatch`.
 
 ## Problem
 
