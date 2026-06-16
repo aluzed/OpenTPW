@@ -9,7 +9,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 
 ## Build / test state (observed)
 
-- **Build**: ✅ `dotnet build OpenTPW.sln` → 6 projects, **0 errors**.
+- **Build**: ✅ `dotnet build OpenTPW.sln` → 6 projects, **0 errors, 0 warnings** (T-009).
 - **Tests**: ✅ `dotnet test` → **0 failed, 21 passed, 13 inconclusive** on a clean Linux
   machine (was 7/7 failing). The inconclusive ones are integration tests that need a game
   install (`OPENTPW_GAMEPATH`) or a real asset sample (`TPW_VIDEO_SAMPLE`,
@@ -27,7 +27,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-006](T-006-gamepath-config.md) | 🟡 Low | ✅ Done | Windows default `GamePath` + no portable override |
 | [T-007](T-007-vm-opcodes-rse.md) | 🟡 Feature | ⚠️ Partial | Ride VM: `.RSE` loader restored; 30/210 opcodes (MULT/DIV/MOD added) |
 | [T-008](T-008-unimplemented-formats.md) | 🟡 Feature | ⚠️ Partial | Formats: `.BF4` ✅, `.TQI/.TGQ` (container+audio+video) ✅, `.LIP` ⚠️, `.MTR` ⚠️ |
-| [T-009](T-009-build-warnings.md) | ⚪ Debt | ☐ To do | build warnings (nullable, Dispose, etc.) |
+| [T-009](T-009-build-warnings.md) | ⚪ Debt | ✅ Done | build warnings (105 → 0: nullable, Dispose, dead code) |
 | [T-010](T-010-add-sub-flags.md) | 🟠 Medium | ✅ Done | ADD/SUB don't set arithmetic flags (branch correctness) |
 | [T-011](T-011-branchto-hardening.md) | 🟡 Feature | ✅ Done | Harden `RideVM.BranchTo` (O(1) map; verified by a compiled loop) |
 | [T-012](T-012-partial-formats.md) | 🟡 Feature | ⚠️ Partial | `.MD2` verified (renders); robustness + `.MAP`/`.TPWS` remain |

@@ -23,7 +23,7 @@ public partial class Material : Asset
 
 	private Dictionary<string, BindableResource> _boundResources = new();
 
-	private ResourceLayout[] _resourceLayouts;
+	private ResourceLayout[] _resourceLayouts = null!;
 
 	public Material( string shaderPath, MaterialFlags flags = MaterialFlags.None )
 	{
@@ -44,7 +44,7 @@ public partial class Material : Asset
 		SetupResources( flags );
 	}
 
-	private DeviceBuffer ScratchBuffer;
+	private DeviceBuffer ScratchBuffer = null!;
 
 	private static readonly Sampler[] Samplers =
 	[
@@ -91,12 +91,8 @@ public partial class Material : Asset
 
 	private void ClearBoundResources()
 	{
-		return;
-
-		if ( _boundResources.Count > 0 )
-		{
-			_boundResources.Clear();
-		}
+		// Intentionally a no-op: bound resources are kept alive between draws.
+		// (Clearing them here was disabled because it freed resources still in use.)
 	}
 
 	public void Set<T>( string name, T obj ) where T : unmanaged

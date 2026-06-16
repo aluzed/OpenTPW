@@ -3,8 +3,8 @@
 namespace OpenTPW;
 public sealed class BFMUReader : BaseFormat
 {
-	private ExpandedMemoryStream memoryStream;
-	public byte[] buffer;
+	private ExpandedMemoryStream memoryStream = null!;
+	public byte[] buffer = null!;
 
 	public BFMUReader( string path )
 	{

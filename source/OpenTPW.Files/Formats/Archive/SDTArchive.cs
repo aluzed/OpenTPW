@@ -2,10 +2,10 @@
 
 public class SdtArchive : IArchive
 {
-	private ExpandedMemoryStream memoryStream;
-	private SoundFile mp2Reader;
+	private ExpandedMemoryStream memoryStream = null!;
+	private SoundFile mp2Reader = null!;
 
-	public byte[] buffer;
+	public byte[] buffer = null!;
 	public List<MP2File> soundFiles;
 
 	public SdtArchive( string path )

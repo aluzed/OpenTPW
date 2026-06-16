@@ -61,7 +61,7 @@ public class BaseFileSystem
 
 		string? directoryName = Path.GetDirectoryName( absolutePath );
 		if ( !Directory.Exists( directoryName ) )
-			Directory.CreateDirectory( directoryName );
+			Directory.CreateDirectory( directoryName! );
 
 		return File.OpenWrite( absolutePath );
 	}
@@ -74,7 +74,7 @@ public class BaseFileSystem
 		if ( !string.IsNullOrEmpty( archivePath ) )
 		{
 			var archive = GetArchive( archivePath );
-			return archive?.OpenFile( internalPath );
+			return archive?.OpenFile( internalPath )!;
 		}
 
 		return File.Open( absolutePath, FileMode.Open, FileAccess.Read, FileShare.Read );
@@ -153,12 +153,13 @@ public class BaseFileSystem
 		var extension = Path.GetExtension( archivePath );
 		if ( archiveHandlers.TryGetValue( extension, out var handlerType ) )
 		{
-			archive = (IArchive)Activator.CreateInstance( handlerType, new[] { archivePath } );
+			archive = (IArchive)Activator.CreateInstance( handlerType, new[] { archivePath } )!;
 			archiveCache[archivePath] = archive;
 			return archive;
 		}
 
-		return null;
+		// No handler registered for this extension: signal "no archive" to the caller.
+		return null!;
 	}
 
 	private (string ArchivePath, string InternalPath) FindArchivePath( string path )

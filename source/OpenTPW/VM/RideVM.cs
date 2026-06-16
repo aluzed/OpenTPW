@@ -23,7 +23,7 @@ public partial class RideVM
 	public VMFlags Flags { get; set; } = VMFlags.None;
 	public VMConfig Config { get; set; } = new VMConfig();
 	public List<Branch> Branches { get; set; } = new List<Branch>();
-	public byte[] FileData { get; set; }
+	public byte[] FileData { get; set; } = null!;
 
 	public List<int> Visitors { get; set; } = new();
 	public Queue<int> Stack { get; set; } = new();
@@ -31,7 +31,7 @@ public partial class RideVM
 	private Dictionary<Opcode, MethodInfo> OpcodeHandlers { get; } = Assembly.GetExecutingAssembly().GetTypes()
 		.SelectMany( t => t.GetMethods() )
 		.Where( x => x.GetCustomAttribute<OpcodeHandlerAttribute>() != null )
-		.Select( x => (x.GetCustomAttribute<OpcodeHandlerAttribute>().Opcode, x) )
+		.Select( x => (x.GetCustomAttribute<OpcodeHandlerAttribute>()!.Opcode, x) )
 		.ToDictionary( x => x.Opcode, x => x.x );
 
 	public RideVM( Stream stream )

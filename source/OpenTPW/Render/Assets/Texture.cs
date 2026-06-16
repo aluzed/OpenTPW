@@ -13,8 +13,8 @@ public partial class Texture : Asset
 
 	public static Texture Missing => new Texture( [255, 255, 255, 255], 1, 1 );
 
-	internal Veldrid.Texture NativeTexture;
-	internal TextureView NativeTextureView;
+	internal Veldrid.Texture NativeTexture = null!;
+	internal TextureView NativeTextureView = null!;
 
 	/// <summary>
 	/// From path on disk, or from a game resource

@@ -4,8 +4,8 @@
 
 public class SoundFile : BaseFormat
 {
-	private ExpandedMemoryStream memoryStream;
-	public byte[] buffer;
+	private ExpandedMemoryStream memoryStream = null!;
+	public byte[] buffer = null!;
 
 	public SoundFile( string path )
 	{
@@ -22,7 +22,7 @@ public class SoundFile : BaseFormat
 		memoryStream.Dispose();
 	}
 
-	protected void ReadFromStream( Stream stream )
+	protected override void ReadFromStream( Stream stream )
 	{
 		// Set up read buffer
 		var tempStreamReader = new StreamReader( stream );

@@ -73,12 +73,12 @@ public partial class Renderer
 		MultisampledFramebuffer = Device.ResourceFactory.CreateFramebuffer( framebufferDescription );
 	}
 
-	public Framebuffer MultisampledFramebuffer;
-	public Veldrid.Texture ResolveColorTexture;
+	public Framebuffer MultisampledFramebuffer = null!;
+	public Veldrid.Texture ResolveColorTexture = null!;
 
-	private Pipeline _blitPipeline;
-	private ResourceSet _blitResourceSet;
-	private ResourceLayout _blitResourceLayout;
+	private Pipeline _blitPipeline = null!;
+	private ResourceSet _blitResourceSet = null!;
+	private ResourceLayout _blitResourceLayout = null!;
 
 	public void Run()
 	{

@@ -4,10 +4,10 @@ namespace OpenTPW;
 
 public class Level
 {
-	internal static Level Current { get; set; }
+	internal static Level Current { get; set; } = null!;
 
-	public RootPanel Hud { get; set; }
-	public Sun SunLight { get; set; }
+	public RootPanel Hud { get; set; } = null!;
+	public Sun SunLight { get; set; } = null!;
 
 	public SettingsFile Global { get; private init; }
 

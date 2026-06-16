@@ -4,8 +4,8 @@ namespace OpenTPW;
 
 internal sealed class BFSTReader : BaseFormat
 {
-	private ExpandedMemoryStream memoryStream;
-	public byte[] buffer;
+	private ExpandedMemoryStream memoryStream = null!;
+	public byte[] buffer = null!;
 
 	private static BFMUReader LookupTable = new BFMUReader( $"Language/English/MBToUni.dat" );
 

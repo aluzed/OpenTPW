@@ -8,7 +8,7 @@ namespace OpenTPW;
 
 public partial class ModelFile : BaseFormat
 {
-	public List<Mesh> Meshes { get; private set; }
+	public List<Mesh> Meshes { get; private set; } = null!;
 
 	public ModelFile( Stream stream )
 	{
@@ -28,7 +28,7 @@ public partial class ModelFile : BaseFormat
 
 	public class Mesh
 	{
-		public string Name { get; set; }
+		public string Name { get; set; } = null!;
 		public uint VertexOffset { get; set; }
 		public uint UvOffset { get; set; }
 		public uint VertCnt { get; set; }
@@ -38,13 +38,13 @@ public partial class ModelFile : BaseFormat
 		public uint VertexCount { get; set; }
 		public uint VertexOrderLen { get; set; }
 		public uint VertexOrderOffset { get; set; }
-		public Vertex[] Vertices { get; set; }
-		public uint[] Indices { get; set; }
-		public Vector2[] TexCoords { get; set; }
+		public Vertex[] Vertices { get; set; } = null!;
+		public uint[] Indices { get; set; } = null!;
+		public Vector2[] TexCoords { get; set; } = null!;
 		public Matrix4x4 TransformMatrix { get; set; }
-		public MaterialData[] Materials { get; set; }
+		public MaterialData[] Materials { get; set; } = null!;
 
-		public Vector3[] Normals { get; set; }
+		public Vector3[] Normals { get; set; } = null!;
 	}
 
 	public struct FrameData
@@ -65,7 +65,7 @@ public partial class ModelFile : BaseFormat
 		public ushort EndIndex;
 		public uint Pad;
 
-		public string Name;
+		public string Name = null!;
 		public uint Flags;
 	}
 
