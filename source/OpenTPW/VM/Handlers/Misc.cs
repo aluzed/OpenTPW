@@ -16,6 +16,13 @@ public partial class OpcodeHandlers
 			Log.Trace( "TODO: Crit lock" );
 		}
 
+		[OpcodeHandler( Opcode.CRIT_UNLOCK, "Crit unlock" )]
+		public static void CritUnlock( ref RideVM vm )
+		{
+			// Pairs with CRIT_LOCK; no critical-section machinery yet.
+			Log.Trace( "TODO: Crit unlock" );
+		}
+
 		[OpcodeHandler( Opcode.COPY, "Copy a value" )]
 		public static void Copy( ref RideVM vm, Operand dest, Operand source )
 		{
@@ -83,6 +90,26 @@ public partial class OpcodeHandlers
 		{
 			var random = System.Random.Shared.Next( 0, maxValue.Value );
 			dest.Value = random;
+		}
+
+		[OpcodeHandler( Opcode.PUSH, "Push a value onto the stack." )]
+		public static void Push( ref RideVM vm, Operand value )
+		{
+			vm.Stack.Push( value.Value );
+		}
+
+		[OpcodeHandler( Opcode.POP, "Pop (and discard) the top value from the stack." )]
+		public static void Pop( ref RideVM vm )
+		{
+			// The instruction takes no destination operand: it just removes the top entry
+			// (used to balance the stack). Guard against an underflow.
+			if ( vm.Stack.Count == 0 )
+			{
+				Log.Warning( "POP on an empty stack; ignoring" );
+				return;
+			}
+
+			vm.Stack.Pop();
 		}
 	}
 }

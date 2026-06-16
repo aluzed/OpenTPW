@@ -110,5 +110,65 @@ public class RideScriptTests
 		Assert.AreEqual( 3, vm.Variables[varI], "loop should run exactly until VAR_I == VAR_LIMIT" );
 	}
 
+	// END stops the script (the game loop only steps while IsRunning).
+	[TestMethod]
+	public void EndHaltsExecution()
+	{
+		Log = new();
+
+		var vm = LoadTestVm();
+		vm.IsRunning = true;
+
+		OpcodeHandlers.Logic.End( ref vm );
+
+		Assert.IsFalse( vm.IsRunning, "END should clear IsRunning" );
+	}
+
+	// PUSH/POP and JSR/RETURN share one LIFO stack: pushes pop in reverse, and nested
+	// subroutine returns unwind last-in-first-out. Underflow is guarded (no throw).
+	[TestMethod]
+	public void StackIsLifoAndGuarded()
+	{
+		Log = new();
+
+		var vm = LoadTestVm();
+
+		// PUSH / POP round-trip.
+		OpcodeHandlers.Misc.Push( ref vm, Lit( vm, 11 ) );
+		OpcodeHandlers.Misc.Push( ref vm, Lit( vm, 22 ) );
+		Assert.AreEqual( 2, vm.Stack.Count );
+
+		OpcodeHandlers.Misc.Pop( ref vm ); // discards 22 (top)
+		Assert.AreEqual( 1, vm.Stack.Count );
+		Assert.AreEqual( 11, vm.Stack.Peek() );
+
+		// POP underflow is ignored rather than throwing.
+		OpcodeHandlers.Misc.Pop( ref vm );
+		OpcodeHandlers.Misc.Pop( ref vm );
+		Assert.AreEqual( 0, vm.Stack.Count );
+
+		// Nested JSR/RETURN unwind LIFO (the old Queue did not).
+		vm.CurrentPos = 100;
+		OpcodeHandlers.Logic.JumpSubRoutine( ref vm, Loc( vm, 0 ) ); // pushes 100
+		vm.CurrentPos = 200;
+		OpcodeHandlers.Logic.JumpSubRoutine( ref vm, Loc( vm, 0 ) ); // pushes 200
+
+		OpcodeHandlers.Logic.Return( ref vm );
+		Assert.AreEqual( 200, vm.CurrentPos, "innermost call returns first" );
+		OpcodeHandlers.Logic.Return( ref vm );
+		Assert.AreEqual( 100, vm.CurrentPos, "outer call returns second" );
+
+		// RETURN underflow is guarded.
+		OpcodeHandlers.Logic.Return( ref vm );
+	}
+
+	private static RideVM LoadTestVm()
+	{
+		var path = Path.Combine( AppContext.BaseDirectory, "content", "testscripts", "Test.RSE" );
+		using var stream = File.OpenRead( path );
+		return new RideVM( stream );
+	}
+
 	private static Operand Lit( RideVM vm, int value ) => new( vm, Operand.Type.Literal, value );
+	private static Operand Loc( RideVM vm, int value ) => new( vm, Operand.Type.Location, value );
 }

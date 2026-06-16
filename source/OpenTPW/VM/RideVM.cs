@@ -26,7 +26,9 @@ public partial class RideVM
 	public byte[] FileData { get; set; } = null!;
 
 	public List<int> Visitors { get; set; } = new();
-	public Queue<int> Stack { get; set; } = new();
+
+	// LIFO call/data stack, shared by JSR/RETURN and PUSH/POP (as on the original VM).
+	public Stack<int> Stack { get; set; } = new();
 
 	private Dictionary<Opcode, MethodInfo> OpcodeHandlers { get; } = Assembly.GetExecutingAssembly().GetTypes()
 		.SelectMany( t => t.GetMethods() )
