@@ -16,6 +16,10 @@ public sealed class RideQueue
 
 	private int riders;
 
+	// The peeps lined up for this ride, front (nearest the entrance) first. A peep's place in line
+	// decides where it stands along the queue path, so a visible queue forms instead of a pile.
+	private readonly List<Peep> line = new();
+
 	public RideQueue( Ride ride, IReadOnlyList<Vector3> waypoints, Vector3 exitPoint, float rideDuration, int capacity )
 	{
 		Ride = ride;
@@ -29,9 +33,35 @@ public sealed class RideQueue
 	public int Riders => riders;
 	public bool HasFreeSlot => riders < Capacity;
 
-	/// <summary>A peep boards: take a slot, starting the ride's boarding cycle on the first rider.</summary>
-	public void Board()
+	/// <summary>How many peeps are currently lined up (waiting, not yet aboard).</summary>
+	public int LineLength => line.Count;
+
+	/// <summary>Join the back of the queue (idempotent).</summary>
+	public void Enqueue( Peep peep )
 	{
+		if ( !line.Contains( peep ) )
+			line.Add( peep );
+	}
+
+	/// <summary>This peep's place in line: 0 = at the front (the entrance), -1 = not queued.</summary>
+	public int PositionOf( Peep peep ) => line.IndexOf( peep );
+
+	/// <summary>
+	/// Where the peep <paramref name="position"/> places back from the front should stand: the front
+	/// stands at the entrance (last waypoint) and each place back steps one waypoint out along the path,
+	/// clamping at the outer end so a longer line simply gathers there.
+	/// </summary>
+	public Vector3 StandPoint( int position )
+	{
+		int idx = Math.Clamp( Waypoints.Count - 1 - Math.Max( 0, position ), 0, Waypoints.Count - 1 );
+		return Waypoints[idx];
+	}
+
+	/// <summary>The front peep boards: leave the line, take a slot, and start the boarding cycle on the
+	/// first rider.</summary>
+	public void Board( Peep peep )
+	{
+		line.Remove( peep );
 		bool wasEmpty = riders == 0;
 		riders++;
 		if ( wasEmpty )

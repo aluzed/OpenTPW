@@ -18,12 +18,16 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
 
 - `Peep` entity rendered as an **upright camera-facing billboard** (cylindrical yaw to the camera), in
   varied clothing colours, double-sided, always dropped onto the terrain surface (`SampleHeight`).
-- **Queue-path following**: each ride exposes a `RideQueue` (ordered waypoints outer end → entrance,
-  the exit world point, ride duration, capacity); a peep walks to a queue's outer end, follows the
-  waypoints to the entrance, then…
-- **Boarding tied to the ride**: a peep boards when a rider slot is free (occupies one of the ride's
-  `Capacity` slots — sourced from the ride's `UsageInfo.MaxCapacity` — so a queue builds at the
-  entrance when the ride is full), hides for the ride duration, reappears at the **exit** cell, and
+- **Queue discipline**: each ride exposes a `RideQueue` (ordered waypoints outer end → entrance, the
+  exit world point, ride duration, capacity) that owns the **line** of waiting peeps. A peep joins the
+  back of the line and stands at the waypoint for its place (front = the entrance, each place back
+  steps one waypoint out, clamping at the outer end), so a visible queue forms along the path instead
+  of a pile on the entrance. As those ahead board, the line shifts forward and each peep's spot
+  advances. Then…
+- **Boarding tied to the ride**: only the **front** peep boards, and only once it has reached the
+  entrance and a rider slot is free (occupies one of the ride's `Capacity` slots — sourced from the
+  ride's `UsageInfo.MaxCapacity` — so the line keeps growing while the ride is full), hides for the
+  ride duration, reappears at the **exit** cell, and
   re-routes. **Occupancy drives the ride's animation cycle**: a ride sits idle until its first rider
   boards (`RideQueue.Board()` edge 0→1 → `RideEngine.SetActive(true)`) and idles again when the last
   rider leaves (`Leave()` edge 1→0). Boarding runs the ride's real animation cycle — **Load → Start →
@@ -41,7 +45,8 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
 1. **Decode the sprite format** (`.ESP`/`.TPC`/`.FPC`) and render the real animated peep sprites
    (direction + walk-cycle frames) instead of coloured billboards.
 2. **Full path network**: a walkable path graph + A* so peeps route over real paths (not straight
-   lines) between rides, park gate, shops; space the queue *along* the path rather than piling at the entrance.
+   lines) between rides, park gate, shops. (Queue spacing *along* the path is now done — see "Queue
+   discipline" above; what remains is the cross-park routing.)
 3. **Per-cycle boarding sound**: the animation cycle and a real ride **duration** are wired (above —
    the duration is one full pass of the ride's running animation, ~11 s monkey / ~14 s totem, falling
    back to `Info.DurationUnit`). Still to do is playing the boarding/unloading **sound** per cycle —

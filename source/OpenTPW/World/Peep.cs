@@ -24,7 +24,6 @@ public sealed class Peep : ModelEntity
 	private readonly Model billboard;
 
 	private RideQueue? route;
-	private int routeIndex;
 	private float rideTimer;
 	private bool riding;
 
@@ -65,26 +64,30 @@ public sealed class Peep : ModelEntity
 			return;
 		}
 
-		if ( routeIndex < route.Waypoints.Count )
+		// Stand at my place in line (front = the entrance, each place back steps one waypoint out), and
+		// walk toward it — as those ahead board, the line shifts forward and my target advances.
+		int pos = route.PositionOf( this );
+		if ( pos < 0 )
 		{
-			// Walk toward the next queue waypoint.
-			var dest = route.Waypoints[routeIndex];
-			var to = new Vector3( dest.X - Position.X, dest.Y - Position.Y, 0 );
-			if ( to.Length < 2.5f )
-				routeIndex++;
-			else
-				Position += to.Normal * speed * Time.Delta;
+			route.Enqueue( this );
+			pos = route.PositionOf( this );
 		}
-		else if ( route.HasFreeSlot )
+
+		var dest = route.StandPoint( pos );
+		var to = new Vector3( dest.X - Position.X, dest.Y - Position.Y, 0 );
+		bool atSpot = to.Length < 2.5f;
+		if ( !atSpot )
+			Position += to.Normal * speed * Time.Delta;
+
+		// Only the front peep boards, and only once it has reached the entrance and a slot is free.
+		if ( pos == 0 && atSpot && route.HasFreeSlot )
 		{
-			// At the entrance with a free slot — board: occupy a rider slot and hide for the ride.
-			route.Board();
+			route.Board( this );
 			riding = true;
 			rideTimer = route.RideDuration;
 			Model = null;
 			return;
 		}
-		// else: ride full — wait at the entrance (a queue builds up).
 
 		DropToGround();
 
@@ -96,11 +99,11 @@ public sealed class Peep : ModelEntity
 
 	private void DropToGround() => Position = Position.WithZ( terrain.SampleHeight( Position.X, Position.Y ) );
 
-	// Pick a random ride's queue to head for; its waypoints run from the outer end up to the entrance.
+	// Pick a random ride's queue to head for and join the back of its line.
 	private void PickRoute()
 	{
 		route = queues.Count > 0 ? queues[Random.Shared.Next( queues.Count )] : null;
-		routeIndex = 0;
+		route?.Enqueue( this );
 	}
 
 	private static Model SharedModel( int colorIndex )
