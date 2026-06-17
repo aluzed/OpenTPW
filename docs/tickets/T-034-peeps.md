@@ -76,7 +76,21 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
 ## Remaining
 
 1. **Decode the sprite format** (`.ESP`/`.TPC`/`.FPC`) and render the real animated peep sprites
-   (direction + walk-cycle frames) instead of coloured billboards.
+   (direction + walk-cycle frames) instead of coloured billboards. **Reconnaissance (done):**
+   `esprites.wad` holds sprite trios under `Generic/*` and `Fantasy/*` (e.g. `Generic/Kids/SPR_KI.*`).
+   - **`.ESP`** = `ESP_FILE2.00` magic (12 bytes) + the referenced texture name (`SPR_KI.TPS`,
+     null-padded); the rest is zero. Just a descriptor/name pointer.
+   - **`.TPC`/`.FPC`** = magic `03 00 03 00`, then a **uint32 count at offset 4 that varies per
+     sprite** (SPR_KI 175, SPR_GU 260, SPR_HA 105, SPR_FL 130 — almost certainly the frame count),
+     then reserved zeros, then encoded pixel data. A recurring high byte every 4th position looks like
+     a per-record marker/run-length.
+   - Decode attempts (probe, not committed): treating the body as **raw BGRA** renders pure noise (so
+     it is *not* raw); treating it as **4-byte `(B,G,R,run)` RLE records** renders coherent *horizontal
+     colour runs* (not noise) — strong evidence it is run-length encoded — but without the per-frame
+     dimensions the runs don't assemble into a sprite.
+   - **Next step**: get the per-frame layout (frame offset/size table keyed by the offset-4 count) via
+     **Ghidra** on the sprite loader in `TP.EXE`; then expand the RLE per frame. Same encoded family as
+     `base.lnd`. Until then, peeps/staff/shops render as flat-colour billboards (`Billboard.Make`).
 2. **Full path network**: a walkable path graph + A* so peeps route over real paths (not straight
    lines) between rides, park gate, shops. (Queue spacing *along* the path is now done — see "Queue
    discipline" above; what remains is the cross-park routing.)
