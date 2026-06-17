@@ -84,6 +84,80 @@ public class RideKeyframeFileTests
 		return d;
 	}
 
+	// Builds a frame with one vertex-morph record: a block (bbox offset/scale + 1 sub-entry) whose
+	// sub-entry has vc vertices keyframed via 10-bit-packed positions (see docs/08).
+	private static byte[] BuildFrameWithMorph( int slot, SVector3 off, SVector3 scl, (int time, (int x, int y, int z))[] keys )
+	{
+		var d = new byte[0x400];
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( 0, 4 ), 0x1CD15D46 );
+		int trailer = 0x100, records = 0x140, block = 0x180, sub = 0x1c0, idx = 0x200, times = 0x210, packed = 0x220;
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( 0x98, 4 ), (uint)trailer );
+		BinaryPrimitives.WriteUInt16LittleEndian( d.AsSpan( trailer + 0x12, 2 ), 1 );
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( trailer + 0x2c, 4 ), (uint)records );
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( records + 0x04, 4 ), RideKeyframeFile.FlagVertexMorph );
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( records + 0x28, 4 ), (uint)block );
+
+		BinaryPrimitives.WriteUInt16LittleEndian( d.AsSpan( block + 0x02, 2 ), 1 );            // nsub
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( block + 0x0c, 4 ), (uint)sub );    // substruct
+		BinaryPrimitives.WriteSingleLittleEndian( d.AsSpan( block + 0x14, 4 ), off.X );
+		BinaryPrimitives.WriteSingleLittleEndian( d.AsSpan( block + 0x18, 4 ), off.Y );
+		BinaryPrimitives.WriteSingleLittleEndian( d.AsSpan( block + 0x1c, 4 ), off.Z );
+		BinaryPrimitives.WriteSingleLittleEndian( d.AsSpan( block + 0x20, 4 ), scl.X );
+		BinaryPrimitives.WriteSingleLittleEndian( d.AsSpan( block + 0x24, 4 ), scl.Y );
+		BinaryPrimitives.WriteSingleLittleEndian( d.AsSpan( block + 0x28, 4 ), scl.Z );
+
+		BinaryPrimitives.WriteUInt16LittleEndian( d.AsSpan( sub + 0x02, 2 ), 1 );              // vertexCount
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( sub + 0x04, 4 ), (uint)idx );      // index ptr
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( sub + 0x08, 4 ), (uint)times );    // times ptr
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( sub + 0x0c, 4 ), (uint)packed );   // packed ptr
+
+		BinaryPrimitives.WriteUInt16LittleEndian( d.AsSpan( idx, 2 ), (ushort)slot );
+		for ( int f = 0; f < keys.Length; f++ )
+		{
+			BinaryPrimitives.WriteUInt16LittleEndian( d.AsSpan( times + f * 2, 2 ), (ushort)keys[f].time );
+			var (x, y, z) = keys[f].Item2;
+			uint p = (uint)((x & 0x3ff) | ((y & 0x3ff) << 10) | ((z & 0x3ff) << 20));
+			BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( packed + f * 4, 4 ), p );
+		}
+		return d;
+	}
+
+	[TestMethod]
+	public void ParsesVertexMorphAndDequantises()
+	{
+		// Two keyframes; identity bbox transform so dequant returns the raw signed-10-bit components.
+		var keys = new (int, (int, int, int))[] { (0, (10, 20, 30)), (10, (40, -50, 60)) };
+		var kf = new RideKeyframeFile( BuildFrameWithMorph( slot: 3, SVector3.Zero, SVector3.One, keys ) );
+
+		var m = kf.Surfaces.Single().Morph.Single();
+		Assert.AreEqual( 1, m.VertexSlots.Length );
+		Assert.AreEqual( 3, m.VertexSlots[0], "output vertex slot" );
+		Assert.AreEqual( 2, m.Times.Length );
+		Assert.AreEqual( 10f, kf.Duration );
+
+		// Frame 0 dequantises to the raw components; negative component sign-extends.
+		Assert.AreEqual( new SVector3( 10, 20, 30 ), m.Frames[0][0] );
+		Assert.AreEqual( new SVector3( 40, -50, 60 ), m.Frames[1][0] );
+
+		// Midpoint lerps.
+		var mid = m.Sample( 0, 5f );
+		Assert.AreEqual( 25f, mid.X, 1e-3f );
+		Assert.AreEqual( -15f, mid.Y, 1e-3f );
+		Assert.AreEqual( 45f, mid.Z, 1e-3f );
+	}
+
+	[TestMethod]
+	public void MorphDequantAppliesBoundingBoxTransform()
+	{
+		// Non-identity bbox: component * scale + offset.
+		var keys = new (int, (int, int, int))[] { (0, (100, 0, -100)) };
+		var kf = new RideKeyframeFile( BuildFrameWithMorph( 0, new SVector3( 1, 2, 3 ), new SVector3( 0.5f, 0.5f, 0.5f ), keys ) );
+		var p = kf.Surfaces.Single().Morph.Single().Frames[0][0];
+		Assert.AreEqual( 100 * 0.5f + 1, p.X, 1e-3f );
+		Assert.AreEqual( 0 * 0.5f + 2, p.Y, 1e-3f );
+		Assert.AreEqual( -100 * 0.5f + 3, p.Z, 1e-3f );
+	}
+
 	[TestMethod]
 	public void ParsesScaleTrackAndComposesWithRotation()
 	{

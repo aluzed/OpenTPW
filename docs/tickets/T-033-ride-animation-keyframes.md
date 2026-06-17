@@ -123,24 +123,25 @@ Dequantising the packed ints at a sub-entry's data pointer with the block's bbox
 (`signed10 * scale + offset`) yields **plausible** clustered vertex positions (a small ~1-unit part
 around the block offset), so the 10-bit dequant formula is right.
 
-### Status — not yet validated; parser deferred
+### Done — morph format cracked, validated, and parsed
 
-This is the most nested part of the system. What's **not** confirmed: which sub-entry pointer is
-times / packed / index; the per-sub-entry keyframe count; and how the index array maps onto our
-`ModelFile` vertex order. There is **no ground truth** to check morphed positions against, so a parser
-built on these assumptions could be silently wrong (a finite/in-bounds test would not catch it).
-Deliberately **not shipping an unvalidated parser**. A correct implementation needs a dedicated RE
-pass: decompile `FUN_004711d0` (key blend) and `FUN_00470e90` (the remaining-sub-entries loop),
-confirm the three pointer roles and keyframe count, then validate a dequantised frame against the base
-mesh before wiring. Lower priority than it looks — rotation+scale already cover the visible motion of
-most rides.
+Dedicated deep-RE pass (`FUN_00470e90` per-sub-entry loop + `FUN_004711d0` blend + `FUN_004721f0`
+driver). The sub-entry layout is confirmed (vc `+2`, index `+4`, times `+8`, packed `+0xc`,
+keyIdx `+0x10`), the keyframe count = the times-array length (packed size = `frameCount × vc × 4`,
+verified exact), and the dequant (10-bit signed × bbox scale + offset) produces coherent per-vertex
+clouds. Application is a **global additive blend-shape**: `FUN_004721f0` applies *all* records to one
+shared vertex buffer additively, so index slots are **global** vertex indices.
 
-### Remaining
+- ✅ **Parser**: `RideKeyframeFile.MorphSub` (per surface, `SurfaceAnim.Morph`) — vertex slots, times,
+  and dequantised per-frame positions, with `Sample(i, t)` lerp. Unit-tested (10-bit dequant, bbox
+  transform, lerp) and cross-checked against real `BbugsC.MD2` (12 surfaces, coherent keyframes).
 
-1. **Wire vertex morph** (per the above): confirm the sub-entry pointer roles + keyframe count
-   (decompile `FUN_004711d0`/`FUN_00470e90`), parse + dequantise + blend, remap via the vertex-index
-   array onto our `ModelFile` order, and re-upload through `Model`. (Organic deformation, e.g.
-   `fantasy/bbugs`.)
+### Remaining (wiring only — format is done)
+
+1. **Wire vertex morph to the renderer**: map each global slot → our per-mesh `ModelFile` vertex
+   (cumulative vertex counts), apply additively per frame, re-upload via `Model.UpdateBuffer`, and
+   confirm the absolute-vs-delta semantics + base-pose interaction **visually** (the one detail the
+   parse can't settle). Validate on `fantasy/bbugs`.
 2. Tune the playback rate vs. the original's time units (`KeyframeRate`); confirm pivot/compose order
    on more rides.
 3. Handle multi-frame channels' extra files (`m2..m7`) and surfaces with two records targeting the

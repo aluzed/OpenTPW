@@ -43,7 +43,44 @@ public sealed class RideKeyframeFile
 		public List<(float Time, SVector3 Value)> Translation { get; } = new();
 		public List<(float Time, SVector3 Value)> Scale { get; } = new();
 
-		public bool HasAnimation => Rotation.Count > 0 || Translation.Count > 0 || Scale.Count > 0;
+		/// <summary>Vertex-morph sub-animations (flag <see cref="FlagVertexMorph"/>); each deforms a set of the surface's vertices over keyframes.</summary>
+		public List<MorphSub> Morph { get; } = new();
+
+		public bool HasAnimation => Rotation.Count > 0 || Translation.Count > 0 || Scale.Count > 0 || Morph.Count > 0;
+	}
+
+	/// <summary>
+	/// One vertex-morph sub-animation: a set of the surface's vertices (<see cref="VertexSlots"/>) whose
+	/// positions are keyframed (<see cref="Times"/> × <see cref="Frames"/>). Decoded from the morph
+	/// block's 0x14-byte sub-entries; the packed 10-bit-per-axis positions are already dequantised here.
+	/// </summary>
+	public sealed class MorphSub
+	{
+		public int[] VertexSlots = System.Array.Empty<int>();   // output vertex index per morphed vertex
+		public float[] Times = System.Array.Empty<float>();     // ascending keyframe times
+		public SVector3[][] Frames = System.Array.Empty<SVector3[]>(); // Frames[frame][i] = position of VertexSlots[i]
+
+		/// <summary>Interpolate vertex <paramref name="i"/>'s position at <paramref name="time"/> (lerp between bracketing keyframes).</summary>
+		public SVector3 Sample( int i, float time )
+		{
+			if ( Frames.Length == 0 )
+				return SVector3.Zero;
+			if ( time <= Times[0] )
+				return Frames[0][i];
+			if ( time >= Times[^1] )
+				return Frames[^1][i];
+
+			for ( int f = 0; f < Times.Length - 1; f++ )
+			{
+				if ( time <= Times[f + 1] )
+				{
+					float span = Times[f + 1] - Times[f];
+					float t = span > 0 ? (time - Times[f]) / span : 0f;
+					return SVector3.Lerp( Frames[f][i], Frames[f + 1][i], t );
+				}
+			}
+			return Frames[^1][i];
+		}
 	}
 
 	/// <summary>The per-surface animation tracks found in the file (only surfaces that actually animate).</summary>
@@ -125,14 +162,89 @@ public sealed class RideKeyframeFile
 			ReadTrack( d, rotOff, NextBound( rotOff ), 4, 0xFFFF, U32, F32, ( t, v ) => anim.Rotation.Add( (t, Quaternion.Normalize( new Quaternion( v[1], v[2], v[3], v[0] ) )) ) );
 			ReadTrack( d, scaleOff, NextBound( scaleOff ), 3, 0x0000, U32, F32, ( t, v ) => anim.Scale.Add( (t, new SVector3( v[0], v[1], v[2] )) ) );
 
+			if ( (anim.Flags & FlagVertexMorph) != 0 )
+				ReadMorph( d, (int)U32( rec + 0x28 ), U16, U32, F32, anim );
+
 			if ( anim.HasAnimation )
 			{
 				surfaces.Add( anim );
 				foreach ( var k in anim.Rotation ) Duration = MathF.Max( Duration, k.Time );
 				foreach ( var k in anim.Translation ) Duration = MathF.Max( Duration, k.Time );
 				foreach ( var k in anim.Scale ) Duration = MathF.Max( Duration, k.Time );
+				foreach ( var m in anim.Morph ) if ( m.Times.Length > 0 ) Duration = MathF.Max( Duration, m.Times[^1] );
 			}
 		}
+	}
+
+	// Parses a vertex-morph block (see docs/08): a bounding-box scale/offset header and a count of
+	// 0x14-byte sub-entries, each describing a set of vertices whose positions are keyframed. A vertex
+	// is a packed 32-bit int holding three 10-bit signed components, dequantised as
+	// component = signed10 * scaleAxis + offsetAxis. Decoded from FUN_004714a0 / FUN_00470e90.
+	private static void ReadMorph( byte[] d, int block, Func<int, ushort> U16, Func<int, uint> U32, Func<int, float> F32, SurfaceAnim anim )
+	{
+		if ( block <= 0 || block + 0x2c > d.Length )
+			return;
+
+		var offset = new SVector3( F32( block + 0x14 ), F32( block + 0x18 ), F32( block + 0x1c ) );
+		var scale = new SVector3( F32( block + 0x20 ), F32( block + 0x24 ), F32( block + 0x28 ) );
+		int nsub = U16( block + 2 );
+		int sub0 = (int)U32( block + 0x0c );
+		if ( sub0 <= 0 || nsub <= 0 || nsub > 4096 )
+			return;
+
+		// Dequantise one packed vertex (three 10-bit signed components) with the block's bbox transform.
+		SVector3 Dequant( uint p ) => new(
+			Sext10( p ) * scale.X + offset.X,
+			Sext10( p >> 10 ) * scale.Y + offset.Y,
+			Sext10( p >> 20 ) * scale.Z + offset.Z );
+
+		for ( int e = 0; e < nsub; e++ )
+		{
+			int se = sub0 + e * 0x14;
+			if ( se + 0x14 > d.Length )
+				break;
+
+			int vc = U16( se + 0x02 );
+			int idxPtr = (int)U32( se + 0x04 );
+			int timesPtr = (int)U32( se + 0x08 );
+			int packPtr = (int)U32( se + 0x0c );
+			if ( vc <= 0 || vc > 65536 || idxPtr <= 0 || timesPtr <= 0 || packPtr <= 0 )
+				continue;
+
+			// Keyframe times: ascending u16, bounded by where the packed data starts.
+			var times = new List<float>();
+			for ( int o = timesPtr; o + 2 <= d.Length && o + 2 <= packPtr; o += 2 )
+			{
+				float t = U16( o );
+				if ( times.Count > 0 && t <= times[^1] )
+					break;
+				times.Add( t );
+			}
+			if ( times.Count == 0 )
+				continue;
+
+			var slots = new int[vc];
+			for ( int v = 0; v < vc; v++ )
+				slots[v] = U16( idxPtr + v * 2 );
+
+			// Packed positions: frame-contiguous, vc ints per frame.
+			var frames = new SVector3[times.Count][];
+			for ( int f = 0; f < times.Count; f++ )
+			{
+				frames[f] = new SVector3[vc];
+				for ( int v = 0; v < vc; v++ )
+					frames[f][v] = Dequant( U32( packPtr + (f * vc + v) * 4 ) );
+			}
+
+			anim.Morph.Add( new MorphSub { VertexSlots = slots, Times = times.ToArray(), Frames = frames } );
+		}
+	}
+
+	// Sign-extend the low 10 bits of a packed value to a signed int.
+	private static int Sext10( uint v )
+	{
+		int x = (int)(v & 0x3ff);
+		return x >= 0x200 ? x - 0x400 : x;
 	}
 
 	// Reads keyframes starting at <paramref name="off"/>: each key is a header dword
