@@ -42,27 +42,33 @@ The frame format is now reversed (loader `FUN_0046d6d0`, cross-checked against `
   vertex region. The bulk **`0xb8` .. `[0x98]`** is the frame's **vertex-position payload** (verified
   real model-space floats). A frame only carries the surfaces that move, so sizes vary.
 
-## Validation finding (loader validated first, before engine code)
+## Loader validated + runtime apply decompiled
 
-Decoding `monkeym1`'s payload **refutes the vertex-morph hypothesis**: a record's offsets point to a
-**sparse indexed list** — `0xFFFF0000 | index` markers (indices step `0,10,20,30…`) each followed by
-four **unit-magnitude, quaternion-like** floats (`(1,0,0,0)`, `(0.7071,0,0,0.7071)`, `(0,0,0,1)`), not
-model-space positions. Both `monkeym1` records target base surface 5 (`m_arm`) — consistent with
-**per-surface rotational animation**, not a replacement vertex set.
+The runtime apply path is now reversed (see docs/08), so the format is fully known:
 
-→ Ride animation should be modelled as **per-surface transform/rotation animation** (maps onto the
-per-mesh `TransformMatrix` we already apply), *not* a vertex-morph path with dynamic buffers. This
-de-risk pass means we will not build the wrong architecture.
+- **Keyframes are time-indexed tracks.** `FUN_00470b60` is the interpolator: it reads each entry's
+  leading `u16` keyframe time (the `0xFFFF0000|time` dwords), finds the keys bracketing the current
+  animation time, and returns a lerp factor. Entry stride by track type: `1→4`, `2→20`, `4→16` B.
+- **`FUN_00471860` applies a surface's tracks**, selected by a flags word (`desc[1]`): vertex morph
+  (`0x1000`, per-vertex `vec3` lerp into the surface vertex buffer), rotation (`0x8`, quaternion →
+  matrix via `FUN_00474490`), scale (`0x80`), translation (`0x200`/`0x1`). `FUN_004679d0` runs it for
+  every surface.
+- It's a **hybrid**: a surface can morph vertices *and/or* carry T/R/S tracks. `monkeym1` surf 5
+  (`m_arm`) carries the rotation-quaternion track (the arms swing). Animating-textures
+  (`FUN_00467310`, UV scroll) is a separate system.
+
+Earlier note corrected: the payload is **not** "transform-only" — vertex morph *and* TRS tracks
+coexist; only morph surfaces need a dynamic vertex path.
 
 ## Remaining
 
-1. Decompile the **runtime pose-apply function** (the consumer of the model's `0x98` animation
-   pointer during rendering) to pin down the vec4 semantics: quaternion vs. axis form, per-vertex vs.
-   per-bone, and how it composes with the base pose.
-2. Implement the keyframe loader on that basis (flat-load + relocate per `FUN_0046d6d0`; read the
-   `0x98` trailer; decode each surface's sparse quaternion list).
-3. Apply per-frame transforms to the ride's `ModelEntity` parts over the channel frame sequence (loop
-   Main); validate against `monkey` (arms swing) / `totem`.
+1. Keyframe loader: flat-load + relocate (mirror `FUN_0046d6d0`), read the `0x98` trailer's surface
+   records, and decode each surface's tracks (time-keyed: morph `vec3` / rotation quaternion / scale /
+   translation), mapping each to the base surface.
+2. Per-frame evaluator (mirror `FUN_00470b60`/`FUN_00471860`): bracket keys by animation time,
+   interpolate, compose T·R·S onto the surface transform; lerp vertex positions for morph surfaces.
+3. Apply to the ride's `ModelEntity` parts over the channel frame sequence (loop Main); validate
+   against `monkey` (arms swing) / `totem`.
 4. Load the `7`-prefixed LOD set for distant rides; ignore `P`-prefixed preview models in-world.
 
 ## Acceptance

@@ -137,27 +137,44 @@ holds `count` (at `+0x12`) surface records of `0x40` bytes each (array at `+0x2c
 `+0x10` is the base surface index, `+0xc` an element count, and `+0x18`/`+0x1c`/`+0x20` are three
 offsets into the data region.
 
-### Validation finding — the payload is sparse rotation data, NOT vertex positions
+### The keyframe data is time-indexed tracks — decoded from the runtime
 
-Decoding `monkeym1`'s record data region settles what the payload actually is, and it is **not** plain
-vertex-morph positions:
+Decompiling the runtime apply path settles exactly what the payload is. It is **keyframed animation
+tracks**, interpolated by animation time — a per-surface, multi-track system.
 
-- The data at a record's offsets is a **sparse indexed list**. Each entry is a `0xFFFF`-tagged marker
-  dword `0xFFFF0000 | index` (observed indices `0, 10, 20, 30 …` — they step through the surface's
-  vertices) followed by **four floats of unit magnitude**: `(1,0,0,0)`, `(0.7071,0,0,0.7071)`,
-  `(0,0,0,1)` — i.e. **normalised, quaternion-like** values (`0.7071` = sin 45°), not model-space
-  coordinates.
-- The clean `0.7071`/`±1`/`~0` structure across `0x158`–`0x218`, two records both pointing at base
-  surface 5 (`m_arm` / the monkey's arms), is consistent with **per-surface rotational animation**
-  (the arms swing), encoded sparsely per vertex, rather than a full replacement vertex set.
+**The interpolator — `FUN_00470b60`.** Given a track and the current animation time (`model+0x20`,
+converted with `__ftol`), it walks the track's entries (entry stride selected by a **type** arg:
+`1→4 B`, `2→0x14=20 B`, `4→0x10=16 B`), reads each entry's leading `u16` as the **keyframe time**,
+finds the two keys bracketing now, and returns the bracketing indices + a lerp factor
+`t = (now − prevTime) / (nextTime − prevTime)`. So the `0xFFFF`-tagged dwords we saw are
+`time | 0xFFFF0000` keyframe headers: the **low `u16` is the keyframe time** (`0,10,20,30…`), the high
+`0xFFFF` is just a sentinel. A stride-20 entry = `[time dword][4 floats]` — exactly our `0x158`
+quaternion data.
 
-**Consequence for the engine.** Ride keyframes are best modelled as **per-surface transform / rotation
-animation**, which maps onto the per-mesh `TransformMatrix` we already parse and apply — *not* as a
-vertex-morph path needing dynamic vertex buffers. The exact semantics of the vec4 (quaternion vs. axis
-form, per-vertex vs. per-bone, and how it composes with the base pose) need the **runtime pose-apply
-function** decompiled to pin down before implementing — building a loader on the morph assumption would
-have been the wrong architecture. That decompile + the transform-animation path is the remaining T-033
-work; the file structure and the *nature* of the payload are now known.
+**The apply — `FUN_00471860`** (per surface; `FUN_004679d0` calls it for every surface). A flags word
+on the surface's anim descriptor (`desc[1]`) selects which tracks run, and it composes them:
+
+| Flag (`desc[1]`) | Track | What it does |
+|---|---|---|
+| `0x1000` (+`0x4000`) | **vertex morph** | linearly interpolates per-vertex `vec3` positions between integer keyframes, writing the surface's vertex buffer (`out[0x18]`, SoA-of-4 X/Y/Z at `+0/+0x10/+0x20`) |
+| `0x8` | **rotation** | quaternion keyframe track → rotation matrix (`FUN_00474490`) |
+| `0x80` | **scale** | scale keyframe track |
+| `0x200` / `0x1` | **translation** | position keyframe track → `out[0x10..0x12]` |
+
+So TPW ride animation is a **hybrid**: a surface can morph its vertices *and/or* carry T/R/S keyframe
+tracks. `monkeym1`'s two records both target base surface 5 (`m_arm`) and hold the unit-magnitude
+quaternions (`(1,0,0,0)`, `(0.7071,0,0,0.7071)`) of the **rotation** track — the monkey's arms swing.
+The `(0,0,0,1)`-style and `vec3` blocks in the same file are the scale/translation/morph tracks for
+their surfaces. (`0.7071` = sin 45°.) A separate system, **animating textures** (`FUN_00467310`,
+`ANIMATINGTEXTURES`), scrolls UVs procedurally — that's water/conveyor flow, not part of this keyframe
+path.
+
+**Consequence for the engine.** The clean target is a per-surface animation evaluator that, each frame:
+finds the bracketing keys per track (the `FUN_00470b60` logic), interpolates rotation (slerp/lerp on
+the quaternion), scale and translation, and composes T·R·S onto the surface's transform (which maps to
+our per-mesh `TransformMatrix`); surfaces flagged `0x1000` additionally lerp their vertex positions
+(this is the only part that needs a dynamic/morph vertex path). The track byte layout and the apply
+order are now fully known — this is the remaining T-033 implementation work.
 
 This is classic Quake-II-style MD2 vertex-morph animation, but with each keyframe stored in its own
 file instead of appended into one. (It also explains the earlier finding that a single shipping
@@ -184,6 +201,11 @@ quantisation it references) so the engine can morph the base mesh through the re
 | `FUN_00467a80` | **Sign** loader: rasterises `.sgn` text via GDI onto `sign1.tga`/`sign2.tga` surfaces |
 | `FUN_0046d6d0` | Model file loader: flat-loads the file, checks magic, relocates the offset table (`0x4c`–`0x7c`, `0x98`, `0xac`) to absolute pointers in place — used for both base and frame files |
 | `FUN_0046dcf0` / `FUN_0044a220` | Higher-level load/lookup of a model by path (calls `FUN_0046d6d0`) |
+| `FUN_00471860` | **Per-surface pose apply**: runs the surface's vertex-morph / rotation / scale / translation tracks (flags in `desc[1]`) and composes the result |
+| `FUN_004679d0` | Iterates a model's surfaces and calls `FUN_00471860` for each |
+| `FUN_00470b60` | **Keyframe interpolator**: finds the two keys bracketing the current time and returns the lerp factor (entry stride by track type: `4`/`20`/`16` B) |
+| `FUN_00474490` | Builds a rotation matrix from the interpolated quaternion (rotation track) |
+| `FUN_00467310` | **Animating textures** (`ANIMATINGTEXTURES`): procedural UV scroll — a *separate* system from keyframes |
 | `FUN_00470b30` | Marks a frame surface dirty (sets flag `0x20` on the model) — not the vertex fold |
 | `FUN_005ecb40` | GDI text → sign texture rasterisation |
 
