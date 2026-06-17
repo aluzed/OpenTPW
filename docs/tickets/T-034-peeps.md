@@ -39,6 +39,11 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
   (`RideEngine.BodyLoopDuration`, decoded from the loop's keyframe track — ~11 s monkey, ~14 s totem,
   ~3 s wateride), falling back to `Info.DurationUnit × 4 s` for rides whose loop has no decoded
   keyframes, instead of a flat 5 s.
+- **Excitement-weighted ride choice**: a peep picks its next ride at random *weighted by the ride's
+  excitement* (`UsageInfo.ExcitementLevel`, exposed as `Ride.Excitement`), avoiding an immediate
+  repeat of the last ride, so more exciting rides draw bigger crowds (verified: over ~45 s the
+  wateride/75 was chosen 37×, totem/70 23×, monkey/50 16×). First step of the peep→ride attraction
+  loop; `Ride.Attraction` (`Info.AttractionValue`) is also parsed for later use.
 
 ## Remaining
 
@@ -53,5 +58,6 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
    blocked on the `.MAP` audio catalog (T-016): the script-driven sounds currently resolve through an
    approximate index (e.g. the monkey plays `urinal.mp2`), so a per-board cue would just repeat that
    wrong mapping until T-016 lands.
-4. **Needs/stats** (hunger/fatigue/happiness), staff (guards/handymen/entertainers), and the
-   peep→ride excitement/income loop.
+4. **Needs/stats** (hunger/fatigue/happiness), staff (guards/handymen/entertainers), and the rest of
+   the peep→ride excitement/income loop (ride choice is excitement-weighted — above; still to do:
+   per-peep happiness/energy fed by rides & queue waits, peeps leaving when bored/satisfied, and money).

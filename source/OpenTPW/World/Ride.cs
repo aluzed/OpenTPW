@@ -30,6 +30,13 @@ public class Ride : Entity
 	/// ride's own running animation length — see the ctor.</summary>
 	public float RideDuration { get; private set; } = 5f;
 
+	/// <summary>How exciting the ride is (<c>UsageInfo.ExcitementLevel</c>) — its draw: peeps pick rides
+	/// weighted by this, so more exciting rides build longer queues.</summary>
+	public int Excitement { get; private set; } = 50;
+
+	/// <summary>The ride's base attraction value (<c>Info.AttractionValue</c>).</summary>
+	public int Attraction { get; private set; } = 25;
+
 	/// <summary>Run (true) or idle (false) the ride's animation — driven by occupancy (see RideQueue / Peep).</summary>
 	public void SetActive( bool active ) => engine.SetActive( active );
 
@@ -70,6 +77,8 @@ public class Ride : Entity
 			ExitAppearPos = (ReadFloat( settings, "UsageInfo.ExitCellAppearPosX", 0.5f ), ReadFloat( settings, "UsageInfo.ExitCellAppearPosY", 0.5f ));
 			Capacity = Math.Max( 1, ReadInt( settings, "UsageInfo.MaxCapacity", 8 ) );
 			DurationUnit = ReadInt( settings, "Info.DurationUnit", 0 );
+			Excitement = Math.Max( 1, ReadInt( settings, "UsageInfo.ExcitementLevel", 50 ) );
+			Attraction = ReadInt( settings, "Info.AttractionValue", 25 );
 
 			Log.Info( $"[ride] loaded '{Name}' from {rideArchive} (footprint {Shape.Width}x{Shape.Height}, entrance {Shape.Entrance?.ToString() ?? "none"}, exit {Shape.Exit?.ToString() ?? "none"})" );
 		}

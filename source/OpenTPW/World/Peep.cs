@@ -24,6 +24,7 @@ public sealed class Peep : ModelEntity
 	private readonly Model billboard;
 
 	private RideQueue? route;
+	private RideQueue? lastRoute;
 	private float rideTimer;
 	private bool riding;
 
@@ -99,11 +100,28 @@ public sealed class Peep : ModelEntity
 
 	private void DropToGround() => Position = Position.WithZ( terrain.SampleHeight( Position.X, Position.Y ) );
 
-	// Pick a random ride's queue to head for and join the back of its line.
+	// Choose the next ride weighted by its excitement (more exciting rides draw more peeps), avoiding an
+	// immediate repeat of the last ride when there's a choice, and join the back of its line.
 	private void PickRoute()
 	{
-		route = queues.Count > 0 ? queues[Random.Shared.Next( queues.Count )] : null;
-		route?.Enqueue( this );
+		if ( queues.Count == 0 )
+		{
+			route = null;
+			return;
+		}
+
+		var candidates = queues.Where( q => q != lastRoute ).ToList();
+		if ( candidates.Count == 0 )
+			candidates = queues.ToList();
+
+		int Weight( RideQueue q ) => Math.Max( 1, q.Ride.Excitement );
+		int roll = Random.Shared.Next( candidates.Sum( Weight ) );
+		route = candidates[^1];
+		foreach ( var q in candidates )
+			if ( ( roll -= Weight( q ) ) < 0 ) { route = q; break; }
+
+		lastRoute = route;
+		route.Enqueue( this );
 	}
 
 	private static Model SharedModel( int colorIndex )
