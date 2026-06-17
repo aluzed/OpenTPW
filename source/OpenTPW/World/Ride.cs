@@ -23,6 +23,13 @@ public class Ride : Entity
 	/// <summary>How many peeps the ride holds at once (from <c>UsageInfo.MaxCapacity</c>).</summary>
 	public int Capacity { get; private set; } = 8;
 
+	/// <summary>The ride's duration band (<c>Info.DurationUnit</c>, 0–3 — indexes a seconds table in TP.EXE).</summary>
+	public int DurationUnit { get; private set; }
+
+	/// <summary>How long a single ride lasts, in seconds (peeps stay aboard this long). Anchored to the
+	/// ride's own running animation length — see the ctor.</summary>
+	public float RideDuration { get; private set; } = 5f;
+
 	/// <summary>Run (true) or idle (false) the ride's animation — driven by occupancy (see RideQueue / Peep).</summary>
 	public void SetActive( bool active ) => engine.SetActive( active );
 
@@ -62,6 +69,7 @@ public class Ride : Entity
 			EntryStandPos = (ReadFloat( settings, "UsageInfo.EntryCellStandPosX", 0.5f ), ReadFloat( settings, "UsageInfo.EntryCellStandPosY", 0.5f ));
 			ExitAppearPos = (ReadFloat( settings, "UsageInfo.ExitCellAppearPosX", 0.5f ), ReadFloat( settings, "UsageInfo.ExitCellAppearPosY", 0.5f ));
 			Capacity = Math.Max( 1, ReadInt( settings, "UsageInfo.MaxCapacity", 8 ) );
+			DurationUnit = ReadInt( settings, "Info.DurationUnit", 0 );
 
 			Log.Info( $"[ride] loaded '{Name}' from {rideArchive} (footprint {Shape.Width}x{Shape.Height}, entrance {Shape.Entrance?.ToString() ?? "none"}, exit {Shape.Exit?.ToString() ?? "none"})" );
 		}
@@ -84,6 +92,15 @@ public class Ride : Entity
 		engine.SetAnimChannels( channels );
 		LoadKeyframes( rideArchive, rideName, channels );
 		engine.StartBestBodyAnim();
+
+		// Ride duration: one full pass of the ride's running animation is the authoritative, ride-specific
+		// length we have (monkey ~11 s, totem ~14 s). Fall back to Info.DurationUnit (a 0–3 band; the exact
+		// band→seconds table lives in TP.EXE and isn't RE'd yet — ~4 s/unit matches the decoded loop lengths)
+		// then a flat default for rides whose loop has no decoded keyframes.
+		RideDuration = engine.BodyLoopDuration is float loop && loop > 0 ? loop
+			: DurationUnit > 0 ? DurationUnit * 4f
+			: 5f;
+		Log.Info( $"[ride] '{Name}' duration {RideDuration:0.0}s (DurationUnit {DurationUnit}), capacity {Capacity}" );
 
 		VM.IsRunning = true;
 	}

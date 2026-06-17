@@ -31,6 +31,10 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
   before settling into the run loop; emptying runs **End → Unload → Idle (loop, or rest)**. Stages a
   ride doesn't ship are skipped, so e.g. the monkey plays its full Load/Start/Main/End cycle while the
   totem just toggles Main↔rest. The dev park runs 40 peeps over 3 queues, each at the ride's real capacity.
+- **Real ride duration**: a peep stays aboard for one full pass of the ride's running animation
+  (`RideEngine.BodyLoopDuration`, decoded from the loop's keyframe track — ~11 s monkey, ~14 s totem,
+  ~3 s wateride), falling back to `Info.DurationUnit × 4 s` for rides whose loop has no decoded
+  keyframes, instead of a flat 5 s.
 
 ## Remaining
 
@@ -38,8 +42,11 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
    (direction + walk-cycle frames) instead of coloured billboards.
 2. **Full path network**: a walkable path graph + A* so peeps route over real paths (not straight
    lines) between rides, park gate, shops; space the queue *along* the path rather than piling at the entrance.
-3. **Per-cycle boarding sound + real duration**: the load/start/main → end/unload animation cycle is
-   wired (above); still to do is playing the boarding/unloading **sound** per cycle and sourcing the
-   ride **duration** from the ride script/`UsageInfo` rather than the fixed 5 s.
+3. **Per-cycle boarding sound**: the animation cycle and a real ride **duration** are wired (above —
+   the duration is one full pass of the ride's running animation, ~11 s monkey / ~14 s totem, falling
+   back to `Info.DurationUnit`). Still to do is playing the boarding/unloading **sound** per cycle —
+   blocked on the `.MAP` audio catalog (T-016): the script-driven sounds currently resolve through an
+   approximate index (e.g. the monkey plays `urinal.mp2`), so a per-board cue would just repeat that
+   wrong mapping until T-016 lands.
 4. **Needs/stats** (hunger/fatigue/happiness), staff (guards/handymen/entertainers), and the
    peep→ride excitement/income loop.

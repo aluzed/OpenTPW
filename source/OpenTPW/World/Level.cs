@@ -95,7 +95,7 @@ public class Level
 						? grid.PointToWorld( tx + x.X + ride.ExitAppearPos.X, ty + x.Y + ride.ExitAppearPos.Y )
 						: waypoints[^1];
 					exit = exit.WithZ( terrain.SampleHeight( exit.X, exit.Y ) );
-					queues.Add( new RideQueue( ride, waypoints, exit, rideDuration: 5f, capacity: ride.Capacity ) );
+					queues.Add( new RideQueue( ride, waypoints, exit, rideDuration: ride.RideDuration, capacity: ride.Capacity ) );
 				}
 			}
 			catch ( Exception e ) { Log.Warning( $"[park] ride '{path}' failed: {e.Message}" ); }

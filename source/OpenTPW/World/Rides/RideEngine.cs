@@ -225,6 +225,12 @@ public sealed class RideEngine : IRideEngine
 		// Idle loop for an empty ride: only if the ride ships an Idle channel (else it rests).
 		bodyIdleAnim = FrameCount( (int)ScriptDefs.Animations.ANIM_Idle ) > 0 ? (int)ScriptDefs.Animations.ANIM_Idle : -1;
 
+		// The real-world length of one full pass of the running loop (its decoded keyframe track), used
+		// as the authentic per-ride ride duration. Null when the loop has no decoded keyframes.
+		BodyLoopDuration = chosen >= 0 && channelAnims.TryGetValue( chosen, out var loopKf ) && loopKf.Duration > 0
+			? loopKf.Duration / KeyframeRate
+			: null;
+
 		if ( chosen >= 0 )
 			Log.Info( $"[ride] body loop {(ScriptDefs.Animations)chosen}, idle "
 				+ ( bodyIdleAnim >= 0 ? $"{(ScriptDefs.Animations)bodyIdleAnim}" : "rest" ) + " (keyframed)" );
@@ -235,6 +241,10 @@ public sealed class RideEngine : IRideEngine
 	private int bodyLoopAnim = -1;
 	private int bodyIdleAnim = -1;
 	private bool bodyRunning;
+
+	/// <summary>Real-world seconds for one full pass of the ride's running loop animation (null if it has
+	/// no decoded keyframes). The owning Ride uses it as the authentic ride duration.</summary>
+	public float? BodyLoopDuration { get; private set; }
 
 	// The body's pending animation stages (the rest of the boarding/unloading cycle after the stage it
 	// is currently playing). Update advances through these as each one-shot stage finishes.
