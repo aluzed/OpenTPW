@@ -88,8 +88,22 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
      it is *not* raw); treating it as **4-byte `(B,G,R,run)` RLE records** renders coherent *horizontal
      colour runs* (not noise) — strong evidence it is run-length encoded — but without the per-frame
      dimensions the runs don't assemble into a sprite.
-   - **Next step**: get the per-frame layout (frame offset/size table keyed by the offset-4 count) via
-     **Ghidra** on the sprite loader in `TP.EXE`; then expand the RLE per frame. Same encoded family as
+   - **Ghidra session (done, `/var/tmp/nocd/ghidra_proj`, program `tpw_nocd.exe`, full auto-analysis
+     run):** mapped the sprite *system* but the pixel codec is not string-anchored.
+     - `FUN_00541310` = the `"Loading Sprites from %s"` master loader: enumerates categories (kids,
+       kidsheads, handymen, mechanics, guards, researchers, generic…) and builds sprite-list structs
+       through **C++ filesystem-object vtable calls** (e.g. `(**(code**)(obj+0x28))(...)`).
+     - `FUN_00415270` is the **savegame** deserializer (FourCC modules `WRLD`/`SPSC`/`PART`/…); the
+       `SAD_SPRITE_SCRIPTS` string there is in-save peep *AI scripts*, **not** the `.TPC` image codec.
+       `FUN_00532bd0` = sprite hit-testing (`"Found sprite %lx"`).
+     - **Ruled out:** `.tpc`/`.fpc`/`.tps`/`*.ESP`/`data\esprites.wad` are all compiler-generated static
+       `std::string` initializers (~40 sites each; `FUN_005f60b0` = string assign) — not the codec. The
+       `03 00 03 00` magic is **never compared in code** (11 occurrences, all in data) — the loader just
+       skips the 12-byte header.
+   - **Next step**: the codec is reached via the vtable-dispatched load inside `FUN_00541310` (the
+     `obj+0x28` method on the sprite/file object) — trace that class/vtable to the per-file
+     read+RLE-expand, or use **dynamic analysis** (break on the `esprites.wad` read and watch the
+     decode). Then expand the RLE per frame (frame count = the offset-4 field). Same encoded family as
      `base.lnd`. Until then, peeps/staff/shops render as flat-colour billboards (`Billboard.Make`).
 2. **Full path network**: a walkable path graph + A* so peeps route over real paths (not straight
    lines) between rides, park gate, shops. (Queue spacing *along* the path is now done — see "Queue
