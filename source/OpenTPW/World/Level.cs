@@ -123,6 +123,10 @@ public class Level
 		_ = new Staff( StaffRole.Entertainer, terrain, staffHome, roam: 90f );
 		_ = new Staff( StaffRole.Handyman, terrain, staffHome, roam: 90f );
 		_ = new Staff( StaffRole.Handyman, terrain, staffHome, roam: 90f );
+
+		// A couple of food stalls flanking the rides; hungry visitors detour to the nearest (see Shop / Peep).
+		_ = new Shop( terrain, new Vector3( centre.X - 70f, centre.Y + 40f, 0 ) );
+		_ = new Shop( terrain, new Vector3( centre.X + 70f, centre.Y - 40f, 0 ) );
 	}
 
 	// Visualises a ride's entrance/exit cells (from its Info.Shape) as small markers on the terrain —
@@ -231,7 +235,7 @@ public class Level
 		if ( Environment.GetEnvironmentVariable( "OPENTPW_ECON_DEBUG" ) != null && ParkFinances.Current is { } f && Time.Now > nextEconLog )
 		{
 			nextEconLog = Time.Now + 5f;
-			Log.Info( $"[econ] money={f.Money:0}  ride+={f.RideRevenue:0}  entry+={f.EntryRevenue:0}  upkeep-={f.UpkeepPaid:0}  wages-={f.WagesPaid:0}" );
+			Log.Info( $"[econ] money={f.Money:0}  ride+={f.RideRevenue:0}  entry+={f.EntryRevenue:0}  food+={f.FoodRevenue:0}  upkeep-={f.UpkeepPaid:0}  wages-={f.WagesPaid:0}" );
 		}
 	}
 

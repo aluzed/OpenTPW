@@ -8,7 +8,7 @@ namespace OpenTPW;
 public sealed class Litter : ModelEntity
 {
 	/// <summary>Every piece of litter currently on the ground.</summary>
-	public static readonly List<Litter> All = new();
+	public static readonly List<Litter> Active = new();
 
 	private static Model? sharedModel;
 
@@ -17,13 +17,13 @@ public sealed class Litter : ModelEntity
 		Model = SharedModel();
 		Position = groundPos.WithZ( groundPos.Z + 0.2f ); // just above the terrain to avoid z-fighting
 		Scale = new Vector3( 1.5f );
-		All.Add( this );
+		Active.Add( this );
 	}
 
 	/// <summary>Remove this litter from the world (a handyman cleaned it up).</summary>
 	public void PickUp()
 	{
-		All.Remove( this );
+		Active.Remove( this );
 		Entity.All.Remove( this );
 	}
 

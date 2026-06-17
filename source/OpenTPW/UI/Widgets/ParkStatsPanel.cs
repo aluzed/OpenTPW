@@ -32,10 +32,11 @@ internal sealed class ParkStatsPanel : Panel
 			$"MONEY {fin.Money:0}",
 			$"TICKETS {fin.RideRevenue:0}",
 			$"GATE {fin.EntryRevenue:0}",
+			$"FOOD {fin.FoodRevenue:0}",
 			$"UPKEEP {fin.UpkeepPaid:0}",
 			$"WAGES {fin.WagesPaid:0}",
 			$"VISITORS {visitors}",
-			$"LITTER {Litter.All.Count}",
+			$"LITTER {Litter.Active.Count}",
 		};
 
 		for ( int i = 0; i < lines.Length; i++ )

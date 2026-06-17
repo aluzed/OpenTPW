@@ -20,6 +20,8 @@ public sealed class Peep : ModelEntity
 	private const float LitterChancePerSec = 0.04f; // ~1 dropped every ~25 s of wandering
 	private const float LitterRadius = 18f;          // litter within this sours the mood
 	private const float LitterPenaltyPerSec = 1.5f;  // happiness lost per second per nearby litter (capped)
+	private const float HungerPerSec = 2f;           // hunger builds while in the park (0..100)
+	private const float HungerThreshold = 55f;        // detour to a shop for a snack at this point
 
 	// A small palette of clothing colours so the crowd reads as varied people.
 	private static readonly (byte R, byte G, byte B)[] Palette =
@@ -41,8 +43,10 @@ public sealed class Peep : ModelEntity
 	private float rideTimer;
 	private bool riding;
 	private bool leaving;
+	private Shop? shopTarget;
 	private float happiness = StartHappiness;
 	private float energy = MaxEnergy;
+	private float hunger;
 
 	private static int recycles; // park-wide count of visitors that left and were replaced (diagnostics)
 
@@ -93,6 +97,20 @@ public sealed class Peep : ModelEntity
 			return;
 		}
 
+		// Detouring to a shop: walk there, buy a snack (park income), then resume riding.
+		if ( shopTarget != null )
+		{
+			if ( WalkToward( shopTarget.Position ) )
+			{
+				ParkFinances.Current?.TakeFoodSale( shopTarget.Price );
+				hunger = 0f;
+				shopTarget = null;
+				PickRoute();
+			}
+			FaceCamera();
+			return;
+		}
+
 		if ( route == null )
 		{
 			PickRoute();
@@ -113,6 +131,16 @@ public sealed class Peep : ModelEntity
 		if ( WantsToLeave() )
 		{
 			BeginLeaving();
+			return;
+		}
+
+		// Getting peckish: leave the ride line and head for the nearest shop for a snack.
+		hunger += HungerPerSec * Time.Delta;
+		if ( hunger >= HungerThreshold && Shop.Stalls.Count > 0 )
+		{
+			route?.Dequeue( this );
+			route = null;
+			shopTarget = NearestShop();
 			return;
 		}
 
@@ -160,8 +188,10 @@ public sealed class Peep : ModelEntity
 	{
 		recycles++;
 		leaving = false;
+		shopTarget = null;
 		happiness = StartHappiness;
 		energy = MaxEnergy;
+		hunger = 0f;
 		lastRoute = null;
 		ParkFinances.Current?.TakeEntryFee(); // a fresh visitor pays the gate
 		PickRoute();
@@ -183,12 +213,30 @@ public sealed class Peep : ModelEntity
 	/// <summary>An entertainer lifts this peep's mood (capped at full); a happier peep stays longer.</summary>
 	public void Cheer( float amount ) => happiness = Math.Min( 100f, happiness + amount );
 
+	// The closest shop to head to when hungry (null if the park has none).
+	private Shop? NearestShop()
+	{
+		Shop? best = null;
+		float bestD2 = float.MaxValue;
+		foreach ( var s in Shop.Stalls )
+		{
+			float dx = s.Position.X - Position.X, dy = s.Position.Y - Position.Y;
+			float d2 = dx * dx + dy * dy;
+			if ( d2 < bestD2 )
+			{
+				bestD2 = d2;
+				best = s;
+			}
+		}
+		return best;
+	}
+
 	// Litter within reach, capped so a single filthy spot doesn't drive happiness down instantly.
 	private int CountNearbyLitter()
 	{
 		float r2 = LitterRadius * LitterRadius;
 		int count = 0;
-		foreach ( var l in Litter.All )
+		foreach ( var l in Litter.Active )
 		{
 			float dx = l.Position.X - Position.X, dy = l.Position.Y - Position.Y;
 			if ( dx * dx + dy * dy <= r2 && ++count >= 3 )
@@ -237,26 +285,14 @@ public sealed class Peep : ModelEntity
 		return sharedModels[((colorIndex % Palette.Length) + Palette.Length) % Palette.Length];
 	}
 
-	// One upright unit quad (local XZ plane, z = 0..1 standing on the ground, facing +Y), shared per
-	// colour — the billboard yaw + per-entity scale do the rest. Double-sided so it shows from any yaw.
+	// One shared upright billboard per clothing colour — the yaw + per-entity scale do the rest.
 	private static Model[] BuildModels()
 	{
-		var vertices = new[]
-		{
-			new Vertex { Position = new Vector3( -0.5f, 0, 0 ), TexCoords = new Vector2( 0, 1 ), Normal = new Vector3( 0, 1, 0 ) },
-			new Vertex { Position = new Vector3( 0.5f, 0, 0 ), TexCoords = new Vector2( 1, 1 ), Normal = new Vector3( 0, 1, 0 ) },
-			new Vertex { Position = new Vector3( -0.5f, 0, 1 ), TexCoords = new Vector2( 0, 0 ), Normal = new Vector3( 0, 1, 0 ) },
-			new Vertex { Position = new Vector3( 0.5f, 0, 1 ), TexCoords = new Vector2( 1, 0 ), Normal = new Vector3( 0, 1, 0 ) },
-		};
-		uint[] indices = { 0, 2, 1, 1, 2, 3 };
-
 		var models = new Model[Palette.Length];
 		for ( int i = 0; i < Palette.Length; i++ )
 		{
 			var (r, g, b) = Palette[i];
-			var material = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader", MaterialFlags.DoubleSided );
-			material.Set( "Color", new Texture( [r, g, b, 255], 1, 1 ) );
-			models[i] = new Model( vertices, indices, material );
+			models[i] = Billboard.Make( r, g, b );
 		}
 		return models;
 	}

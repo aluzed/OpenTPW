@@ -57,16 +57,21 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
   books balance (verified: from 10000 → 10609 over ~50 s = +400 gate +383 tickets −174 upkeep). Ride
   prices / entry fee are derived defaults (the original lets the player set them) pending a build/manage UI.
 - **Park-stats HUD**: a top-left readout (`ParkStatsPanel`) shows the live balance and flows
-  (MONEY / TICKETS / GATE / UPKEEP / WAGES) plus the VISITORS and LITTER counts, so the economy and
-  crowd are visible on screen rather than only in logs. No-op without a park (harmless in the plain lobby).
+  (MONEY / TICKETS / GATE / FOOD / UPKEEP / WAGES) plus the VISITORS and LITTER counts, so the economy
+  and crowd are visible on screen rather than only in logs. No-op without a park (harmless in the lobby).
 - **Staff (entertainers + handymen)**: `Staff` entities roam the park (role-coloured billboards —
   orange entertainers, blue handymen) and draw a **wage** every second (`ParkFinances.PayWages`, shown
   as WAGES). Entertainers lift the **happiness** of nearby visitors (`Peep.Cheer`); handymen seek out
   the nearest **litter** and pick it up.
-- **Litter**: visitors occasionally drop `Litter` (tracked in `Litter.All`); standing among litter
+- **Litter**: visitors occasionally drop `Litter` (tracked in `Litter.Active`); standing among litter
   sours the mood (so a filthy park drives peeps home unhappy) until a handyman clears it. Shown as
   LITTER in the HUD. Verified: litter accumulates from the crowd but stays bounded as handymen clear it,
-  the books reconcile, and the sim runs crash-free at 60 FPS.
+  the books reconcile, and the sim runs crash-free.
+- **Hunger + shops**: hunger builds while a peep is in the park; past a threshold it leaves the ride
+  line and detours to the nearest `Shop` (a green food stall, tracked in `Shop.Stalls`), pays for a
+  snack (a **FOOD** income flow) and has its hunger reset before resuming. Verified: FOOD revenue
+  accrues as the crowd eats and the books reconcile. (All billboards — peeps, staff, shops — now share
+  one `Billboard.Make` helper.)
 
 ## Remaining
 
@@ -81,8 +86,8 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
    blocked on the `.MAP` audio catalog (T-016): the script-driven sounds currently resolve through an
    approximate index (e.g. the monkey plays `urinal.mp2`), so a per-board cue would just repeat that
    wrong mapping until T-016 lands.
-4. **Shops + guards**: ride choice, needs, turnover, the core **economy** (gate fee, tickets, upkeep,
-   **wages**), **entertainers**, and **handymen + litter** are done (above); still to do are **guards**
-   (safety/vandalism), **shops** with hunger/thirst needs driving spending, and a player-facing
-   build/manage UI to set ride prices, the entry fee, and research/upgrades (the `Upgrades[*]`/`CostOf*`
-   fields are parsed already).
+4. **Guards + build/manage UI**: ride choice, needs, turnover, the **economy** (gate, tickets, food,
+   upkeep, wages), **entertainers**, **handymen + litter**, and **hunger + shops** are done (above);
+   still to do are **guards** (safety/vandalism), a richer thirst need, and a player-facing build/manage
+   UI to place rides/shops and set prices, the entry fee, and research/upgrades (the `Upgrades[*]`/
+   `CostOf*` fields are parsed already).

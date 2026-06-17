@@ -97,7 +97,7 @@ public sealed class Staff : ModelEntity
 	{
 		Litter? best = null;
 		float bestD2 = float.MaxValue;
-		foreach ( var l in Litter.All )
+		foreach ( var l in Litter.Active )
 		{
 			float dx = l.Position.X - Position.X, dy = l.Position.Y - Position.Y;
 			float d2 = dx * dx + dy * dy;
@@ -144,19 +144,7 @@ public sealed class Staff : ModelEntity
 
 		// Entertainer = bright orange, Handyman = blue, so roles are distinguishable in the crowd.
 		var (r, g, b) = role == StaffRole.Handyman ? ((byte)40, (byte)90, (byte)220) : ((byte)255, (byte)140, (byte)0);
-		var material = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader", MaterialFlags.DoubleSided );
-		material.Set( "Color", new Texture( [r, g, b, 255], 1, 1 ) );
-
-		var vertices = new[]
-		{
-			new Vertex { Position = new Vector3( -0.5f, 0, 0 ), TexCoords = new Vector2( 0, 1 ), Normal = new Vector3( 0, 1, 0 ) },
-			new Vertex { Position = new Vector3( 0.5f, 0, 0 ), TexCoords = new Vector2( 1, 1 ), Normal = new Vector3( 0, 1, 0 ) },
-			new Vertex { Position = new Vector3( -0.5f, 0, 1 ), TexCoords = new Vector2( 0, 0 ), Normal = new Vector3( 0, 1, 0 ) },
-			new Vertex { Position = new Vector3( 0.5f, 0, 1 ), TexCoords = new Vector2( 1, 0 ), Normal = new Vector3( 0, 1, 0 ) },
-		};
-		uint[] indices = { 0, 2, 1, 1, 2, 3 };
-
-		var model = new Model( vertices, indices, material );
+		var model = Billboard.Make( r, g, b );
 		roleModels[role] = model;
 		return model;
 	}

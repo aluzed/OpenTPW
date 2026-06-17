@@ -17,6 +17,7 @@ public sealed class ParkFinances
 
 	public float RideRevenue { get; private set; }
 	public float EntryRevenue { get; private set; }
+	public float FoodRevenue { get; private set; }
 	public float UpkeepPaid { get; private set; }
 	public float WagesPaid { get; private set; }
 
@@ -38,6 +39,13 @@ public sealed class ParkFinances
 	{
 		Money += EntryFee;
 		EntryRevenue += EntryFee;
+	}
+
+	/// <summary>A hungry visitor buys a snack from a shop.</summary>
+	public void TakeFoodSale( float price )
+	{
+		Money += price;
+		FoodRevenue += price;
 	}
 
 	/// <summary>Ongoing ride running cost.</summary>
