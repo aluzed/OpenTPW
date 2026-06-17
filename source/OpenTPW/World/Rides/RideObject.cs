@@ -30,4 +30,12 @@ public sealed class RideObject
 	/// / BaseRot are the loaded transform that animation composes onto.
 	/// </summary>
 	public List<(ModelEntity Entity, Vector3 BasePos, System.Numerics.Quaternion BaseRot, Vector3 BaseScale)> Parts { get; } = new();
+
+	/// <summary>
+	/// Vertex-morph support. The morph addresses one combined vertex buffer spanning all parts in
+	/// order, so <see cref="PartVertexOffset"/>[p] is part p's global vertex start, and
+	/// <see cref="PartBaseVerts"/>[p] is its rest-pose positions (to restore before each frame's morph).
+	/// </summary>
+	public List<int> PartVertexOffset { get; } = new();
+	public List<Vector3[]> PartBaseVerts { get; } = new();
 }

@@ -203,13 +203,13 @@ rarer `0x4000` variant):
   Needs a **dynamic vertex buffer**; OpenTPW `Model` already exposes `Device.UpdateBuffer`, so a
   per-frame CPU dequantise + re-upload is feasible.
 
-**Status: parser implemented + validated** (`RideKeyframeFile.MorphSub`, unit-tested incl. the 10-bit
-dequant and bbox transform; cross-checked against real `BbugsC.MD2` — 12 surfaces, coherent per-vertex
-keyframes). **Remaining to wire (T-033):** map the global slot → our per-mesh `ModelFile` vertex
-(cumulative vertex counts), apply additively to a `Model.UpdateBuffer` path per frame, and confirm the
-absolute-vs-delta semantics + base-pose interaction visually (the one detail not verifiable from the
-parse alone). Rotation+scale already cover the visible motion of most rides; morph adds organic
-deformation (e.g. `fantasy/bbugs`).
+**Status: implemented + working in-engine.** `RideKeyframeFile.MorphSub` parses it (unit-tested: 10-bit
+dequant, bbox transform; cross-checked against real `BbugsC.MD2`). `RideEngine.ApplyMorph` drives it
+per frame — resets each part to its rest pose, samples the keyframes, maps the **global** slot → our
+per-mesh vertex (cumulative offsets), writes the dequantised position (model→world Y/Z swizzle,
+**absolute** — confirmed visually), and re-uploads via `Model.UploadVertices`. Verified on
+`fantasy/bbugs`: the creature deforms coherently from the real keyframes. All three track families
+(rotation, translation/scale, vertex morph) are now driven from real ride data.
 
 **Consequence for the engine.** The clean target is a per-surface animation evaluator that, each frame:
 finds the bracketing keys per track (the `FUN_00470b60` logic), interpolates rotation (slerp/lerp on

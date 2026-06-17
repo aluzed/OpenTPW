@@ -52,7 +52,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-030](T-030-async-level-load.md) | 🟠 Medium | ⚠️ Mostly | Level load: freeze resolved (per-step + per-mesh progress); only optional 60fps async remains |
 | [T-031](T-031-game-audio.md) | 🟡 Feature | ⚠️ Mostly | Game audio: lobby music (minimp3), UI click SFX, music volume keys, cross-platform build; ambience/settings-UI remain |
 | [T-032](T-032-ride-engine.md) | 🟡 Feature | ⚠️ In progress | Ride engine: VM→engine seam + sound + a ride rendered/running in-scene (slice 1); anim/lights/peeps/park remain |
-| [T-033](T-033-ride-animation-keyframes.md) | 🟡 Feature | ⚠️ In progress | Ride animation RE'd (vertex keyframes in sibling `.md2` files; `.sgn`=signs); channel discovery wired; keyframe decode remains — see docs/08 |
+| [T-033](T-033-ride-animation-keyframes.md) | 🟡 Feature | ✅ Core done | Ride animation: rotation + translation/scale + vertex-morph keyframes all RE'd and driven from real ride data, verified in-game; polish remains — see docs/08 |
 
 Priority legend: 🔴 blocking · 🟠 important · 🟡 desirable/feature · ⚪ technical debt/polish.
 Status legend: ✅ done · ⚠️ partial · ☐ to do · 🗂️ split into focused tickets · ⏸️ deferred.

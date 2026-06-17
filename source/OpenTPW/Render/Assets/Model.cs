@@ -8,6 +8,12 @@ public class Model : Asset
 	public DeviceBuffer VertexBuffer { get; private set; } = null!;
 	public DeviceBuffer? IndexBuffer { get; private set; } = null;
 
+	/// <summary>
+	/// The model's vertices, retained so dynamic geometry (ride vertex-morph animation) can mutate
+	/// positions and re-upload via <see cref="UploadVertices"/>. Static models never touch this.
+	/// </summary>
+	public Vertex[] Vertices { get; private set; } = System.Array.Empty<Vertex>();
+
 	public Material Material { get; private set; }
 	public bool IsIndexed { get; private set; }
 
@@ -39,6 +45,7 @@ public class Model : Asset
 		var factory = Device.ResourceFactory;
 		var vertexStructSize = (uint)Marshal.SizeOf( typeof( Vertex ) );
 		vertexCount = (uint)vertices.Length;
+		Vertices = vertices;
 
 		VertexBuffer = factory.CreateBuffer(
 			new BufferDescription( vertexCount * vertexStructSize, BufferUsage.VertexBuffer )
@@ -46,6 +53,9 @@ public class Model : Asset
 
 		Device.UpdateBuffer( VertexBuffer, 0, vertices );
 	}
+
+	/// <summary>Re-upload <see cref="Vertices"/> to the GPU after mutating positions (dynamic morph).</summary>
+	public void UploadVertices() => Device.UpdateBuffer( VertexBuffer, 0, Vertices );
 
 	private void SetupMesh( Vertex[] vertices, uint[] indices )
 	{

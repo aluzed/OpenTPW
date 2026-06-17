@@ -57,6 +57,7 @@ public class Ride : Entity
 		var channels = DiscoverAnimChannels( rideArchive, rideName );
 		engine.SetAnimChannels( channels );
 		LoadKeyframes( rideArchive, rideName, channels );
+		engine.StartBestBodyAnim();
 
 		VM.IsRunning = true;
 	}

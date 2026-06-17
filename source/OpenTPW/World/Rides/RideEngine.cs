@@ -65,8 +65,21 @@ public sealed class RideEngine : IRideEngine
 	public void RegisterBody( IEnumerable<ModelEntity> parts )
 	{
 		var body = new RideObject { Id = SelfId, Type = -1 };
+		int globalOffset = 0;
 		foreach ( var e in parts )
+		{
 			body.Parts.Add( (e, e.Position, e.Rotation, e.Scale) );
+
+			// Capture the rest-pose vertex positions + this part's global vertex start, so vertex-morph
+			// (which addresses one combined buffer across all parts) can map its global slots to parts.
+			var verts = e.Model?.Vertices ?? System.Array.Empty<Vertex>();
+			var basePos = new Vector3[verts.Length];
+			for ( int i = 0; i < verts.Length; i++ )
+				basePos[i] = verts[i].Position;
+			body.PartBaseVerts.Add( basePos );
+			body.PartVertexOffset.Add( globalOffset );
+			globalOffset += verts.Length;
+		}
 
 		objects[SelfId] = body;
 
@@ -180,6 +193,30 @@ public sealed class RideEngine : IRideEngine
 			channelAnims[anim] = keyframes;
 	}
 
+	/// <summary>
+	/// Picks the body's looping animation once keyframes are loaded: prefer Main, then Idle, otherwise
+	/// any channel that has real keyframe data (so a ride that only ships e.g. Create still visibly
+	/// animates). Called by the Ride after <see cref="SetChannelKeyframes"/>.
+	/// </summary>
+	public void StartBestBodyAnim()
+	{
+		if ( !objects.TryGetValue( SelfId, out var body ) )
+			return;
+
+		int chosen = -1;
+		foreach ( var pref in new[] { (int)ScriptDefs.Animations.ANIM_Main, (int)ScriptDefs.Animations.ANIM_Idle } )
+			if ( channelAnims.ContainsKey( pref ) ) { chosen = pref; break; }
+
+		if ( chosen < 0 && channelAnims.Count > 0 )
+			chosen = channelAnims.Keys.OrderBy( k => k ).First();
+
+		if ( chosen >= 0 )
+		{
+			StartAnim( body, chosen, loop: true );
+			Log.Info( $"[ride] body looping {(ScriptDefs.Animations)chosen} (keyframed)" );
+		}
+	}
+
 	private readonly Dictionary<int, RideKeyframeFile> channelAnims = new();
 
 	/// <summary>Per-frame animation: drive real keyframe tracks where we have them, else the placeholder bob.</summary>
@@ -239,6 +276,73 @@ public sealed class RideEngine : IRideEngine
 				entity.Position = basePos + new Vector3( tr.X, tr.Z, tr.Y );
 			}
 		}
+
+		ApplyMorph( obj, kf, clock );
+	}
+
+	// Vertex-morph: a global additive blend-shape over one combined vertex buffer (see
+	// docs/08-ghidra-animation.md). Resets each touched part to its rest pose, then writes the
+	// keyframed positions (model space → world Y/Z-swizzled, the same swizzle the loader applies to
+	// vertices) at the morph's global vertex slots, and re-uploads only the parts that changed.
+	private void ApplyMorph( RideObject obj, RideKeyframeFile kf, float clock )
+	{
+		Span<bool> touched = obj.Parts.Count <= 64 ? stackalloc bool[obj.Parts.Count] : new bool[obj.Parts.Count];
+
+		foreach ( var sa in kf.Surfaces )
+		{
+			foreach ( var m in sa.Morph )
+			{
+				if ( m.VertexSlots.Length == 0 || m.Times.Length == 0 )
+					continue;
+
+				var t = TrackTime( clock, m.Times[^1], obj.AnimLoop );
+				for ( int i = 0; i < m.VertexSlots.Length; i++ )
+				{
+					if ( !TryMapSlot( obj, m.VertexSlots[i], out var part, out var local ) )
+						continue;
+
+					if ( !touched[part] )
+					{
+						ResetPartVerts( obj, part );
+						touched[part] = true;
+					}
+
+					var p = m.Sample( i, t );
+					obj.Parts[part].Entity.Model!.Vertices[local].Position = new Vector3( p.X, p.Z, p.Y );
+				}
+			}
+		}
+
+		for ( int part = 0; part < touched.Length; part++ )
+			if ( touched[part] )
+				obj.Parts[part].Entity.Model?.UploadVertices();
+	}
+
+	// Maps a global morph vertex slot to its part + local index (parts hold contiguous global ranges).
+	private static bool TryMapSlot( RideObject obj, int slot, out int part, out int local )
+	{
+		for ( int p = obj.Parts.Count - 1; p >= 0; p-- )
+		{
+			if ( slot >= obj.PartVertexOffset[p] )
+			{
+				local = slot - obj.PartVertexOffset[p];
+				part = p;
+				var verts = obj.Parts[p].Entity.Model?.Vertices;
+				return verts != null && local < verts.Length;
+			}
+		}
+		part = local = -1;
+		return false;
+	}
+
+	private static void ResetPartVerts( RideObject obj, int part )
+	{
+		var verts = obj.Parts[part].Entity.Model?.Vertices;
+		var basePos = obj.PartBaseVerts[part];
+		if ( verts == null )
+			return;
+		for ( int i = 0; i < verts.Length && i < basePos.Length; i++ )
+			verts[i].Position = basePos[i];
 	}
 
 	// Maps the animation clock onto a single track's [0, last] domain: wrap for a looping anim, clamp

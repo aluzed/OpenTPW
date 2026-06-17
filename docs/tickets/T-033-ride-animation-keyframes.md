@@ -2,8 +2,9 @@
 
 - **Priority**: 🟡 Feature (ride engine stage 3 — replaces procedural placeholder with original motion)
 - **Type**: Engine / format RE
-- **Status**: ⚠️ In progress — animation system reverse-engineered & documented; channel discovery
-  wired into `RideEngine`; the per-frame vertex-payload decode remains.
+- **Status**: ✅ Core done — all three keyframe track families (rotation, translation/scale, vertex
+  morph) reverse-engineered, parsed and driven from real ride data in `RideEngine`; verified in-game.
+  Only polish remains (rate tuning, multi-frame channel merge, LOD).
 - **Related**: [T-032](T-032-ride-engine.md) (ride engine), [T-015](T-015-md2-static-variant.md) (MD2
   versions), [08-ghidra-animation.md](../08-ghidra-animation.md) (the RE writeup).
 
@@ -136,17 +137,30 @@ shared vertex buffer additively, so index slots are **global** vertex indices.
   and dequantised per-frame positions, with `Sample(i, t)` lerp. Unit-tested (10-bit dequant, bbox
   transform, lerp) and cross-checked against real `BbugsC.MD2` (12 surfaces, coherent keyframes).
 
-### Remaining (wiring only — format is done)
+### Done — vertex morph wired + working
 
-1. **Wire vertex morph to the renderer**: map each global slot → our per-mesh `ModelFile` vertex
-   (cumulative vertex counts), apply additively per frame, re-upload via `Model.UpdateBuffer`, and
-   confirm the absolute-vs-delta semantics + base-pose interaction **visually** (the one detail the
-   parse can't settle). Validate on `fantasy/bbugs`.
-2. Tune the playback rate vs. the original's time units (`KeyframeRate`); confirm pivot/compose order
+- ✅ `Model` retains its vertices and exposes `UploadVertices()` (dynamic vertex buffer).
+- ✅ `RideEngine.ApplyMorph`: per frame it resets each touched part to its rest pose, samples each
+  morph sub-animation (lerp between bracketing keyframes), maps the **global** vertex slot → part +
+  local index (via per-part cumulative offsets captured in `RegisterBody`), writes the dequantised
+  position (model→world Y/Z swizzle, **absolute**), and re-uploads only the parts that changed.
+- ✅ `StartBestBodyAnim`: the body loops the best keyframed channel (Main → Idle → any with data), so a
+  ride that only ships e.g. Create (like `bbugs`) still animates.
+- ✅ **Verified in-game** on `fantasy/bbugs` (Create, 12 morph surfaces): the creature deforms
+  coherently from the real decoded keyframes (no scrambled/exploded verts) — confirming the global
+  slot mapping, absolute-position semantics, swizzle, and per-frame upload are all correct.
+
+All three keyframe track families — rotation, translation/scale, and vertex morph — are now decoded
+and driven from real ride data. 51 tests pass.
+
+### Remaining (polish)
+
+1. Tune the playback rate vs. the original's time units (`KeyframeRate`); confirm pivot/compose order
    on more rides.
-3. Handle multi-frame channels' extra files (`m2..m7`) and surfaces with two records targeting the
+2. Handle multi-frame channels' extra files (`m2..m7`) and surfaces with two records targeting the
    same index (both arms).
-4. Load the `7`-prefixed LOD set for distant rides; ignore `P`-prefixed preview models in-world.
+3. Load the `7`-prefixed LOD set for distant rides; ignore `P`-prefixed preview models in-world.
+4. Per-frame full-buffer re-upload is fine for ride-sized meshes; revisit if a hot path needs it.
 
 ## Acceptance
 
