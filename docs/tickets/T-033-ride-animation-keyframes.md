@@ -108,11 +108,39 @@ Reverse-engineered from `FUN_004714a0` (the flag-`0x1000` morph apply). It is co
 - Result is written into the surface's render vertex buffer → needs a **dynamic vertex buffer**
   (`Model` already supports `Device.UpdateBuffer`, so per-frame CPU dequant + re-upload is feasible).
 
+### Morph sub-entry structure (mapped further — `fantasy/bbugs`)
+
+The morph block's `+0xc` points to an **array of sub-entries** (one per sub-part/"bone"), each `0x14`
+bytes:
+
+- `+0x00`: `(flags << 16) | vertexCount` (e.g. `0x20024` = 36 verts; `0x10013` = 19 verts)
+- `+0x04`, `+0x08`, `+0x0c`: three file offsets — the keyframe times, the packed-int vertex data, and
+  the vertex-index array (exact roles **not yet confirmed**)
+- `+0x10`: `0` (runtime current-key field, zeroed in the file; `FUN_004714a0` clears it with a
+  5-dword stride == sub-entry size, confirming the `0x14` stride)
+
+Dequantising the packed ints at a sub-entry's data pointer with the block's bbox scale/offset
+(`signed10 * scale + offset`) yields **plausible** clustered vertex positions (a small ~1-unit part
+around the block offset), so the 10-bit dequant formula is right.
+
+### Status — not yet validated; parser deferred
+
+This is the most nested part of the system. What's **not** confirmed: which sub-entry pointer is
+times / packed / index; the per-sub-entry keyframe count; and how the index array maps onto our
+`ModelFile` vertex order. There is **no ground truth** to check morphed positions against, so a parser
+built on these assumptions could be silently wrong (a finite/in-bounds test would not catch it).
+Deliberately **not shipping an unvalidated parser**. A correct implementation needs a dedicated RE
+pass: decompile `FUN_004711d0` (key blend) and `FUN_00470e90` (the remaining-sub-entries loop),
+confirm the three pointer roles and keyframe count, then validate a dequantised frame against the base
+mesh before wiring. Lower priority than it looks — rotation+scale already cover the visible motion of
+most rides.
+
 ### Remaining
 
-1. **Wire vertex morph**: parse the nested block→sub-struct layout, dequantise + blend the two
-   bracketing keyframes each frame, remap via the vertex-index array onto our `ModelFile` vertex
-   order, and re-upload through `Model`. (Adds organic deformation, e.g. `fantasy/bbugs`.)
+1. **Wire vertex morph** (per the above): confirm the sub-entry pointer roles + keyframe count
+   (decompile `FUN_004711d0`/`FUN_00470e90`), parse + dequantise + blend, remap via the vertex-index
+   array onto our `ModelFile` order, and re-upload through `Model`. (Organic deformation, e.g.
+   `fantasy/bbugs`.)
 2. Tune the playback rate vs. the original's time units (`KeyframeRate`); confirm pivot/compose order
    on more rides.
 3. Handle multi-frame channels' extra files (`m2..m7`) and surfaces with two records targeting the
