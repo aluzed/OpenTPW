@@ -76,35 +76,39 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
 ## Remaining
 
 1. **Decode the sprite format** (`.ESP`/`.TPC`/`.FPC`) and render the real animated peep sprites
-   (direction + walk-cycle frames) instead of coloured billboards. **Reconnaissance (done):**
-   `esprites.wad` holds sprite trios under `Generic/*` and `Fantasy/*` (e.g. `Generic/Kids/SPR_KI.*`).
-   - **`.ESP`** = `ESP_FILE2.00` magic (12 bytes) + the referenced texture name (`SPR_KI.TPS`,
-     null-padded); the rest is zero. Just a descriptor/name pointer.
-   - **`.TPC`/`.FPC`** = magic `03 00 03 00`, then a **uint32 count at offset 4 that varies per
-     sprite** (SPR_KI 175, SPR_GU 260, SPR_HA 105, SPR_FL 130 — almost certainly the frame count),
-     then reserved zeros, then encoded pixel data. A recurring high byte every 4th position looks like
-     a per-record marker/run-length.
-   - Decode attempts (probe, not committed): treating the body as **raw BGRA** renders pure noise (so
-     it is *not* raw); treating it as **4-byte `(B,G,R,run)` RLE records** renders coherent *horizontal
-     colour runs* (not noise) — strong evidence it is run-length encoded — but without the per-frame
-     dimensions the runs don't assemble into a sprite.
-   - **Ghidra session (done, `/var/tmp/nocd/ghidra_proj`, program `tpw_nocd.exe`, full auto-analysis
-     run):** mapped the sprite *system* but the pixel codec is not string-anchored.
-     - `FUN_00541310` = the `"Loading Sprites from %s"` master loader: enumerates categories (kids,
-       kidsheads, handymen, mechanics, guards, researchers, generic…) and builds sprite-list structs
-       through **C++ filesystem-object vtable calls** (e.g. `(**(code**)(obj+0x28))(...)`).
-     - `FUN_00415270` is the **savegame** deserializer (FourCC modules `WRLD`/`SPSC`/`PART`/…); the
-       `SAD_SPRITE_SCRIPTS` string there is in-save peep *AI scripts*, **not** the `.TPC` image codec.
-       `FUN_00532bd0` = sprite hit-testing (`"Found sprite %lx"`).
-     - **Ruled out:** `.tpc`/`.fpc`/`.tps`/`*.ESP`/`data\esprites.wad` are all compiler-generated static
-       `std::string` initializers (~40 sites each; `FUN_005f60b0` = string assign) — not the codec. The
-       `03 00 03 00` magic is **never compared in code** (11 occurrences, all in data) — the loader just
-       skips the 12-byte header.
-   - **Next step**: the codec is reached via the vtable-dispatched load inside `FUN_00541310` (the
-     `obj+0x28` method on the sprite/file object) — trace that class/vtable to the per-file
-     read+RLE-expand, or use **dynamic analysis** (break on the `esprites.wad` read and watch the
-     decode). Then expand the RLE per frame (frame count = the offset-4 field). Same encoded family as
-     `base.lnd`. Until then, peeps/staff/shops render as flat-colour billboards (`Billboard.Make`).
+   instead of coloured billboards. **Container format fully reverse-engineered via Ghidra** (no-CD
+   `tpw_nocd.exe`, project `/var/tmp/nocd/ghidra_proj`, full auto-analysis); only the inner RLE
+   control encoding remains. `esprites.wad` holds sprite trios under `Generic/*` / `Fantasy/*`.
+   - **`.ESP`** = `ESP_FILE2.00` magic (12 bytes) + the referenced texture name (`SPR_KI.TPS`), zero-padded.
+   - **`.TPC`/`.FPC`** layout (read primitive `FUN_005c4f60(dst, elemSize, count, stream)` = fread):
+     ```
+     u16 fmt          // = 3  (the "03 00"); fmt 2 is an alternate path
+     u16 _            // = 3
+     u32 frameCount   // SPR_KI 175, SPR_GU 260, SPR_HA 105, SPR_FL 130
+     if fmt == 3:
+       u8 palette[1024]            // 256 entries × 4 bytes RGBA  (index 0 = transparent)
+     frame[frameCount]:
+       u32 dataLen                 // compressed pixel-data size in bytes
+       u16 width, u16 height
+       u16 unkA, u16 unkB          // 128/128 on SPR_KI frame 0
+       s32 hotspotX, s32 hotspotY  // signed origin (-14, -25); stored as i16 at struct +0x14/+0x16
+       u8  data[dataLen]           // palette-indexed pixels, RLE-compressed (dataLen < width*height)
+     ```
+     (SPR_KI frame 0: dataLen=736, w=33, h=29 → 957 px, so ~1.3× compression.)
+   - **Load call chain (RE'd):** `FUN_00541310` (“Loading Sprites from %s”, catalogs files) →
+     `FUN_00540d90` (per-file: reads the sprite descriptor's 16-entry anim/direction table) →
+     `FUN_00587db0` (reads fmt/`frameCount` + the 1024-byte palette, allocs `frameCount`×{0x60,0x18}
+     structs, loops frames; for 16-bit display `DAT_008bd554==2` it remaps the palette through channel
+     LUTs via `FUN_005839e0`) → `FUN_00588660` (reads the 20-byte frame header) → `FUN_00564750`
+     (`malloc(dataLen)` + read `dataLen` raw bytes = the compressed indices) and `FUN_00588410`
+     (surface setup). The surface lifecycle vtable is `0x701168` (`FUN_00564a80…` are ctor/dtor, not
+     the codec). Not string-anchored — `.tpc`/`.fpc`/`*.ESP` are all `std::string` boilerplate; the
+     `03 00 03 00` magic is never compared (loader just consumes the header).
+   - **Remaining:** the **RLE control-byte scheme**, expanded at *blit* time (the screen blitter that
+     consumes `surface+4`, a separate trace from the lifecycle vtable above). Frame-0 data begins
+     `06 F0 00 FE ED F1 00 0A F2 00 05 …`. With the palette + per-frame dims now known, this can be
+     finished by tracing the blitter or by fitting the RLE empirically against rendered output. Until
+     then, peeps/staff/shops render as flat-colour billboards (`Billboard.Make`).
 2. **Full path network**: a walkable path graph + A* so peeps route over real paths (not straight
    lines) between rides, park gate, shops. (Queue spacing *along* the path is now done — see "Queue
    discipline" above; what remains is the cross-park routing.)
