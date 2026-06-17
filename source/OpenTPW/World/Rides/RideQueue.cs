@@ -43,6 +43,9 @@ public sealed class RideQueue
 			line.Add( peep );
 	}
 
+	/// <summary>Leave the line without riding (a peep giving up / heading home).</summary>
+	public void Dequeue( Peep peep ) => line.Remove( peep );
+
 	/// <summary>This peep's place in line: 0 = at the front (the entrance), -1 = not queued.</summary>
 	public int PositionOf( Peep peep ) => line.IndexOf( peep );
 

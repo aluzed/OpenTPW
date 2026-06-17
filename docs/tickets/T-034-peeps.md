@@ -42,8 +42,14 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
 - **Excitement-weighted ride choice**: a peep picks its next ride at random *weighted by the ride's
   excitement* (`UsageInfo.ExcitementLevel`, exposed as `Ride.Excitement`), avoiding an immediate
   repeat of the last ride, so more exciting rides draw bigger crowds (verified: over ~45 s the
-  wateride/75 was chosen 37×, totem/70 23×, monkey/50 16×). First step of the peep→ride attraction
-  loop; `Ride.Attraction` (`Info.AttractionValue`) is also parsed for later use.
+  wateride/75 was chosen 37×, totem/70 23×, monkey/50 16×). `Ride.Attraction` (`Info.AttractionValue`)
+  is also parsed for later use.
+- **Needs + visitor turnover**: each peep carries `happiness` (0–100) and `energy`. Riding an exciting
+  ride raises happiness (∝ the ride's excitement); standing in a stalled queue slowly lowers it; energy
+  drains while walking/queuing (~50 s of activity). A tired (energy ≤ 0) or fed-up (happiness ≤ 10)
+  peep abandons its queue, walks back to its entry point, and is **recycled as a fresh arrival** — so
+  the crowd turns over without churning entities (verified: ~23 visitors recycled over ~75 s as they
+  tired out). This is the simulation half of the peep→ride loop; the money/income side is still to do.
 
 ## Remaining
 
@@ -58,6 +64,6 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
    blocked on the `.MAP` audio catalog (T-016): the script-driven sounds currently resolve through an
    approximate index (e.g. the monkey plays `urinal.mp2`), so a per-board cue would just repeat that
    wrong mapping until T-016 lands.
-4. **Needs/stats** (hunger/fatigue/happiness), staff (guards/handymen/entertainers), and the rest of
-   the peep→ride excitement/income loop (ride choice is excitement-weighted — above; still to do:
-   per-peep happiness/energy fed by rides & queue waits, peeps leaving when bored/satisfied, and money).
+4. **Income + staff**: ride choice, per-peep happiness/energy, and visitor turnover are done (above);
+   still to do is the **money/income** side (ticket/entry revenue, ride upkeep, shops & spending) and
+   **staff** (guards/handymen/entertainers), plus richer needs (hunger/thirst driving shop visits).
