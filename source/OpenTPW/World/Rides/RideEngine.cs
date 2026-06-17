@@ -57,10 +57,16 @@ public sealed class RideEngine : IRideEngine
 				.Select( kv => $"{(ScriptDefs.Animations)kv.Key}({ChannelLetter( (ScriptDefs.Animations)kv.Key )}×{kv.Value})" ) ) ) );
 	}
 
-	// Frame count for an animation channel (0 if the ride doesn't ship it), and the placeholder
-	// playback duration derived from it.
+	// Frame count for an animation channel (0 if the ride doesn't ship it), and the playback duration.
+	// A channel with decoded keyframes runs for its real track length (Duration is in keyframe time
+	// units; the clock advances at KeyframeRate per second), so a one-shot (Load/Start/End) plays in
+	// full before the cycle advances. Channels with no decoded keyframes fall back to a per-frame
+	// placeholder length.
 	private int FrameCount( int anim ) => channelFrames.TryGetValue( anim, out var n ) ? n : 0;
-	private float DurationOf( int anim ) => Math.Max( FrameCount( anim ), 1 ) * FrameSeconds;
+	private float DurationOf( int anim ) =>
+		channelAnims.TryGetValue( anim, out var kf ) && kf.Duration > 0
+			? kf.Duration / KeyframeRate
+			: Math.Max( FrameCount( anim ), 1 ) * FrameSeconds;
 
 	// Registers the ride's loaded meshes as the body, and starts its looping motion so it visibly
 	// moves. The looping channel is Main (the original's primary ride motion) when the ride ships it,
@@ -197,9 +203,11 @@ public sealed class RideEngine : IRideEngine
 	}
 
 	/// <summary>
-	/// Picks the body's looping animation once keyframes are loaded: prefer Main, then Idle, otherwise
-	/// any channel that has real keyframe data (so a ride that only ships e.g. Create still visibly
-	/// animates). Called by the Ride after <see cref="SetChannelKeyframes"/>.
+	/// Chooses the body's running loop + idle channels once keyframes are loaded, and leaves the body
+	/// idle (occupancy drives whether it runs — see <see cref="SetActive"/>). The running loop prefers
+	/// Main, then Idle, otherwise any channel with real keyframe data (so a ride that only ships e.g.
+	/// Create still animates); the idle loop is the ride's Idle channel when it ships one (else the body
+	/// rests). Called by the Ride after <see cref="SetChannelKeyframes"/>.
 	/// </summary>
 	public void StartBestBodyAnim()
 	{
@@ -213,20 +221,31 @@ public sealed class RideEngine : IRideEngine
 		if ( chosen < 0 && channelAnims.Count > 0 )
 			chosen = channelAnims.Keys.OrderBy( k => k ).First();
 
+		bodyLoopAnim = chosen;
+		// Idle loop for an empty ride: only if the ride ships an Idle channel (else it rests).
+		bodyIdleAnim = FrameCount( (int)ScriptDefs.Animations.ANIM_Idle ) > 0 ? (int)ScriptDefs.Animations.ANIM_Idle : -1;
+
 		if ( chosen >= 0 )
-		{
-			bodyLoopAnim = chosen;
-			StartAnim( body, chosen, loop: true );
-			Log.Info( $"[ride] body looping {(ScriptDefs.Animations)chosen} (keyframed)" );
-		}
+			Log.Info( $"[ride] body loop {(ScriptDefs.Animations)chosen}, idle "
+				+ ( bodyIdleAnim >= 0 ? $"{(ScriptDefs.Animations)bodyIdleAnim}" : "rest" ) + " (keyframed)" );
+
+		GoIdle( body );
 	}
 
 	private int bodyLoopAnim = -1;
+	private int bodyIdleAnim = -1;
+	private bool bodyRunning;
+
+	// The body's pending animation stages (the rest of the boarding/unloading cycle after the stage it
+	// is currently playing). Update advances through these as each one-shot stage finishes.
+	private readonly Queue<(int Anim, bool Loop)> bodyQueue = new();
 
 	/// <summary>
-	/// Runs (true) or idles (false) the ride body's looping motion — used to tie a ride's animation to
-	/// its occupancy, so an empty ride sits still and a ride with riders moves. Resuming restarts the
-	/// channel <see cref="StartBestBodyAnim"/> chose; idling returns the body to its rest pose.
+	/// Runs (true) or idles (false) the ride body, tying its animation to occupancy. The first rider
+	/// starts the boarding cycle (Load → Start → Main loop); emptying runs the unloading cycle (End →
+	/// Unload → Idle loop, or rest). Stages the ride doesn't ship are skipped, so a ride with no cycle
+	/// art simply switches between its run loop and idle. Idempotent while occupied (a second rider
+	/// boarding does not restart the cycle).
 	/// </summary>
 	public void SetActive( bool active )
 	{
@@ -235,13 +254,82 @@ public sealed class RideEngine : IRideEngine
 
 		if ( active )
 		{
-			if ( body.AnimId == null && bodyLoopAnim >= 0 )
-				StartAnim( body, bodyLoopAnim, loop: true );
+			if ( bodyRunning )
+				return; // already running — another rider joining must not restart the cycle
+			bodyRunning = true;
+			var seq = BuildCycle( running: true );
+			Log.Trace( $"[ride] boarding cycle: {DescribeCycle( seq )}" );
+			PlayBodySequence( body, seq );
 		}
-		else if ( body.AnimId != null )
+		else if ( bodyRunning )
+		{
+			bodyRunning = false;
+			var seq = BuildCycle( running: false );
+			Log.Trace( $"[ride] unloading cycle: {DescribeCycle( seq )}" );
+			PlayBodySequence( body, seq );
+		}
+		else
+		{
+			GoIdle( body ); // not running (initial setup / already empty): just settle into idle
+		}
+	}
+
+	// Builds the body's animation cycle. Running: optional Load/Start lead-ins then the run loop.
+	// Stopping: optional End/Unload outros then the idle loop (or rest). Only stages the ride actually
+	// ships are included.
+	private List<(int Anim, bool Loop)> BuildCycle( bool running )
+	{
+		var seq = new List<(int Anim, bool Loop)>();
+		void AddIfShipped( ScriptDefs.Animations a )
+		{
+			if ( FrameCount( (int)a ) > 0 )
+				seq.Add( ((int)a, false) );
+		}
+
+		if ( running )
+		{
+			AddIfShipped( ScriptDefs.Animations.ANIM_Load );
+			AddIfShipped( ScriptDefs.Animations.ANIM_Start );
+			if ( bodyLoopAnim >= 0 )
+				seq.Add( (bodyLoopAnim, true) );
+		}
+		else
+		{
+			AddIfShipped( ScriptDefs.Animations.ANIM_End );
+			AddIfShipped( ScriptDefs.Animations.ANIM_Unload );
+			if ( bodyIdleAnim >= 0 )
+				seq.Add( (bodyIdleAnim, true) );
+		}
+		return seq;
+	}
+
+	private static string DescribeCycle( List<(int Anim, bool Loop)> seq ) =>
+		seq.Count == 0 ? "rest" : string.Join( " -> ", seq.Select( s => $"{(ScriptDefs.Animations)s.Anim}{( s.Loop ? "(loop)" : "" )}" ) );
+
+	// Starts the first stage of a cycle now and queues the rest; an empty cycle rests the body.
+	private void PlayBodySequence( RideObject body, List<(int Anim, bool Loop)> seq )
+	{
+		bodyQueue.Clear();
+		if ( seq.Count == 0 )
 		{
 			StopAnim( body );
+			return;
 		}
+
+		StartAnim( body, seq[0].Anim, seq[0].Loop );
+		for ( int i = 1; i < seq.Count; i++ )
+			bodyQueue.Enqueue( seq[i] );
+	}
+
+	// Puts the body into its empty-ride state directly (no End/Unload outro): the idle loop if shipped,
+	// otherwise the rest pose.
+	private void GoIdle( RideObject body )
+	{
+		bodyQueue.Clear();
+		if ( bodyIdleAnim >= 0 )
+			StartAnim( body, bodyIdleAnim, loop: true );
+		else
+			StopAnim( body );
 	}
 
 	private readonly Dictionary<int, RideKeyframeFile> channelAnims = new();
@@ -258,7 +346,15 @@ public sealed class RideEngine : IRideEngine
 			var t = ( now - obj.AnimStart ) * obj.AnimSpeed;
 			if ( !obj.AnimLoop && t > DurationOf( anim ) )
 			{
-				StopAnim( obj );
+				// The ride body steps through its boarding/unloading cycle: when a one-shot stage
+				// (Load/Start/End/Unload) finishes, advance to the next queued stage rather than stopping.
+				if ( obj.Id == SelfId && bodyQueue.Count > 0 )
+				{
+					var (next, loop) = bodyQueue.Dequeue();
+					StartAnim( obj, next, loop );
+				}
+				else
+					StopAnim( obj );
 				continue;
 			}
 

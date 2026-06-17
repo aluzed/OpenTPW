@@ -24,10 +24,13 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
 - **Boarding tied to the ride**: a peep boards when a rider slot is free (occupies one of the ride's
   `Capacity` slots — sourced from the ride's `UsageInfo.MaxCapacity` — so a queue builds at the
   entrance when the ride is full), hides for the ride duration, reappears at the **exit** cell, and
-  re-routes. **Occupancy drives the ride's animation**: a ride sits idle (`RideEngine.SetActive(false)`)
-  until its first rider boards (`RideQueue.Board()` → `SetActive(true)`) and idles again when the last
-  rider leaves (`RideQueue.Leave()`), so empty rides are still and busy ones move. The dev park runs
-  40 peeps over 3 queues, each at the ride's real capacity.
+  re-routes. **Occupancy drives the ride's animation cycle**: a ride sits idle until its first rider
+  boards (`RideQueue.Board()` edge 0→1 → `RideEngine.SetActive(true)`) and idles again when the last
+  rider leaves (`Leave()` edge 1→0). Boarding runs the ride's real animation cycle — **Load → Start →
+  Main (loop)** — stepping through each one-shot stage (its length from the decoded keyframe track)
+  before settling into the run loop; emptying runs **End → Unload → Idle (loop, or rest)**. Stages a
+  ride doesn't ship are skipped, so e.g. the monkey plays its full Load/Start/Main/End cycle while the
+  totem just toggles Main↔rest. The dev park runs 40 peeps over 3 queues, each at the ride's real capacity.
 
 ## Remaining
 
@@ -35,8 +38,8 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
    (direction + walk-cycle frames) instead of coloured billboards.
 2. **Full path network**: a walkable path graph + A* so peeps route over real paths (not straight
    lines) between rides, park gate, shops; space the queue *along* the path rather than piling at the entrance.
-3. **Ride load/unload cycle**: play the ride's load/start/unload animation channels + boarding sound
-   per cycle (occupancy currently just runs/idles the body loop), and source ride duration from the
-   ride script/`UsageInfo` rather than the fixed 5 s.
+3. **Per-cycle boarding sound + real duration**: the load/start/main → end/unload animation cycle is
+   wired (above); still to do is playing the boarding/unloading **sound** per cycle and sourcing the
+   ride **duration** from the ride script/`UsageInfo` rather than the fixed 5 s.
 4. **Needs/stats** (hunger/fatigue/happiness), staff (guards/handymen/entertainers), and the
    peep→ride excitement/income loop.
