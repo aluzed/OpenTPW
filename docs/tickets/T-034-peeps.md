@@ -116,19 +116,21 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
        from literal data at a command boundary needs the authoritative inner decoder (the per-scanline
        blit/decompress routine) — the one piece not yet pinned. Empirical fit reconstructs ~⅓ of rows
        exactly; the rest hit this ambiguity.
-   - **Decoder located:** the RLE source is consumed by **`FUN_0055f780`**, the *scaled* sprite
-     blitter (reads the texture descriptor `param_1`, walks the compressed source via the size-class
-     mip tables `DAT_008798c8`; its `0xF0` operands are pixel-format masks `AND AL,0xF0`, so the
-     skip test is a *signed* byte check, not a `CMP 0xF0`). Sprites are drawn through the 3D pipeline
-     (`FUN_0056e7e0`, a textured-quad rasterizer with UV subdivision), i.e. decompressed into a
-     texture and blitted. Empirically the skip/literal rule reconstructs clean rows exactly (rows 0/1/2
-     above) and ~⅓ of all rows, but a structural subtlety (strict skip↔literal alternation vs. value
-     thresholds, with data bytes that collide with skip markers) isn't resolvable by inspection.
-   - **To finish:** read `FUN_0055f780`'s inner source-walk loop (large — ~2.6k decompiled lines, so
-     isolate just the byte-fetch/skip/literal section) **or** dynamic-trace one row's decode; then
-     render through the palette (index 0 = transparent). Everything up to the per-row byte stream is
-     solved and validated. Until then, peeps/staff/shops render as flat-colour billboards
-     (`Billboard.Make`).
+   - **Texture pipeline mapped:** load → `FUN_00564750` stores the **compressed** scanlines at
+     `surface+4` → **[decompress → flat base texture]** *(the one function still unlocated)* →
+     `FUN_0055e780` generates mip levels (bilinear downsample) → `FUN_0055f780` does the **scaled
+     blit** from the flat mip texture (`param_1 + n*0xD8` mip structs; its `0xF0`s are pixel-format
+     masks). Sprites reach the screen via the 3D textured-quad rasterizer `FUN_0056e7e0`. So
+     `FUN_0055f780`/`FUN_0055e780` operate on the *already-decompressed* flat texture — the RLE
+     decompressor is upstream (reads `surface+4`, writes the flat base at `surface+0x20`).
+   - Empirically the per-row skip/literal grammar reconstructs clean rows exactly (rows 0/1/2 above)
+     and ~⅓ of all rows; a structural subtlety (skip↔literal disambiguation when data bytes collide
+     with skip markers) isn't resolvable by inspection.
+   - **To finish (recommended: dynamic trace):** break where `surface+4` is read after load and watch
+     one scanline expand into `surface+0x20`; that reveals the exact rule directly. (Static alt: find
+     the function that reads `surface+4` and writes `surface+0x20`.) Then render through the palette
+     (index 0 = transparent). Everything up to the per-row byte stream is solved and validated; until
+     then peeps/staff/shops render as flat-colour billboards (`Billboard.Make`).
 2. **Full path network**: a walkable path graph + A* so peeps route over real paths (not straight
    lines) between rides, park gate, shops. (Queue spacing *along* the path is now done — see "Queue
    discipline" above; what remains is the cross-park routing.)
