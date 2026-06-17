@@ -123,14 +123,21 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
      masks). Sprites reach the screen via the 3D textured-quad rasterizer `FUN_0056e7e0`. So
      `FUN_0055f780`/`FUN_0055e780` operate on the *already-decompressed* flat texture — the RLE
      decompressor is upstream (reads `surface+4`, writes the flat base at `surface+0x20`).
-   - Empirically the per-row skip/literal grammar reconstructs clean rows exactly (rows 0/1/2 above)
-     and ~⅓ of all rows; a structural subtlety (skip↔literal disambiguation when data bytes collide
-     with skip markers) isn't resolvable by inspection.
-   - **To finish (recommended: dynamic trace):** break where `surface+4` is read after load and watch
-     one scanline expand into `surface+0x20`; that reveals the exact rule directly. (Static alt: find
-     the function that reads `surface+4` and writes `surface+0x20`.) Then render through the palette
-     (index 0 = transparent). Everything up to the per-row byte stream is solved and validated; until
-     then peeps/staff/shops render as flat-colour billboards (`Billboard.Make`).
+   - **✅ RLE SOLVED** — decompressor is **`FUN_00564790`** (the sprite surface's vtable method, found
+     via the lazy-decompress in `FUN_00590d40`). The pixel stream is **per-scanline signed-byte RLE**:
+     each row is prefixed by its byte-length (used for row-skipping), then for that row, read a signed
+     control byte `c` until `width` pixels are produced:
+     - **`c < 0`** → a **run** of `|c|` pixels, all of palette index = the *next* byte (index 0 =
+       transparent). Consumes 2 bytes (`c`, index).
+     - **`c > 0`** → a **literal** run of `c` pixels = the next `c` palette indices. Consumes `1 + c`.
+     - **`c == 0`** → empty (no-op).
+     **Verified: 0/6226 rows mis-decode across all 175 SPR_KI frames**, and the rendered frames are
+     clean, recognisable peeps (orange shirt, green trousers — see `final_0`). Full container + codec
+     now decode end-to-end. (The original converts each palette index → 16-bit colour via a per-mode
+     LUT for the display surface; for our renderer we map index → the 1024-byte RGBA palette directly.)
+   - **Remaining (engine work, not RE):** implement a `TpcFile` loader (header + palette + per-frame
+     signed-RLE) producing RGBA frame textures, then swap `Peep`/`Staff` billboards to the real
+     animated sprites (direction + walk-cycle frames). The format is fully specified above.
 2. **Full path network**: a walkable path graph + A* so peeps route over real paths (not straight
    lines) between rides, park gate, shops. (Queue spacing *along* the path is now done — see "Queue
    discipline" above; what remains is the cross-park routing.)
