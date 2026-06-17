@@ -19,6 +19,8 @@ public partial class Renderer
 	private bool _fpsKeyWas;
 	private bool _volDownWas;
 	private bool _volUpWas;
+	private bool _f2Was;
+	private bool _freeCam;
 	private Font? _debugFont;
 
 	public Window Window;
@@ -285,6 +287,19 @@ public partial class Renderer
 		}
 		_volDownWas = volDown;
 		_volUpWas = volUp;
+
+		// F2 toggles the free-fly debug camera (explore the scene) vs the fixed lobby orbit.
+		var f2 = Input.Keyboard.KeysDown.Contains( Key.F2 );
+		if ( f2 && !_f2Was )
+		{
+			_freeCam = !_freeCam;
+			if ( _freeCam )
+				Camera.SetCameraMode<FreeCameraMode>();
+			else
+				Camera.SetCameraMode<LobbyCameraMode>();
+			Log.Info( $"Camera: {( _freeCam ? "free (WASD move, hold right-mouse to look, wheel speed, Space/Ctrl up/down)" : "lobby orbit" )}" );
+		}
+		_f2Was = f2;
 
 		PreRender();
 		PreUpdate?.Invoke();
