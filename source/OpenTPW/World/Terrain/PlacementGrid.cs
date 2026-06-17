@@ -39,6 +39,10 @@ public sealed class PlacementGrid
 	public Vector3 TileToWorld( int tx, int ty, int fw = 1, int fh = 1 ) =>
 		Origin + new Vector3( (tx + fw / 2f) * TileSize, (ty + fh / 2f) * TileSize, 0 );
 
+	/// <summary>World position of a fractional tile coordinate (e.g. a sub-tile entrance/exit stand point).</summary>
+	public Vector3 PointToWorld( float tileX, float tileY ) =>
+		Origin + new Vector3( tileX * TileSize, tileY * TileSize, 0 );
+
 	/// <summary>The tile a world position falls in (floored; may be out of bounds).</summary>
 	public (int tx, int ty) WorldToTile( Vector3 world )
 	{

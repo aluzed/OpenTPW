@@ -64,24 +64,56 @@ public class Level
 		ParkOverviewCameraMode.Height = centre.Z + 200f;
 		Camera.SetCameraMode<ParkOverviewCameraMode>();
 
-		// Place a few rides at tile coordinates near the centre, dropped onto the terrain surface.
+		// Lay a few rides out in a row near the centre, each reserving its real tile footprint (from the
+		// ride's Info.Shape) on the grid and dropped onto the terrain surface.
 		LoadProgress.Report( "Placing rides...", 0.9f );
-		int cx = grid.Width / 2, cy = grid.Height / 2;
-		var rides = new (string path, int tx, int ty)[]
+		var paths = new[] { "levels/jungle/rides/totem", "levels/jungle/rides/monkey", "levels/jungle/rides/wateride" };
+		int tx = grid.Width / 2 - 7, ty = grid.Height / 2 - 2;
+		foreach ( var path in paths )
 		{
-			("levels/jungle/rides/totem", cx - 4, cy - 4),
-			("levels/jungle/rides/monkey", cx + 2, cy - 4),
-			("levels/jungle/rides/wateride", cx - 4, cy + 2),
-		};
-		foreach ( var (path, tx, ty) in rides )
-		{
-			if ( !grid.TryPlace( tx, ty, 4, 4 ) )
+			var shape = RideShape.Load( path, Path.GetFileName( path ) );
+			if ( !grid.TryPlace( tx, ty, shape.Width, shape.Height ) )
+			{
+				tx += shape.Width + 1;
 				continue;
-			var w = grid.TileToWorld( tx, ty, 4, 4 );
+			}
+
+			var w = grid.TileToWorld( tx, ty, shape.Width, shape.Height );
 			var wz = w.WithZ( terrain.SampleHeight( w.X, w.Y ) );
-			try { _ = new Ride( path, wz ); }
+			Log.Info( $"[park] {Path.GetFileName( path )} footprint {shape.Width}x{shape.Height} at tile({tx},{ty})" );
+			try
+			{
+				var ride = new Ride( path, wz );
+				PlaceEntranceExitMarkers( ride, grid, terrain, tx, ty );
+			}
 			catch ( Exception e ) { Log.Warning( $"[park] ride '{path}' failed: {e.Message}" ); }
+
+			tx += shape.Width + 1; // 1-tile gap before the next ride
 		}
+	}
+
+	// Visualises a ride's entrance/exit cells (from its Info.Shape) as small markers on the terrain —
+	// green = entrance (where the queue connects), red = exit (where peeps appear). The sub-tile stand
+	// point comes from the ride's UsageInfo entry/exit positions.
+	private static void PlaceEntranceExitMarkers( Ride ride, PlacementGrid grid, ParkTerrain terrain, int tx, int ty )
+	{
+		if ( ride.Shape.Entrance is { } e )
+		{
+			var p = grid.PointToWorld( tx + e.X + ride.EntryStandPos.X, ty + e.Y + ride.EntryStandPos.Y );
+			SpawnMarker( p.WithZ( terrain.SampleHeight( p.X, p.Y ) + 2f ), 40, 220, 60 );
+		}
+		if ( ride.Shape.Exit is { } x )
+		{
+			var p = grid.PointToWorld( tx + x.X + ride.ExitAppearPos.X, ty + x.Y + ride.ExitAppearPos.Y );
+			SpawnMarker( p.WithZ( terrain.SampleHeight( p.X, p.Y ) + 2f ), 230, 40, 40 );
+		}
+	}
+
+	private static void SpawnMarker( Vector3 position, byte r, byte g, byte b )
+	{
+		var material = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader" );
+		material.Set( "Color", new Texture( [r, g, b, 255], 1, 1 ) );
+		_ = new ModelEntity { Model = Primitives.Cube.GenerateModel( material ), Position = position, Scale = new Vector3( 4f ) };
 	}
 
 	private void SetupHud()

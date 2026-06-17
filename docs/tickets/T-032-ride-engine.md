@@ -73,10 +73,17 @@ is what makes a ride *do* anything, and it backs the remaining VM opcodes (T-007
    landscape (`terrain.wad`/`base.MD2`, 272 meshes — textured ground, water, paths) with rides placed
    on its surface (height-sampled) via the grid. The terrain needed **double-sided** rendering
    (`MaterialFlags.DoubleSided`) — its heightfield winding isn't uniform after the Y/Z swizzle, so
-   back-face culling dropped most of it. Remaining: the `base.lnd`/`*.map` (TP2M attribute) data and a
-   proper terrain heightfield mesh (vs the scenery in `base.MD2`); robust grid↔terrain alignment (the
-   bounds have outlier scenery meshes — uses the centroid for now); wire `RideInfo` footprints; a
-   build/placement UI; and lobby-vs-park scene separation (the demo reuses the lobby scene).
+   back-face culling dropped most of it. Ride **footprints** are now wired: `RideShape` parses a ride's
+   `Info.Shape` ASCII grid from its `.sam` (e.g. monkey 4×4, totem 3×4, coaster 2×3; `*`=tile,
+   `S`/`2`/`N`=entrance/exit markers), exposed as `Ride.Shape`; the dev park lays rides in a row each
+   reserving its real footprint via `PlacementGrid.TryPlace` (no overlap). Unit-tested.
+   **Entrance/exit cells** are wired: `RideShape` records the entrance (`S`/`N`/`E`) and exit (`2`)
+   tiles; `Ride` reads the `UsageInfo` entry/exit sub-tile stand positions; the dev park drops green
+   (entrance) / red (exit) markers at the computed world points on the terrain. Unit-tested.
+   Remaining: the `base.lnd`/`*.map` (TP2M attribute) data and a proper terrain heightfield mesh (vs the
+   scenery in `base.MD2`); robust grid↔terrain alignment (the bounds have outlier scenery meshes — uses
+   the centroid for now); the `Info.Hoarding` perimeter fence + queue-path from the entrance + coaster
+   track connectors (`<`/`>`); a build/placement UI; and lobby-vs-park scene separation.
 7. ☐ Sound-code→asset mapping via `.MAP` ([T-016]); fold `EVENT`/`SETREVERB`/`DIPMUSIC` into sound.
 
 ## Affected files

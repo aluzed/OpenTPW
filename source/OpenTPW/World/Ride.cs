@@ -14,6 +14,12 @@ public class Ride : Entity
 	/// <summary>The ride's tile footprint (from its <c>.sam</c> Info.Shape) — how many grid tiles it occupies.</summary>
 	public RideShape Shape { get; }
 
+	/// <summary>Fractional position within the entrance cell where queueing peeps stand (default centre).</summary>
+	public (float X, float Y) EntryStandPos { get; private set; } = (0.5f, 0.5f);
+
+	/// <summary>Fractional position within the exit cell where peeps appear (default centre).</summary>
+	public (float X, float Y) ExitAppearPos { get; private set; } = (0.5f, 0.5f);
+
 	private readonly RideEngine engine = new();
 
 	public Ride( string rideArchive, Vector3 position )
@@ -45,7 +51,12 @@ public class Ride : Entity
 			var settings = new SettingsFile( FileSystem.OpenRead( $"{rideArchive}/{rideName}.sam" ) );
 			var rideTitle = settings.Entries.Where( x => x.Key == "Info.Name" ).Select( x => x.Value ).FirstOrDefault();
 			Name = string.IsNullOrEmpty( rideTitle ) ? rideName : rideTitle;
-			Log.Info( $"[ride] loaded '{Name}' from {rideArchive}" );
+
+			// Sub-tile positions within the entrance/exit cells (where peeps stand / appear), default centre.
+			EntryStandPos = (ReadFloat( settings, "UsageInfo.EntryCellStandPosX", 0.5f ), ReadFloat( settings, "UsageInfo.EntryCellStandPosY", 0.5f ));
+			ExitAppearPos = (ReadFloat( settings, "UsageInfo.ExitCellAppearPosX", 0.5f ), ReadFloat( settings, "UsageInfo.ExitCellAppearPosY", 0.5f ));
+
+			Log.Info( $"[ride] loaded '{Name}' from {rideArchive} (footprint {Shape.Width}x{Shape.Height}, entrance {Shape.Entrance?.ToString() ?? "none"}, exit {Shape.Exit?.ToString() ?? "none"})" );
 		}
 		catch ( Exception e )
 		{
@@ -122,6 +133,9 @@ public class Ride : Entity
 			return null;
 		}
 	}
+
+	private static float ReadFloat( SettingsFile settings, string key, float fallback ) =>
+		float.TryParse( settings[key], System.Globalization.CultureInfo.InvariantCulture, out var v ) ? v : fallback;
 
 	// Probes the WAD for each animation channel's keyframe files and returns anim id -> frame count.
 	// A channel is a numbered sequence (<base><c>1.md2, <base><c>2.md2, …) or a single frame
