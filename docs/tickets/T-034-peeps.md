@@ -146,10 +146,14 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
      frame + parses these segments; `Peep` picks the segment from its 8-sector movement direction and
      cycles its frames at 8 fps while moving (holding the first frame when idle), sized to each frame's
      aspect. **Verified in-game: peeps walk (legs cycle) and face their travel direction.**
-   - **Remaining (polish):** load varied sprites (kids/adults) for crowd variety; give `Staff` their
-     real sprites (`Generic/Handymen`, `Generic/Guards`, `Fantasy/Entertainers`); optionally rotate the
-     direction→segment mapping to the camera so facing matches screen-space exactly. The `.FPC`
-     companion is the same format (likely a shadow/alt frame set).
+   - **✅ Crowd variety + staff sprites:** generalised into a cached `SpriteSheet` (TPC frames + `.ESP`
+     anims, keyed by path). Each peep gets one of the **8 kid sprites** (`Generic/Kids/SPR_*`) at random;
+     `Staff` use their real sprites (handyman `Generic/Handymen/SPR_HA`, entertainer a random
+     `Fantasy/Entertainers/SPR_*`), animated + directional like peeps. All ~10 sheets (~1900 frames)
+     load in ~1 s. **Verified in-game: a varied, animated crowd of kids + costumed staff.**
+   - **Remaining (minor polish):** guard sprites once guards exist; optionally rotate the
+     direction→segment mapping to the camera so facing matches screen-space exactly; the `.FPC`
+     companion (same format) is likely a shadow/alt set.
 2. **Full path network**: a walkable path graph + A* so peeps route over real paths (not straight
    lines) between rides, park gate, shops. (Queue spacing *along* the path is now done — see "Queue
    discipline" above; what remains is the cross-park routing.)

@@ -21,9 +21,11 @@ public sealed class Staff : ModelEntity
 	private const float CheerRadius = 35f;     // entertainer reach
 	private const float CheerPerSecond = 8f;   // happiness lifted per second for visitors in range
 	private const float ReachDistance = 3f;    // how close counts as "arrived" / "picked up"
+	private const float WalkFps = 8f;          // walk-cycle frames per second
 
 	// One shared billboard model per role (built once), so the crowd reads staff roles by colour.
 	private static readonly Dictionary<StaffRole, Model> roleModels = new();
+	private static readonly string[] EntertainerSprites = { "SPR_FL", "SPR_GN", "SPR_LA" };
 
 	private readonly StaffRole role;
 	private readonly ParkTerrain terrain;
@@ -32,6 +34,14 @@ public sealed class Staff : ModelEntity
 	private readonly float speed;
 	private Vector3 target;
 
+	// Sprite animation (real sprite path only); falls back to the flat role billboard if unavailable.
+	private readonly SpriteSheet? sheet;
+	private readonly Model fallback;
+	private readonly float spriteHeight;
+	private int facing;
+	private float walkPhase;
+	private bool movedThisFrame;
+
 	public Staff( StaffRole role, ParkTerrain terrain, Vector3 center, float roam )
 	{
 		this.role = role;
@@ -39,8 +49,11 @@ public sealed class Staff : ModelEntity
 		this.center = center;
 		this.roam = roam;
 
-		Model = RoleModel( role );
-		Scale = new Vector3( 3f, 1f, 7f ); // a touch taller than a peep so staff stand out
+		sheet = RoleSprite( role );
+		fallback = RoleModel( role );
+		spriteHeight = 16f;
+		Model = sheet != null ? sheet.FrameModel( 0 ) : fallback;
+		Scale = new Vector3( 3f, 1f, 7f ); // overridden per-frame on the sprite path
 		speed = 10f + (float)Random.Shared.NextDouble() * 4f;
 		target = PickWanderTarget();
 		Position = target;
@@ -60,6 +73,37 @@ public sealed class Staff : ModelEntity
 		var cam = Camera.Position;
 		float yaw = MathF.Atan2( -(cam.X - Position.X), cam.Y - Position.Y );
 		Rotation = System.Numerics.Quaternion.CreateFromAxisAngle( System.Numerics.Vector3.UnitZ, yaw );
+
+		ApplySprite();
+	}
+
+	private static SpriteSheet? RoleSprite( StaffRole role ) => role == StaffRole.Handyman
+		? SpriteSheet.Load( "esprites/Generic/Handymen", "SPR_HA" )
+		: SpriteSheet.Load( "esprites/Fantasy/Entertainers", EntertainerSprites[Random.Shared.Next( EntertainerSprites.Length )] );
+
+	// Picks the current sprite frame from the facing direction + walk phase, sizing the billboard.
+	private void ApplySprite()
+	{
+		if ( sheet == null )
+			return;
+
+		var anims = sheet.Anims;
+		int frame = 0;
+		if ( anims.Count > 0 )
+		{
+			var a = anims[facing % anims.Count];
+			walkPhase = movedThisFrame ? walkPhase + WalkFps * Time.Delta : 0f;
+			frame = a.Start + ( a.Count > 0 ? (int)walkPhase % a.Count : 0 );
+		}
+		Model = sheet.FrameModel( frame );
+		Scale = new Vector3( spriteHeight * sheet.FrameAspect( frame ), 1f, spriteHeight );
+	}
+
+	// World movement angle → one of 8 compass sectors.
+	private static int DirSector( float dx, float dy )
+	{
+		int s = (int)MathF.Round( MathF.Atan2( dy, dx ) / (MathF.PI / 4f) );
+		return ((s % 8) + 8) % 8;
 	}
 
 	// Wander the park and lift the mood of every visitor within reach.
@@ -122,8 +166,12 @@ public sealed class Staff : ModelEntity
 	{
 		var d = new Vector3( to.X - Position.X, to.Y - Position.Y, 0 );
 		bool arrived = d.Length < ReachDistance;
+		movedThisFrame = !arrived;
 		if ( !arrived )
+		{
 			Position += d.Normal * speed * Time.Delta;
+			facing = DirSector( d.X, d.Y );
+		}
 		DropToGround();
 		return arrived;
 	}

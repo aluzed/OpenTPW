@@ -32,6 +32,12 @@ public sealed class Peep : ModelEntity
 
 	private static Model[]? sharedModels;
 
+	// The kid sprites in esprites.wad — each peep gets a random one so the crowd reads as varied.
+	private static readonly string[] KidSprites =
+		{ "SPR_BE", "SPR_BI", "SPR_CH", "SPR_FR", "SPR_KI", "SPR_SA", "SPR_SU", "SPR_TA" };
+
+	private readonly SpriteSheet? sheet;
+
 	private readonly ParkTerrain terrain;
 	private readonly IReadOnlyList<RideQueue> queues;
 	private readonly float speed;
@@ -63,12 +69,13 @@ public sealed class Peep : ModelEntity
 		this.queues = queues;
 		home = spawn;
 
-		// Prefer the real decoded peep sprite (per-frame models, directional walk cycles); fall back to a
-		// flat-colour billboard if it can't load.
+		// Prefer a real decoded peep sprite (per-frame models, directional walk cycles), a random kid for
+		// crowd variety; fall back to a flat-colour billboard if it can't load.
 		spriteHeight = 15f + (float)Random.Shared.NextDouble() * 3f;
-		if ( PeepSprite.Loaded )
+		sheet = SpriteSheet.Load( "esprites/Generic/Kids", KidSprites[Random.Shared.Next( KidSprites.Length )] );
+		if ( sheet != null )
 		{
-			billboard = PeepSprite.FrameModel( 0 );
+			billboard = sheet.FrameModel( 0 );
 			Model = billboard;
 			ApplySprite();
 		}
@@ -248,10 +255,10 @@ public sealed class Peep : ModelEntity
 	// the frame's aspect. No-op on the flat-billboard fallback path.
 	private void ApplySprite()
 	{
-		if ( !PeepSprite.Loaded )
+		if ( sheet == null )
 			return;
 
-		var anims = PeepSprite.Anims;
+		var anims = sheet.Anims;
 		int frame = 0;
 		if ( anims.Count > 0 )
 		{
@@ -263,8 +270,8 @@ public sealed class Peep : ModelEntity
 			frame = a.Start + ( a.Count > 0 ? (int)walkPhase % a.Count : 0 );
 		}
 
-		Model = PeepSprite.FrameModel( frame );
-		Scale = new Vector3( spriteHeight * PeepSprite.FrameAspect( frame ), 1f, spriteHeight );
+		Model = sheet.FrameModel( frame );
+		Scale = new Vector3( spriteHeight * sheet.FrameAspect( frame ), 1f, spriteHeight );
 	}
 
 	/// <summary>An entertainer lifts this peep's mood (capped at full); a happier peep stays longer.</summary>
