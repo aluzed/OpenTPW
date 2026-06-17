@@ -63,11 +63,16 @@ is what makes a ride *do* anything, and it backs the remaining VM opcodes (T-007
 
 ## To do (roadmap)
 
-1. ☐ **Real MD2 keyframe playback** (decode the frame-file vertex payload; morph behind `TriggerAnim`) — [T-033](T-033-ride-animation-keyframes.md).
+1. ✅ **Ride keyframe animation** — rotation, translation/scale and vertex morph all decoded and driven
+   from real ride data at the authentic 30 FPS rate, with multi-frame channel merge — [T-033](T-033-ride-animation-keyframes.md).
 3. ☐ **Lights** — `ENABLELIGHT`/`DISABLELIGHT`/`SETLIGHT`/`COLOURLIGHT` (needs a multi-light render path).
 4. ☐ **Walk/limbo** — needs a peep/visitor system.
 5. ☐ **Scream / coaster** — `STARTSCREAM`/`TOUR`/`COAST`/`TURBO`/`BUMP` (depends on peeps + track).
-6. ☐ **Real park + placement grid** — unblocks correct ride siting (slice 1 placement is approximate).
+6. ⚠️ **Park placement grid** — `PlacementGrid` added (tile↔world, footprint, occupancy; jungle's
+   95×84 grid dims read from `Standard.sam`'s `MapInfo.HeightfieldWidth/Height`, unit-tested). Rides
+   are placed at tile coordinates on the ground (dev demo: a flat plot + 3 rides), replacing the single
+   floated ride. Remaining: render the authentic terrain heightfield (`terrain.wad`/`2dmap.tga`), wire
+   `RideInfo` footprints, and a build/placement UI.
 7. ☐ Sound-code→asset mapping via `.MAP` ([T-016]); fold `EVENT`/`SETREVERB`/`DIPMUSIC` into sound.
 
 ## Affected files
