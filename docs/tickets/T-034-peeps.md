@@ -104,11 +104,22 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
      (surface setup). The surface lifecycle vtable is `0x701168` (`FUN_00564a80…` are ctor/dtor, not
      the codec). Not string-anchored — `.tpc`/`.fpc`/`*.ESP` are all `std::string` boilerplate; the
      `03 00 03 00` magic is never compared (loader just consumes the header).
-   - **Remaining:** the **RLE control-byte scheme**, expanded at *blit* time (the screen blitter that
-     consumes `surface+4`, a separate trace from the lifecycle vtable above). Frame-0 data begins
-     `06 F0 00 FE ED F1 00 0A F2 00 05 …`. With the palette + per-frame dims now known, this can be
-     finished by tracing the blitter or by fitting the RLE empirically against rendered output. Until
-     then, peeps/staff/shops render as flat-colour billboards (`Billboard.Make`).
+   - **Per-frame pixel data = `height` RLE scanlines** (confirmed empirically: the command count per
+     frame equals `height` for **all 175** SPR_KI frames, and the per-row literal totals trace the
+     figure's silhouette). Each scanline is one outer command `count c` followed by `c` bytes of an
+     **inner run-length scanline** that expands to exactly `width` pixels:
+     - **transparent skip** — a control byte `b ≥ 0xF0` skips `256 − b` transparent pixels (so `0xFE`→2,
+       `0xFC`→4, `0xF2`→14, `0xF0`→16). Verified: row 1 `F2 00 05 <5> F2 00` = skip14 + 5 literals +
+       skip14 = 33; row 2 `FC 00 07 <7> FE 00 0A <10> F6 00` = 4+7+2+10+10 = 33.
+     - **literal run** — a low control byte = pixel count, followed by that many palette-index bytes.
+     - **Remaining nuance:** literal *data* bytes can also be ≥0xF0, so distinguishing a skip marker
+       from literal data at a command boundary needs the authoritative inner decoder (the per-scanline
+       blit/decompress routine) — the one piece not yet pinned. Empirical fit reconstructs ~⅓ of rows
+       exactly; the rest hit this ambiguity.
+   - **To finish:** read the inner-scanline decompressor (called per row from the sprite blitter) to
+     nail the skip/literal disambiguation, then render through the palette (index 0 = transparent).
+     Everything up to the per-row byte stream is solved and validated. Until then, peeps/staff/shops
+     render as flat-colour billboards (`Billboard.Make`).
 2. **Full path network**: a walkable path graph + A* so peeps route over real paths (not straight
    lines) between rides, park gate, shops. (Queue spacing *along* the path is now done — see "Queue
    discipline" above; what remains is the cross-park routing.)
