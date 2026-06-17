@@ -50,7 +50,50 @@ public class Ride : Entity
 
 		LoadModel( $"{rideArchive}/{rideName}.md2", rideArchive );
 
+		// Discover the ride's real animation channels from the WAD (see docs/08-ghidra-animation.md):
+		// the original names keyframe files <base><letter>[<n>].md2, letter = first letter of the
+		// animation name. We probe each ScriptDefs.Animations channel so the engine animates only what
+		// the ride actually ships, and knows each channel's frame count.
+		engine.SetAnimChannels( DiscoverAnimChannels( rideArchive, rideName ) );
+
 		VM.IsRunning = true;
+	}
+
+	// Probes the WAD for each animation channel's keyframe files and returns anim id -> frame count.
+	// A channel is a numbered sequence (<base><c>1.md2, <base><c>2.md2, …) or a single frame
+	// (<base><c>.md2); a channel with no files is simply absent (no animation for that state).
+	private static Dictionary<int, int> DiscoverAnimChannels( string rideArchive, string rideName )
+	{
+		// A file is present only if OpenRead yields a non-null stream: a missing entry inside a
+		// *mounted* WAD returns null (not an exception), so a bare try/catch would treat every
+		// missing frame as present and loop forever. See WadArchive.OpenFile.
+		bool Exists( string rel )
+		{
+			try { using var s = FileSystem.OpenRead( rel ); return s != null; }
+			catch { return false; }
+		}
+
+		var map = new Dictionary<int, int>();
+		foreach ( ScriptDefs.Animations anim in Enum.GetValues<ScriptDefs.Animations>() )
+		{
+			var c = RideEngine.ChannelLetter( anim );
+			if ( c == '\0' )
+				continue;
+
+			// Numbered sequence first (Main is e.g. <base>m1.md2 … <base>m7.md2).
+			int frames = 0;
+			while ( Exists( $"{rideArchive}/{rideName}{c}{frames + 1}.md2" ) )
+				frames++;
+
+			// Otherwise a single unnumbered frame (<base><c>.md2).
+			if ( frames == 0 && Exists( $"{rideArchive}/{rideName}{c}.md2" ) )
+				frames = 1;
+
+			if ( frames > 0 )
+				map[(int)anim] = frames;
+		}
+
+		return map;
 	}
 
 	// Loads the ride's main model and spawns a ModelEntity per mesh (the LobbyIsland pattern). Ride

@@ -90,6 +90,24 @@ public class RideEngineTests
 	}
 
 	[TestMethod]
+	public void ChannelLetterIsFirstLetterOfAnimationName()
+	{
+		// The original (FUN_00461f10) names ride keyframe files <base><letter>[<n>].md2, where the
+		// channel letter is the first letter of the animation name. Verified against monkey/totem/
+		// wateride WAD contents — see docs/08-ghidra-animation.md.
+		Assert.AreEqual( 'c', RideEngine.ChannelLetter( ScriptDefs.Animations.ANIM_Create ) );
+		Assert.AreEqual( 'i', RideEngine.ChannelLetter( ScriptDefs.Animations.ANIM_Idle ) );
+		Assert.AreEqual( 'l', RideEngine.ChannelLetter( ScriptDefs.Animations.ANIM_Load ) );
+		Assert.AreEqual( 's', RideEngine.ChannelLetter( ScriptDefs.Animations.ANIM_Start ) );
+		Assert.AreEqual( 'm', RideEngine.ChannelLetter( ScriptDefs.Animations.ANIM_Main ) );
+		Assert.AreEqual( 'e', RideEngine.ChannelLetter( ScriptDefs.Animations.ANIM_End ) );
+		Assert.AreEqual( 'u', RideEngine.ChannelLetter( ScriptDefs.Animations.ANIM_Unload ) );
+		Assert.AreEqual( 'b', RideEngine.ChannelLetter( ScriptDefs.Animations.ANIM_Break ) );
+		Assert.AreEqual( 'r', RideEngine.ChannelLetter( ScriptDefs.Animations.ANIM_Repair ) );
+		Assert.AreEqual( 'o', RideEngine.ChannelLetter( ScriptDefs.Animations.ANIM_Other ) );
+	}
+
+	[TestMethod]
 	public void EngineOpcodesAreNoOpWithoutEngine()
 	{
 		var vm = NewVm(); // Engine is null

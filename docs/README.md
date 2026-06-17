@@ -14,6 +14,9 @@
 | [03-disc-compatibility.md](03-disc-compatibility.md) | Is the provided `.7z` compatible with the project? |
 | [04-linux-compatibility.md](04-linux-compatibility.md) | Does OpenTPW run on Linux? (nuanced answer) |
 | [05-ghidra-reverse.md](05-ghidra-reverse.md) | Ghidra installed: how it helps here + RE roadmap |
+| [06-rse-vm-opcodes.md](06-rse-vm-opcodes.md) | RSE ride-script VM: opcode table + arities |
+| [07-ghidra-render.md](07-ghidra-render.md) | Native render loop & frame pacing (DDraw + D3D execute buffers + MMX software) |
+| [08-ghidra-animation.md](08-ghidra-animation.md) | Ride animation (vertex keyframes in sibling `.md2` files) & `.sgn` signs, RE'd |
 | [Linux.md](Linux.md) | Step-by-step setup guide for the Linux toolchain (.NET, Ghidra, deps) |
 | [tickets/](tickets/) | Backlog of actionable tickets derived from build + test runs |
 

@@ -2,9 +2,10 @@
 
 - **Priority**: 🟡 Feature (the central unlock — backs Batch B of the VM and real gameplay)
 - **Type**: Engine
-- **Status**: ⚠️ In progress — slice 1 (seam + sound + ride in-scene) and stage 1 (lifecycle +
-  procedural animation) done; real keyframe anim / lights / peeps / coaster / park remain.
-- **Related**: [T-007](T-007-vm-opcodes-rse.md) (the VM + opcode RE), [05](../05-ghidra-reverse.md)/[07](../07-ghidra-render.md).
+- **Status**: ⚠️ In progress — slice 1 (seam + sound + ride in-scene), stage 1 (lifecycle +
+  procedural animation) and stage 2 (animation system RE'd + channel-aware engine) done; real keyframe
+  playback / lights / peeps / coaster / park remain.
+- **Related**: [T-007](T-007-vm-opcodes-rse.md) (the VM + opcode RE), [T-033](T-033-ride-animation-keyframes.md) (animation keyframes), [05](../05-ghidra-reverse.md)/[07](../07-ghidra-render.md)/[08](../08-ghidra-animation.md).
 
 ## Problem
 
@@ -46,9 +47,23 @@ is what makes a ride *do* anything, and it backs the remaining VM opcodes (T-007
   procedural transform (a model with an active anim bobs); the ride body is registered as a self
   object playing a looping idle so the model is visibly alive. Tested (routing + `WAITANIM` rewind).
 
+## Done — stage 2 (animation system RE'd + channel-aware engine)
+
+- ✅ **Animation reverse-engineered** ([08-ghidra-animation.md](../08-ghidra-animation.md),
+  [T-033](T-033-ride-animation-keyframes.md)): ride animation is **vertex keyframes split across
+  sibling `.md2` files** (`<base><letter>[<n>].md2`, letter = first letter of the animation name; 12
+  channels = `ScriptDefs.Animations`; Main = looping motion). `.sgn` files turned out to be **signs**
+  (GDI billboard text), not animation — the original assumption was wrong.
+- ✅ **Channel-aware engine.** `Ride` discovers the real channels from the WAD and `RideEngine` maps
+  each `ScriptDefs.Animations` value → channel letter + frame count, animates only channels the ride
+  ships, scales `WAITANIM` duration by frame count, and loops Main (else Idle) on the body. Verified
+  in-game (e.g. `tourride` → `ANIM_Create(c×1)`, `totem` → Create/Main×10/Break×2/Repair). Fixed a
+  latent hang: a missing entry in a *mounted* WAD returns a null stream (not an exception), which made
+  the frame-probe loop forever.
+
 ## To do (roadmap)
 
-1. ☐ **Real MD2 keyframe animation** (decode keyframes; swap behind `TriggerAnim`).
+1. ☐ **Real MD2 keyframe playback** (decode the frame-file vertex payload; morph behind `TriggerAnim`) — [T-033](T-033-ride-animation-keyframes.md).
 3. ☐ **Lights** — `ENABLELIGHT`/`DISABLELIGHT`/`SETLIGHT`/`COLOURLIGHT` (needs a multi-light render path).
 4. ☐ **Walk/limbo** — needs a peep/visitor system.
 5. ☐ **Scream / coaster** — `STARTSCREAM`/`TOUR`/`COAST`/`TURBO`/`BUMP` (depends on peeps + track).
