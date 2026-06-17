@@ -206,6 +206,7 @@ public class Level
 		var layout = new LobbyLayout() { Hud = Hud };
 		layout.OnInit();
 
+		Hud.AddChild( new ParkStatsPanel() ); // live park finances/visitors readout (no-op without a park)
 		Hud.AddChild( new Cursor() );
 	}
 

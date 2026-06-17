@@ -56,6 +56,9 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
   (`Ride.UpkeepPerSecond`, scaled by capacity). Money in/out is logged (`OPENTPW_ECON_DEBUG`) and the
   books balance (verified: from 10000 → 10609 over ~50 s = +400 gate +383 tickets −174 upkeep). Ride
   prices / entry fee are derived defaults (the original lets the player set them) pending a build/manage UI.
+- **Park-stats HUD**: a top-left readout (`ParkStatsPanel`) shows the live balance and flows
+  (MONEY / TICKETS / GATE / UPKEEP) plus the VISITORS count, so the economy and crowd are visible on
+  screen rather than only in logs. No-op without a park (harmless in the plain lobby).
 
 ## Remaining
 
