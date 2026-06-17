@@ -155,8 +155,9 @@ and driven from real ride data. 51 tests pass.
 
 ### Remaining (polish)
 
-1. Tune the playback rate vs. the original's time units (`KeyframeRate`); confirm pivot/compose order
-   on more rides.
+1. ✅ **Playback rate** — RE'd from `FUN_004735d0`: keyframe times are 30 FPS frames
+   (`animTime = elapsed_ms × 0.03 × speed`, the clock is ms, `0.03 ≈ 1/33.33`), so `KeyframeRate = 30`
+   units/second. Confirm pivot/compose order on more rides.
 2. Handle multi-frame channels' extra files (`m2..m7`) and surfaces with two records targeting the
    same index (both arms).
 3. Load the `7`-prefixed LOD set for distant rides; ignore `P`-prefixed preview models in-world.

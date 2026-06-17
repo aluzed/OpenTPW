@@ -16,7 +16,10 @@ public sealed class RideEngine : IRideEngine
 	private const int SelfId = -1;     // the ride body's handle (script object ids are >= 0)
 	private const float FrameSeconds = 0.1f; // placeholder playback rate (~10 fps) per keyframe
 	private const float BobAmplitude = 12f;
-	private const float KeyframeRate = 13f;  // keyframe track time units advanced per second (tuned for ~3s/loop)
+	// Keyframe time units advanced per second. The original computes animTime = elapsed_ms * 0.03 * speed
+	// (FUN_004735d0; _DAT_006fec0c = 0.03 ≈ 1/33.33, the 30 FPS frame time), i.e. keyframe times are in
+	// 30 FPS frames — so the clock advances 30 units/second. (RE'd, see docs/08-ghidra-animation.md.)
+	private const float KeyframeRate = 30f;
 
 	private readonly Dictionary<int, RideObject> objects = new();
 	private SdtArchive? rideSounds;

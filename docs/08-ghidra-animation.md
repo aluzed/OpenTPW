@@ -155,6 +155,12 @@ scale/translation key (e.g. `space_bouncy`'s `0.07→1.0` grow-in). Tracks are l
 a track is bounded by the next track's offset (plus the marker + strictly-increasing-time rule) — the
 marker scan alone over-reads an identity track into adjacent record data.
 
+**Playback rate.** Keyframe times are in **30 FPS frames**. The animation clock is
+`animTime = (nowMs − startMs) × speed × 0.03` (`FUN_004735d0`; the global clock `DAT_007b496c` is
+milliseconds, `_DAT_006fec0c = 0.03 ≈ 1/33.33`, and the neighbouring `33.3333 = 1000/30` constants are
+the 30 FPS frame time). So at `speed = 1` the clock advances **30 keyframe units per second** — e.g.
+monkey's 0→40 arm spin takes ~1.33 s, bbugs's 0→100 morph ~3.3 s. (OpenTPW uses `KeyframeRate = 30`.)
+
 **The apply — `FUN_00471860`** (per surface; `FUN_004679d0` calls it for every surface). A flags word
 on the surface's anim descriptor (`desc[1]`) selects which tracks run, and it composes them:
 
