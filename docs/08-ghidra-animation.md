@@ -108,6 +108,34 @@ payload**, not a full mesh tree. They only make sense applied on top of the base
 This matches `FUN_00461f10` folding each frame into the base via `FUN_00470b30` rather than loading
 them as independent models.
 
+### Decoded frame-file binary layout
+
+Decompiling the model loader `FUN_0046d6d0` (shared by base and frame files) and cross-checking the
+bytes of `monkeym1.MD2` / `monkeyc.MD2` pins the layout down:
+
+- The loader reads the whole file into memory, checks the `0x1CD15D46` magic, then **relocates** a
+  table of internal offsets (struct dwords `[0x13]`..`[0x1f]` = file offsets `0x4c`..`0x7c`, plus
+  `[0x26]` = `0x98` and `[0x2b]` = `0xac`) into absolute pointers in place. Base and frame files use
+  the *same* loader.
+- A **frame file's header `0x00`–`0x4f` is byte-identical to the base** (magic, version, the counts at
+  `0x36`/`0x3a`/`0x3e`/`0x42`/`0x44`) — so it inherits the base's mesh/face/vertex counts. But the
+  base's **offset-table fields `0x50`–`0x7c` are all zero** in a frame: a frame has no texture list, no
+  frame list and no mesh table of its own.
+- The dword at **`0x98`** is the frame's animation pointer. In the **base it is 0** (the base is the
+  static bind pose); in a frame it is a file offset to a small (~72-byte) **per-surface relink
+  trailer** near EOF. The bulk of the file, **`0xb8` .. `[0x98]`**, is the frame's **vertex-position
+  payload** (verified: the floats there are model-space coordinates, e.g. `-12.92, 2.45, -0.1`).
+- The `0x98` trailer is a per-surface descriptor: a count (`+0x12`) and an offset array (`+0x2c`)
+  whose entries point back into the `0xb8`-region vertex blocks. `FUN_00461f10` walks it to **relink
+  each frame surface to the matching base-model surface** (comparing texture/surface indices), so a
+  frame supplies new positions only for the surfaces that actually move — which is why frame sizes
+  vary (`monkeym1` 2.9 KB carries a few surfaces; `monkeyc` 33 KB carries most of the model).
+
+So a complete keyframe loader must: load the frame via the same flat-load+relocate path, read the
+`0x98` trailer to map each frame surface → base surface, and overwrite those surfaces' vertex
+positions from the `0xb8` region. That surface-relink + the renderer morph (lerp base↔frame over the
+channel's frame sequence) is the remaining T-033 work; the structural layout above is now known.
+
 This is classic Quake-II-style MD2 vertex-morph animation, but with each keyframe stored in its own
 file instead of appended into one. (It also explains the earlier finding that a single shipping
 `.md2` looks "static": the motion lives in the *sibling* frame files, which the parser had never been
@@ -129,10 +157,11 @@ quantisation it references) so the engine can morph the base mesh through the re
 
 | Function | Role |
 |----------|------|
-| `FUN_00461f10` | Model + animation loader: loads base `.md2`, then per-channel `<base><c>[<n>].md2` keyframe files |
+| `FUN_00461f10` | Model + animation loader: loads base `.md2`, then per-channel `<base><c>[<n>].md2` keyframe files; walks each frame's `0x98` trailer to relink its surfaces onto the base |
 | `FUN_00467a80` | **Sign** loader: rasterises `.sgn` text via GDI onto `sign1.tga`/`sign2.tga` surfaces |
-| `FUN_00470b30` | Folds one keyframe's vertex data into the base model's animation tables |
-| `FUN_0046d6d0` / `FUN_0044a220` | Load/lookup a model file by path |
+| `FUN_0046d6d0` | Model file loader: flat-loads the file, checks magic, relocates the offset table (`0x4c`–`0x7c`, `0x98`, `0xac`) to absolute pointers in place — used for both base and frame files |
+| `FUN_0046dcf0` / `FUN_0044a220` | Higher-level load/lookup of a model by path (calls `FUN_0046d6d0`) |
+| `FUN_00470b30` | Marks a frame surface dirty (sets flag `0x20` on the model) — not the vertex fold |
 | `FUN_005ecb40` | GDI text → sign texture rasterisation |
 
 Strings: `%s%s%c.md2` `0x0074d2a8` · `%s%s%c%d.md2` `0x0074d2b4` · `sign1.tga` `0x0074d6b4` ·

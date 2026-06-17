@@ -31,16 +31,25 @@ motion lives in **sibling `.md2` keyframe files** (see below), which the engine 
   `TriggerAnim`/`LoopAnim` against that real data (animate only channels the ride ships; log true
   channel + frame count). Placeholder motion retained until the payload decode lands.
 
+## Frame-file binary layout — decoded (see docs/08)
+
+The frame format is now reversed (loader `FUN_0046d6d0`, cross-checked against `monkeym1`/`monkeyc`):
+
+- Header `0x00`–`0x4f` is byte-identical to the base (same magic/version/counts) → inherits base
+  topology. The base's offset-table fields `0x50`–`0x7c` are **zero** in a frame (no own tables).
+- Dword at **`0x98`** = frame animation pointer (0 in the base). It points to a small (~72 B)
+  **per-surface relink trailer** near EOF: a count (`+0x12`) + an offset array (`+0x2c`) into the
+  vertex region. The bulk **`0xb8` .. `[0x98]`** is the frame's **vertex-position payload** (verified
+  real model-space floats). A frame only carries the surfaces that move, so sizes vary.
+
 ## Remaining
 
-1. Decode the frame-file vertex payload: how `FUN_00470b30` reads a frame's positions relative to the
-   base model's vertex value tables (`posValueTableOffset` quantisation, `ModelFile`). Document the
-   byte layout next to the existing MD2 notes.
-2. Extend `ModelFile` (or a sibling reader) to load a keyframe file *given its base model*, producing a
-   `Vector3[]` of per-vertex positions per frame.
-3. In the renderer, morph the base mesh between frames (CPU lerp into the existing vertex buffer, or a
-   two-pose vertex shader) at the channel's frame rate; loop the Main channel.
-4. Load the `7`-prefixed LOD set for distant rides; ignore `P`-prefixed preview models in-world.
+1. Implement a keyframe loader: flat-load + relocate (mirror `FUN_0046d6d0`), read the `0x98` trailer
+   to map each frame surface → base surface, and produce per-surface `Vector3[]` overriding the base
+   positions. Validate by morphing `monkey` Main (`m1..m7`) and eyeballing against the original.
+2. Renderer morph: lerp base↔frame vertex positions over the channel's frame sequence (CPU lerp into
+   the vertex buffer, or a two-pose vertex shader) at the channel frame rate; loop Main.
+3. Load the `7`-prefixed LOD set for distant rides; ignore `P`-prefixed preview models in-world.
 
 ## Acceptance
 
