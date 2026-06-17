@@ -82,8 +82,11 @@ is what makes a ride *do* anything, and it backs the remaining VM opcodes (T-007
    (entrance) / red (exit) markers at the computed world points on the terrain. Unit-tested.
    Remaining: the `base.lnd`/`*.map` (TP2M attribute) data and a proper terrain heightfield mesh (vs the
    scenery in `base.MD2`); robust grid↔terrain alignment (the bounds have outlier scenery meshes — uses
-   the centroid for now); the `Info.Hoarding` perimeter fence + queue-path from the entrance + coaster
-   track connectors (`<`/`>`); a build/placement UI; and lobby-vs-park scene separation.
+   the centroid for now); the `Info.Hoarding` perimeter fence + coaster track connectors (`<`/`>`); a
+   build/placement UI; and lobby-vs-park scene separation. **Queue paths** are wired: a strip of path
+   tiles is laid from each ride's entrance cell (stepping out from the footprint edge it sits on),
+   reserved on the grid and rendered on the terrain with the queue path texture (`queue.wad`); the 3D
+   queue-fence meshes (`questra`/`quebnd`) remain a follow-up.
 7. ☐ Sound-code→asset mapping via `.MAP` ([T-016]); fold `EVENT`/`SETREVERB`/`DIPMUSIC` into sound.
 
 ## Affected files

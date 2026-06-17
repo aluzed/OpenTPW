@@ -85,6 +85,7 @@ public class Level
 			{
 				var ride = new Ride( path, wz );
 				PlaceEntranceExitMarkers( ride, grid, terrain, tx, ty );
+				SpawnQueuePath( ride, grid, terrain, tx, ty );
 			}
 			catch ( Exception e ) { Log.Warning( $"[park] ride '{path}' failed: {e.Message}" ); }
 
@@ -107,6 +108,52 @@ public class Level
 			var p = grid.PointToWorld( tx + x.X + ride.ExitAppearPos.X, ty + x.Y + ride.ExitAppearPos.Y );
 			SpawnMarker( p.WithZ( terrain.SampleHeight( p.X, p.Y ) + 2f ), 230, 40, 40 );
 		}
+	}
+
+	// Lays a queue path leading out from a ride's entrance cell: a strip of path tiles stepping away
+	// from the footprint edge the entrance sits on, each reserved on the grid and rendered as a flat
+	// path quad on the terrain. (The 3D queue-fence meshes — questra/quebnd in queue.wad — are a
+	// follow-up; this is the walkable path peeps queue along.)
+	private static void SpawnQueuePath( Ride ride, PlacementGrid grid, ParkTerrain terrain, int tx, int ty, int length = 6 )
+	{
+		if ( ride.Shape.Entrance is not { } e )
+			return;
+
+		// Outward direction = away from the footprint edge the entrance is on.
+		int dx = 0, dy = 0;
+		if ( e.Y == 0 ) dy = -1;
+		else if ( e.Y == ride.Shape.Height - 1 ) dy = 1;
+		else if ( e.X == 0 ) dx = -1;
+		else if ( e.X == ride.Shape.Width - 1 ) dx = 1;
+		else dy = -1;
+
+		var material = new Material<ObjectUniformBuffer>( "content/shaders/3d.shader" );
+		material.Set( "Color", LoadPathTexture() );
+
+		for ( int i = 1; i <= length; i++ )
+		{
+			int cx = tx + e.X + dx * i, cy = ty + e.Y + dy * i;
+			if ( !grid.TryPlace( cx, cy, 1, 1 ) )
+				break; // ran off the grid or hit another object
+
+			var w = grid.TileToWorld( cx, cy );
+			_ = new ModelEntity
+			{
+				Model = Primitives.Plane.GenerateModel( material ),
+				Position = w.WithZ( terrain.SampleHeight( w.X, w.Y ) + 0.15f ),
+				Scale = new Vector3( grid.TileSize / 2f ),
+			};
+		}
+	}
+
+	private static Texture LoadPathTexture()
+	{
+		foreach ( var p in new[] { "levels/jungle/queue/stexture/jpa_que1.wct", "levels/jungle/terrain/spathtex/jpa_str1.wct" } )
+		{
+			try { return new Texture( p, TextureFlags.Repeat ); }
+			catch { /* try next */ }
+		}
+		return Texture.Missing;
 	}
 
 	private static void SpawnMarker( Vector3 position, byte r, byte g, byte b )
