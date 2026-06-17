@@ -158,10 +158,14 @@ and driven from real ride data. 51 tests pass.
 1. ✅ **Playback rate** — RE'd from `FUN_004735d0`: keyframe times are 30 FPS frames
    (`animTime = elapsed_ms × 0.03 × speed`, the clock is ms, `0.03 ≈ 1/33.33`), so `KeyframeRate = 30`
    units/second. Confirm pivot/compose order on more rides.
-2. Handle multi-frame channels' extra files (`m2..m7`) and surfaces with two records targeting the
-   same index (both arms).
+2. ✅ **Multi-frame channel merge** — a numbered channel's files each animate a *different* surface
+   (e.g. totem Main: m1→part 0/11, m2→14, m3→13, … m10→16). `Ride.LoadKeyframes` now loads all of a
+   channel's frame files and `RideKeyframeFile.Merge`s their surfaces, so the whole ride animates (not
+   just the first file's parts). Verified in-game: totem Main went from ~3 to 12 animated surfaces.
 3. Load the `7`-prefixed LOD set for distant rides; ignore `P`-prefixed preview models in-world.
-4. Per-frame full-buffer re-upload is fine for ride-sized meshes; revisit if a hot path needs it.
+4. Surfaces with two records on the same index (e.g. monkey's two arms): currently last-writer-wins
+   per slot; fine visually, revisit if the relink distinguishes them.
+5. Per-frame full-buffer re-upload is fine for ride-sized meshes; revisit if a hot path needs it.
 
 ## Acceptance
 

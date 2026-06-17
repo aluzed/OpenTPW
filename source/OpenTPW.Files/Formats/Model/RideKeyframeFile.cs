@@ -90,6 +90,16 @@ public sealed class RideKeyframeFile
 	/// <summary>The longest track's last keyframe time — the animation's loop length (0 if none).</summary>
 	public float Duration { get; private set; }
 
+	/// <summary>
+	/// Appends another keyframe file's surfaces (used to merge a channel's numbered frame files, each of
+	/// which animates different surfaces of the ride — see docs/08-ghidra-animation.md).
+	/// </summary>
+	public void Merge( RideKeyframeFile other )
+	{
+		surfaces.AddRange( other.surfaces );
+		Duration = MathF.Max( Duration, other.Duration );
+	}
+
 	public RideKeyframeFile( Stream stream )
 	{
 		using var ms = new MemoryStream();

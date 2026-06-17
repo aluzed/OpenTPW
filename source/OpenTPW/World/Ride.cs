@@ -64,31 +64,54 @@ public class Ride : Entity
 
 	// Loads the decoded keyframe tracks for each animation channel and hands them to the engine, so a
 	// channel with real animation data plays its tracks (rotation, …) instead of the placeholder bob.
-	// A channel's animation lives in its frame file(s) (<base><c>.md2 or <base><c>1.md2 — see
-	// docs/08-ghidra-animation.md). Non-fatal: any failure just leaves that channel on the bob.
+	// A channel's animation lives in its frame file(s) (<base><c>.md2 or <base><c>1.md2 … — see
+	// docs/08-ghidra-animation.md). A numbered channel's files each animate different surfaces of the
+	// ride (e.g. totem: m1→part 0/11, m2→part 14, …), so all are loaded and their surfaces merged —
+	// otherwise only the first file's parts would move. Non-fatal: failures leave that channel on the bob.
 	private void LoadKeyframes( string rideArchive, string rideName, Dictionary<int, int> channels )
 	{
 		foreach ( var (anim, frames) in channels )
 		{
 			var c = RideEngine.ChannelLetter( (ScriptDefs.Animations)anim );
-			// A numbered sequence starts at frame 1 (<base><c>1.md2); a single-frame channel is <base><c>.md2.
-			var rel = frames > 1 ? $"{rideArchive}/{rideName}{c}1.md2" : $"{rideArchive}/{rideName}{c}.md2";
-			try
+
+			RideKeyframeFile? merged = null;
+			if ( frames > 1 )
 			{
-				using var s = FileSystem.OpenRead( rel );
-				if ( s == null )
-					continue;
-				var kf = new RideKeyframeFile( s );
-				if ( kf.Surfaces.Count > 0 )
+				for ( int n = 1; n <= frames; n++ )
 				{
-					engine.SetChannelKeyframes( anim, kf );
-					Log.Info( $"[ride] keyframes for {(ScriptDefs.Animations)anim}: {kf.Surfaces.Count} animated surface(s), duration {kf.Duration}" );
+					var kf = TryLoadKeyframe( $"{rideArchive}/{rideName}{c}{n}.md2", anim );
+					if ( kf == null || kf.Surfaces.Count == 0 )
+						continue;
+					if ( merged == null )
+						merged = kf;
+					else
+						merged.Merge( kf );
 				}
 			}
-			catch ( Exception e )
+			else
 			{
-				Log.Warning( $"[ride] keyframes for {(ScriptDefs.Animations)anim} ({rel}) failed: {e.Message}" );
+				merged = TryLoadKeyframe( $"{rideArchive}/{rideName}{c}.md2", anim );
 			}
+
+			if ( merged != null && merged.Surfaces.Count > 0 )
+			{
+				engine.SetChannelKeyframes( anim, merged );
+				Log.Info( $"[ride] keyframes for {(ScriptDefs.Animations)anim}: {merged.Surfaces.Count} animated surface(s), duration {merged.Duration}" );
+			}
+		}
+	}
+
+	private static RideKeyframeFile? TryLoadKeyframe( string rel, int anim )
+	{
+		try
+		{
+			using var s = FileSystem.OpenRead( rel );
+			return s == null ? null : new RideKeyframeFile( s );
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( $"[ride] keyframes for {(ScriptDefs.Animations)anim} ({rel}) failed: {e.Message}" );
+			return null;
 		}
 	}
 

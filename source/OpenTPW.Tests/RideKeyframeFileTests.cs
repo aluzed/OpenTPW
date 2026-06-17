@@ -218,6 +218,20 @@ public class RideKeyframeFileTests
 	}
 
 	[TestMethod]
+	public void MergeCombinesSurfacesAndMaxesDuration()
+	{
+		// A channel's numbered frame files each animate different surfaces; merging unions them.
+		var a = new RideKeyframeFile( BuildFrame( 5, new[] { (0, RotZ( 0 )), (40, RotZ( 360 )) } ) );
+		var b = new RideKeyframeFile( BuildFrame( 9, new[] { (0, RotZ( 0 )), (100, RotZ( 180 )) } ) );
+		Assert.AreEqual( 40f, a.Duration );
+
+		a.Merge( b );
+		Assert.AreEqual( 2, a.Surfaces.Count, "merged file should hold both surfaces" );
+		CollectionAssert.AreEquivalent( new[] { 5, 9 }, a.Surfaces.Select( s => s.SurfaceIndex ).ToArray() );
+		Assert.AreEqual( 100f, a.Duration, "duration is the max across merged files" );
+	}
+
+	[TestMethod]
 	public void EmptyOrBadDataYieldsNoAnimation()
 	{
 		Assert.AreEqual( 0, new RideKeyframeFile( new byte[0x20] ).Surfaces.Count );      // too short / no magic
