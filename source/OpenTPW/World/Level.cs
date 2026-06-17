@@ -116,9 +116,13 @@ public class Level
 		}
 		Log.Info( $"[park] spawned 40 visitors following {queues.Count} queues" );
 
-		// A couple of entertainers roam the park, drawing wages and cheering nearby visitors (see Staff).
-		for ( int i = 0; i < 2; i++ )
-			_ = new Staff( terrain, new Vector3( centre.X, centre.Y, 0 ), roam: 90f );
+		// Staff roam the park, drawing wages: entertainers cheer nearby visitors, handymen pick up the
+		// litter visitors drop (which otherwise sours the crowd). See Staff / Litter.
+		var staffHome = new Vector3( centre.X, centre.Y, 0 );
+		_ = new Staff( StaffRole.Entertainer, terrain, staffHome, roam: 90f );
+		_ = new Staff( StaffRole.Entertainer, terrain, staffHome, roam: 90f );
+		_ = new Staff( StaffRole.Handyman, terrain, staffHome, roam: 90f );
+		_ = new Staff( StaffRole.Handyman, terrain, staffHome, roam: 90f );
 	}
 
 	// Visualises a ride's entrance/exit cells (from its Info.Shape) as small markers on the terrain —
@@ -218,7 +222,10 @@ public class Level
 
 	public void Update()
 	{
-		Entity.All.ForEach( entity => entity.Update() );
+		// Iterate a snapshot: an entity's update may spawn or remove entities (e.g. peeps dropping litter,
+		// handymen clearing it), which would otherwise invalidate the enumeration.
+		foreach ( var entity in Entity.All.ToArray() )
+			entity.Update();
 
 		// Diagnostic: periodically report the park's balance and the cumulative income/cost flows.
 		if ( Environment.GetEnvironmentVariable( "OPENTPW_ECON_DEBUG" ) != null && ParkFinances.Current is { } f && Time.Now > nextEconLog )

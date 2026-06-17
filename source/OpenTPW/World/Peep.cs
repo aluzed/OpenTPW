@@ -17,6 +17,9 @@ public sealed class Peep : ModelEntity
 	private const float WaitPenaltyPerSec = 1f; // standing in a line that isn't moving sours the mood
 	private const float RideRewardScale = 0.3f; // happiness gained = ride excitement × this
 	private const float LeaveHappiness = 10f;   // fed up below this
+	private const float LitterChancePerSec = 0.04f; // ~1 dropped every ~25 s of wandering
+	private const float LitterRadius = 18f;          // litter within this sours the mood
+	private const float LitterPenaltyPerSec = 1.5f;  // happiness lost per second per nearby litter (capped)
 
 	// A small palette of clothing colours so the crowd reads as varied people.
 	private static readonly (byte R, byte G, byte B)[] Palette =
@@ -98,6 +101,15 @@ public sealed class Peep : ModelEntity
 
 		// Being in the park is tiring; a long enough day (or a soured mood) sends the peep home.
 		energy -= EnergyDrainPerSec * Time.Delta;
+
+		// Visitors occasionally drop litter, and standing among litter sours the mood (until a handyman
+		// clears it). Both raise the chance the peep heads home unhappy.
+		if ( Random.Shared.NextDouble() < LitterChancePerSec * Time.Delta )
+			_ = new Litter( Position );
+		int nearbyLitter = CountNearbyLitter();
+		if ( nearbyLitter > 0 )
+			happiness = Math.Max( 0f, happiness - LitterPenaltyPerSec * nearbyLitter * Time.Delta );
+
 		if ( WantsToLeave() )
 		{
 			BeginLeaving();
@@ -170,6 +182,20 @@ public sealed class Peep : ModelEntity
 
 	/// <summary>An entertainer lifts this peep's mood (capped at full); a happier peep stays longer.</summary>
 	public void Cheer( float amount ) => happiness = Math.Min( 100f, happiness + amount );
+
+	// Litter within reach, capped so a single filthy spot doesn't drive happiness down instantly.
+	private int CountNearbyLitter()
+	{
+		float r2 = LitterRadius * LitterRadius;
+		int count = 0;
+		foreach ( var l in Litter.All )
+		{
+			float dx = l.Position.X - Position.X, dy = l.Position.Y - Position.Y;
+			if ( dx * dx + dy * dy <= r2 && ++count >= 3 )
+				break;
+		}
+		return count;
+	}
 
 	private void DropToGround() => Position = Position.WithZ( terrain.SampleHeight( Position.X, Position.Y ) );
 

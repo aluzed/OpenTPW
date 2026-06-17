@@ -35,6 +35,7 @@ internal sealed class ParkStatsPanel : Panel
 			$"UPKEEP {fin.UpkeepPaid:0}",
 			$"WAGES {fin.WagesPaid:0}",
 			$"VISITORS {visitors}",
+			$"LITTER {Litter.All.Count}",
 		};
 
 		for ( int i = 0; i < lines.Length; i++ )
