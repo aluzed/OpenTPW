@@ -135,9 +135,16 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
      clean, recognisable peeps (orange shirt, green trousers — see `final_0`). Full container + codec
      now decode end-to-end. (The original converts each palette index → 16-bit colour via a per-mode
      LUT for the display surface; for our renderer we map index → the 1024-byte RGBA palette directly.)
-   - **Remaining (engine work, not RE):** implement a `TpcFile` loader (header + palette + per-frame
-     signed-RLE) producing RGBA frame textures, then swap `Peep`/`Staff` billboards to the real
-     animated sprites (direction + walk-cycle frames). The format is fully specified above.
+   - **✅ Integrated in-engine:** `OpenTPW.Files/Formats/Image/TpcFile.cs` decodes the container +
+     signed-RLE into straight-RGBA frames; `PeepSprite` loads `esprites/Generic/Kids/SPR_KI.TPC`,
+     builds a textured `Billboard` (double-sided, depth-write off, alpha-blended, point-filtered), and
+     `Peep` renders it (sized to the frame aspect), falling back to the flat-colour billboard if the
+     load fails. **Verified in-game: real peep sprites render around the rides.**
+   - **Remaining (polish):** pick the authentic per-direction / walk-cycle frame (peeps currently all
+     use one standing frame and don't animate or face their travel direction); load varied sprites
+     (kids/adults) for crowd variety; and give `Staff` their real sprites
+     (`Generic/Handymen`, `Generic/Guards`, `Fantasy/Entertainers`). The `.FPC` companion is the
+     same format (likely a shadow/alt frame set).
 2. **Full path network**: a walkable path graph + A* so peeps route over real paths (not straight
    lines) between rides, park gate, shops. (Queue spacing *along* the path is now done — see "Queue
    discipline" above; what remains is the cross-park routing.)

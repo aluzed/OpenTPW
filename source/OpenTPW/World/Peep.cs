@@ -56,9 +56,19 @@ public sealed class Peep : ModelEntity
 		this.queues = queues;
 		home = spawn;
 
-		billboard = SharedModel( colorIndex );
+		// Prefer the real decoded peep sprite; fall back to a flat-colour billboard if it can't load.
+		if ( PeepSprite.Model is { } sprite )
+		{
+			billboard = sprite;
+			float height = 15f + (float)Random.Shared.NextDouble() * 3f;
+			Scale = new Vector3( height * PeepSprite.Aspect, 1f, height );
+		}
+		else
+		{
+			billboard = SharedModel( colorIndex );
+			Scale = new Vector3( 3f, 1f, 5f + (float)Random.Shared.NextDouble() * 2f );
+		}
 		Model = billboard;
-		Scale = new Vector3( 3f, 1f, 5f + (float)Random.Shared.NextDouble() * 2f );
 		speed = 8f + (float)Random.Shared.NextDouble() * 7f;
 		Position = spawn;
 		ParkFinances.Current?.TakeEntryFee(); // pays the gate on arrival
