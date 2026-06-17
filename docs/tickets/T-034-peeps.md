@@ -49,7 +49,13 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
   drains while walking/queuing (~50 s of activity). A tired (energy ≤ 0) or fed-up (happiness ≤ 10)
   peep abandons its queue, walks back to its entry point, and is **recycled as a fresh arrival** — so
   the crowd turns over without churning entities (verified: ~23 visitors recycled over ~75 s as they
-  tired out). This is the simulation half of the peep→ride loop; the money/income side is still to do.
+  tired out).
+- **Park economy**: `ParkFinances` tracks the bank balance. Each visitor pays a gate **entry fee** on
+  arrival (and again when recycled as a fresh arrival), and a **ride ticket** every time it boards
+  (`Ride.TicketPrice`, derived from excitement); each ride drains **upkeep** per second
+  (`Ride.UpkeepPerSecond`, scaled by capacity). Money in/out is logged (`OPENTPW_ECON_DEBUG`) and the
+  books balance (verified: from 10000 → 10609 over ~50 s = +400 gate +383 tickets −174 upkeep). Ride
+  prices / entry fee are derived defaults (the original lets the player set them) pending a build/manage UI.
 
 ## Remaining
 
@@ -64,6 +70,7 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
    blocked on the `.MAP` audio catalog (T-016): the script-driven sounds currently resolve through an
    approximate index (e.g. the monkey plays `urinal.mp2`), so a per-board cue would just repeat that
    wrong mapping until T-016 lands.
-4. **Income + staff**: ride choice, per-peep happiness/energy, and visitor turnover are done (above);
-   still to do is the **money/income** side (ticket/entry revenue, ride upkeep, shops & spending) and
-   **staff** (guards/handymen/entertainers), plus richer needs (hunger/thirst driving shop visits).
+4. **Staff + shops**: ride choice, needs, turnover, and the core **economy** (gate fee, ride tickets,
+   upkeep — above) are done; still to do is **staff** (guards/handymen/entertainers and their wages),
+   **shops** with hunger/thirst needs driving spending, and a player-facing build/manage UI to set ride
+   prices, the entry fee, and research/upgrades (the `Upgrades[*]`/`CostOf*` fields are parsed already).

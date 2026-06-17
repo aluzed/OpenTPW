@@ -53,6 +53,9 @@ public class Level
 		LoadProgress.Report( "Loading park terrain...", 0.5f );
 		var terrain = new ParkTerrain( "levels/jungle/terrain" );
 
+		// The park starts with a budget; peeps pay a gate fee + ride tickets, rides cost upkeep (see Ride / Peep).
+		ParkFinances.Current = new ParkFinances( starting: 10000f, entryFee: 10f );
+
 		// Centre the placement grid on the terrain's dense centroid (robust to stray distant meshes).
 		var standard = new SettingsFile( "/levels/jungle/Standard.sam" );
 		var centre = terrain.Centroid;
@@ -206,9 +209,18 @@ public class Level
 		Hud.AddChild( new Cursor() );
 	}
 
+	private static float nextEconLog;
+
 	public void Update()
 	{
 		Entity.All.ForEach( entity => entity.Update() );
+
+		// Diagnostic: periodically report the park's balance and the cumulative income/cost flows.
+		if ( Environment.GetEnvironmentVariable( "OPENTPW_ECON_DEBUG" ) != null && ParkFinances.Current is { } f && Time.Now > nextEconLog )
+		{
+			nextEconLog = Time.Now + 5f;
+			Log.Info( $"[econ] money={f.Money:0}  ride+={f.RideRevenue:0}  entry+={f.EntryRevenue:0}  upkeep-={f.UpkeepPaid:0}" );
+		}
 	}
 
 	public void Render()

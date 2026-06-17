@@ -37,6 +37,13 @@ public class Ride : Entity
 	/// <summary>The ride's base attraction value (<c>Info.AttractionValue</c>).</summary>
 	public int Attraction { get; private set; } = 25;
 
+	/// <summary>What a peep pays to board, in coins. The original lets the player set this; lacking that,
+	/// it is derived from the ride's excitement (more exciting rides charge more).</summary>
+	public float TicketPrice => MathF.Max( 1f, MathF.Round( Excitement / 10f ) );
+
+	/// <summary>The ride's running cost per second (its money sink), scaled by how many it seats.</summary>
+	public float UpkeepPerSecond => Capacity * 0.1f;
+
 	/// <summary>Run (true) or idle (false) the ride's animation — driven by occupancy (see RideQueue / Peep).</summary>
 	public void SetActive( bool active ) => engine.SetActive( active );
 
@@ -279,5 +286,8 @@ public class Ride : Entity
 		// so a ride that failed to load (VM never assigned) would otherwise crash the update loop.
 		VM?.Update();
 		engine.Update( Time.Now );
+
+		// Running the ride costs money over time (its upkeep drains the park balance).
+		ParkFinances.Current?.PayUpkeep( UpkeepPerSecond * Time.Delta );
 	}
 }

@@ -54,6 +54,7 @@ public sealed class Peep : ModelEntity
 		Scale = new Vector3( 3f, 1f, 5f + (float)Random.Shared.NextDouble() * 2f );
 		speed = 8f + (float)Random.Shared.NextDouble() * 7f;
 		Position = spawn;
+		ParkFinances.Current?.TakeEntryFee(); // pays the gate on arrival
 		PickRoute();
 		DropToGround();
 	}
@@ -117,6 +118,7 @@ public sealed class Peep : ModelEntity
 		// Only the front peep boards, and only once it has reached the entrance and a slot is free.
 		if ( pos == 0 && atSpot && route.HasFreeSlot )
 		{
+			ParkFinances.Current?.TakeRideTicket( route.Ride.TicketPrice ); // pays to board
 			route.Board( this );
 			riding = true;
 			rideTimer = route.RideDuration;
@@ -149,6 +151,7 @@ public sealed class Peep : ModelEntity
 		happiness = StartHappiness;
 		energy = MaxEnergy;
 		lastRoute = null;
+		ParkFinances.Current?.TakeEntryFee(); // a fresh visitor pays the gate
 		PickRoute();
 		if ( Environment.GetEnvironmentVariable( "OPENTPW_PEEP_DEBUG" ) != null )
 			Log.Trace( $"[peep] recycled (total {recycles})" );
