@@ -16,6 +16,7 @@ public sealed class RideEngine : IRideEngine
 	private const int SelfId = -1;     // the ride body's handle (script object ids are >= 0)
 	private const float FrameSeconds = 0.1f; // placeholder playback rate (~10 fps) per keyframe
 	private const float BobAmplitude = 12f;
+	private const float KeyframeRate = 13f;  // keyframe track time units advanced per second (tuned for ~3s/loop)
 
 	private readonly Dictionary<int, RideObject> objects = new();
 	private SdtArchive? rideSounds;
@@ -65,7 +66,7 @@ public sealed class RideEngine : IRideEngine
 	{
 		var body = new RideObject { Id = SelfId, Type = -1 };
 		foreach ( var e in parts )
-			body.Parts.Add( (e, e.Position) );
+			body.Parts.Add( (e, e.Position, e.Rotation) );
 
 		objects[SelfId] = body;
 
@@ -103,7 +104,7 @@ public sealed class RideEngine : IRideEngine
 			return;
 
 		// Despawn its visual parts (the Entity list isn't otherwise pruned on delete).
-		foreach ( var (entity, _) in obj.Parts )
+		foreach ( var (entity, _, _) in obj.Parts )
 			Entity.All.Remove( entity );
 	}
 
@@ -168,7 +169,20 @@ public sealed class RideEngine : IRideEngine
 		return false;
 	}
 
-	/// <summary>Per-frame procedural animation: bob each animating object's parts. Called by the Ride.</summary>
+	/// <summary>
+	/// Supplies the decoded keyframe tracks for an animation channel (the ride's <c>&lt;base&gt;&lt;c&gt;[n].md2</c>
+	/// files, parsed by <see cref="RideKeyframeFile"/>). When that channel is the active animation, the
+	/// engine drives each animated surface's part by its real rotation track instead of the bob.
+	/// </summary>
+	public void SetChannelKeyframes( int anim, RideKeyframeFile keyframes )
+	{
+		if ( keyframes.Surfaces.Count > 0 )
+			channelAnims[anim] = keyframes;
+	}
+
+	private readonly Dictionary<int, RideKeyframeFile> channelAnims = new();
+
+	/// <summary>Per-frame animation: drive real keyframe tracks where we have them, else the placeholder bob.</summary>
 	public void Update( float now )
 	{
 		foreach ( var obj in objects.Values )
@@ -176,18 +190,48 @@ public sealed class RideEngine : IRideEngine
 			if ( obj.AnimId == null || obj.Parts.Count == 0 )
 				continue;
 
+			var anim = obj.AnimId.Value;
 			var t = ( now - obj.AnimStart ) * obj.AnimSpeed;
-			if ( !obj.AnimLoop && t > DurationOf( obj.AnimId.Value ) )
+			if ( !obj.AnimLoop && t > DurationOf( anim ) )
 			{
 				StopAnim( obj );
 				continue;
 			}
 
-			// Procedural placeholder until MD2 keyframes (stage 2-3): a gentle vertical bob.
-			var bob = MathF.Sin( t * 2f ) * BobAmplitude;
-			foreach ( var (entity, basePos) in obj.Parts )
-				entity.Position = basePos + new Vector3( 0, 0, bob );
+			if ( channelAnims.TryGetValue( anim, out var kf ) )
+				ApplyKeyframes( obj, kf, t );
+			else
+				ApplyBob( obj, t );
 		}
+	}
+
+	// Drives each animated surface's part by its rotation track, evaluated at the channel time looped
+	// over the track duration. The keyframe quaternion is in model space (Z up), swizzled to our
+	// world (Y/Z swapped, W negated — the same swizzle the loader applies to the mesh transform) and
+	// composed onto the part's loaded base rotation.
+	private void ApplyKeyframes( RideObject obj, RideKeyframeFile kf, float t )
+	{
+		var loopT = kf.Duration > 0 ? ( t * KeyframeRate ) % kf.Duration : 0f;
+
+		foreach ( var sa in kf.Surfaces )
+		{
+			if ( sa.SurfaceIndex < 0 || sa.SurfaceIndex >= obj.Parts.Count || sa.Rotation.Count == 0 )
+				continue;
+
+			var q = RideKeyframeFile.SampleRotation( sa.Rotation, loopT );
+			var qWorld = new System.Numerics.Quaternion( q.X, q.Z, q.Y, -q.W );
+
+			var (entity, _, baseRot) = obj.Parts[sa.SurfaceIndex];
+			entity.Rotation = baseRot * qWorld;
+		}
+	}
+
+	private static void ApplyBob( RideObject obj, float t )
+	{
+		// Procedural placeholder for channels we have no decoded keyframes for: a gentle vertical bob.
+		var bob = MathF.Sin( t * 2f ) * BobAmplitude;
+		foreach ( var (entity, basePos, _) in obj.Parts )
+			entity.Position = basePos + new Vector3( 0, 0, bob );
 	}
 
 	private static void StartAnim( RideObject o, int anim, bool loop )
@@ -200,8 +244,11 @@ public sealed class RideEngine : IRideEngine
 	private static void StopAnim( RideObject o )
 	{
 		o.AnimId = null;
-		foreach ( var (entity, basePos) in o.Parts )
+		foreach ( var (entity, basePos, baseRot) in o.Parts )
+		{
 			entity.Position = basePos;
+			entity.Rotation = baseRot;
+		}
 	}
 
 	// Unknown ids fall back to the ride body, so a script animating a part we don't model yet still

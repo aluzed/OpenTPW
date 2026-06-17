@@ -60,15 +60,30 @@ The runtime apply path is now reversed (see docs/08), so the format is fully kno
 Earlier note corrected: the payload is **not** "transform-only" — vertex morph *and* TRS tracks
 coexist; only morph surfaces need a dynamic vertex path.
 
+## Done — loader + evaluator + rotation wired
+
+- ✅ **Keyframe loader** (`RideKeyframeFile`, OpenTPW.Files): reads the `0x98` trailer's per-surface
+  records and each surface's time-keyed tracks (rotation quaternion stride-20, translation/scale
+  vec3 stride-16), bounded by the `0xFFFF` sentinel + monotonic-time rule. Validated against the real
+  `monkeym1.MD2` (2 rotation tracks on surface 5 = `m_arm`, full 360° Z-turn, duration 40).
+- ✅ **Evaluator**: `SampleRotation` (slerp) / `SampleVector` (lerp) bracket keys by time, clamped to
+  the track range. Unit-tested (synthetic frame + the real asset via `TPW_KEYFRAME_SAMPLE`).
+- ✅ **Wired into the engine**: `Ride` loads each channel's keyframe file and hands it to `RideEngine`
+  (`SetChannelKeyframes`); when a channel with tracks is the active animation, `RideEngine.Update`
+  evaluates each animated surface's rotation, swizzles it to world space and composes it onto the
+  part's base rotation (replacing the bob for those surfaces). **Verified in-game**: the `monkey`
+  ride's animated surface visibly rotates from the real decoded track.
+
 ## Remaining
 
-1. Keyframe loader: flat-load + relocate (mirror `FUN_0046d6d0`), read the `0x98` trailer's surface
-   records, and decode each surface's tracks (time-keyed: morph `vec3` / rotation quaternion / scale /
-   translation), mapping each to the base surface.
-2. Per-frame evaluator (mirror `FUN_00470b60`/`FUN_00471860`): bracket keys by animation time,
-   interpolate, compose T·R·S onto the surface transform; lerp vertex positions for morph surfaces.
-3. Apply to the ride's `ModelEntity` parts over the channel frame sequence (loop Main); validate
-   against `monkey` (arms swing) / `totem`.
+1. **Vertex-morph** track (flag `0x1000`): decode the per-vertex `vec3` keyframe data (rec dword
+   `[0xa]` pointer) and lerp it into a dynamic vertex buffer — the only part needing a morph vertex
+   path. (Rotation/translation/scale ride on the existing per-mesh transform.)
+2. **Translation + scale** track composition (currently only rotation is applied); confirm the
+   axis-swizzle/compose order and pivot against more rides, and tune the playback rate vs. the
+   original's units (`KeyframeRate`).
+3. Handle multi-frame channels' extra files (`m2..m7`) — merge any tracks they carry (monkey's are in
+   `m1`); and surfaces with two records targeting the same index (both arms).
 4. Load the `7`-prefixed LOD set for distant rides; ignore `P`-prefixed preview models in-world.
 
 ## Acceptance

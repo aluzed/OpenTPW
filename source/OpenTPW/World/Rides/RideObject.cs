@@ -24,6 +24,10 @@ public sealed class RideObject
 	public float AnimStart { get; set; }
 	public float AnimSpeed { get; set; } = 1f;
 
-	/// <summary>The object's visual parts and their rest positions (the ride body has several meshes).</summary>
-	public List<(ModelEntity Entity, Vector3 BasePos)> Parts { get; } = new();
+	/// <summary>
+	/// The object's visual parts and their rest pose (the ride body has several meshes). Part index
+	/// == base-model surface index, so a keyframe track for surface N drives <c>Parts[N]</c>. BasePos
+	/// / BaseRot are the loaded transform that animation composes onto.
+	/// </summary>
+	public List<(ModelEntity Entity, Vector3 BasePos, System.Numerics.Quaternion BaseRot)> Parts { get; } = new();
 }

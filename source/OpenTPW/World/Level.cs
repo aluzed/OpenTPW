@@ -50,7 +50,7 @@ public class Level
 			// Path omits the .wad extension — the VFS mounts "<path>.wad" when a segment matches.
 			// Dev placement (no park/grid yet): float it above the camera target (400,400,12.5 — the
 			// central island) so the loaded ride is dead-centre in frame and clearly visible.
-			_ = new Ride( "levels/jungle/rides/tourride", new Vector3( 400, 400, 45 ) );
+			_ = new Ride( "levels/jungle/rides/monkey", new Vector3( 400, 400, 45 ) );
 		}
 		catch ( Exception e )
 		{

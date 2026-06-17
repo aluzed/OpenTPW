@@ -54,9 +54,41 @@ public class Ride : Entity
 		// the original names keyframe files <base><letter>[<n>].md2, letter = first letter of the
 		// animation name. We probe each ScriptDefs.Animations channel so the engine animates only what
 		// the ride actually ships, and knows each channel's frame count.
-		engine.SetAnimChannels( DiscoverAnimChannels( rideArchive, rideName ) );
+		var channels = DiscoverAnimChannels( rideArchive, rideName );
+		engine.SetAnimChannels( channels );
+		LoadKeyframes( rideArchive, rideName, channels );
 
 		VM.IsRunning = true;
+	}
+
+	// Loads the decoded keyframe tracks for each animation channel and hands them to the engine, so a
+	// channel with real animation data plays its tracks (rotation, …) instead of the placeholder bob.
+	// A channel's animation lives in its frame file(s) (<base><c>.md2 or <base><c>1.md2 — see
+	// docs/08-ghidra-animation.md). Non-fatal: any failure just leaves that channel on the bob.
+	private void LoadKeyframes( string rideArchive, string rideName, Dictionary<int, int> channels )
+	{
+		foreach ( var (anim, frames) in channels )
+		{
+			var c = RideEngine.ChannelLetter( (ScriptDefs.Animations)anim );
+			// A numbered sequence starts at frame 1 (<base><c>1.md2); a single-frame channel is <base><c>.md2.
+			var rel = frames > 1 ? $"{rideArchive}/{rideName}{c}1.md2" : $"{rideArchive}/{rideName}{c}.md2";
+			try
+			{
+				using var s = FileSystem.OpenRead( rel );
+				if ( s == null )
+					continue;
+				var kf = new RideKeyframeFile( s );
+				if ( kf.Surfaces.Count > 0 )
+				{
+					engine.SetChannelKeyframes( anim, kf );
+					Log.Info( $"[ride] keyframes for {(ScriptDefs.Animations)anim}: {kf.Surfaces.Count} animated surface(s), duration {kf.Duration}" );
+				}
+			}
+			catch ( Exception e )
+			{
+				Log.Warning( $"[ride] keyframes for {(ScriptDefs.Animations)anim} ({rel}) failed: {e.Message}" );
+			}
+		}
 	}
 
 	// Probes the WAD for each animation channel's keyframe files and returns anim id -> frame count.

@@ -95,6 +95,29 @@ public class RideKeyframeFileTests
 		Assert.AreEqual( 0, new RideKeyframeFile( noAnim ).Surfaces.Count );
 	}
 
+	// Optional validation against a real keyframe file (e.g. monkeym1.MD2 extracted from monkey.wad).
+	// Set TPW_KEYFRAME_SAMPLE to that file to run.
+	[TestMethod]
+	public void ParsesRealKeyframeSample()
+	{
+		var path = Environment.GetEnvironmentVariable( "TPW_KEYFRAME_SAMPLE" );
+		if ( string.IsNullOrEmpty( path ) || !File.Exists( path ) )
+			Assert.Inconclusive( "Set TPW_KEYFRAME_SAMPLE to a ride keyframe .MD2 (e.g. monkeym1.MD2) to run this test." );
+
+		var kf = new RideKeyframeFile( File.ReadAllBytes( path ) );
+		Assert.IsTrue( kf.Surfaces.Count > 0, "real keyframe file should have animated surfaces" );
+
+		foreach ( var s in kf.Surfaces )
+		{
+			// Each track's times must be strictly increasing, and rotation values must be unit quaternions.
+			for ( int i = 1; i < s.Rotation.Count; i++ )
+				Assert.IsTrue( s.Rotation[i].Time > s.Rotation[i - 1].Time, "keyframe times strictly increase" );
+			foreach ( var (_, q) in s.Rotation )
+				Assert.IsTrue( MathF.Abs( q.Length() - 1f ) < 1e-3f, $"rotation key should be a unit quaternion, got |q|={q.Length()}" );
+		}
+		Assert.IsTrue( kf.Duration > 0, "duration should be positive" );
+	}
+
 	private static void AssertQuat( Quaternion expected, Quaternion actual )
 	{
 		// Quaternions q and -q are the same rotation; compare via dot magnitude.
