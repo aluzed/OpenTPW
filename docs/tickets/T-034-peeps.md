@@ -116,10 +116,19 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
        from literal data at a command boundary needs the authoritative inner decoder (the per-scanline
        blit/decompress routine) — the one piece not yet pinned. Empirical fit reconstructs ~⅓ of rows
        exactly; the rest hit this ambiguity.
-   - **To finish:** read the inner-scanline decompressor (called per row from the sprite blitter) to
-     nail the skip/literal disambiguation, then render through the palette (index 0 = transparent).
-     Everything up to the per-row byte stream is solved and validated. Until then, peeps/staff/shops
-     render as flat-colour billboards (`Billboard.Make`).
+   - **Decoder located:** the RLE source is consumed by **`FUN_0055f780`**, the *scaled* sprite
+     blitter (reads the texture descriptor `param_1`, walks the compressed source via the size-class
+     mip tables `DAT_008798c8`; its `0xF0` operands are pixel-format masks `AND AL,0xF0`, so the
+     skip test is a *signed* byte check, not a `CMP 0xF0`). Sprites are drawn through the 3D pipeline
+     (`FUN_0056e7e0`, a textured-quad rasterizer with UV subdivision), i.e. decompressed into a
+     texture and blitted. Empirically the skip/literal rule reconstructs clean rows exactly (rows 0/1/2
+     above) and ~⅓ of all rows, but a structural subtlety (strict skip↔literal alternation vs. value
+     thresholds, with data bytes that collide with skip markers) isn't resolvable by inspection.
+   - **To finish:** read `FUN_0055f780`'s inner source-walk loop (large — ~2.6k decompiled lines, so
+     isolate just the byte-fetch/skip/literal section) **or** dynamic-trace one row's decode; then
+     render through the palette (index 0 = transparent). Everything up to the per-row byte stream is
+     solved and validated. Until then, peeps/staff/shops render as flat-colour billboards
+     (`Billboard.Make`).
 2. **Full path network**: a walkable path graph + A* so peeps route over real paths (not straight
    lines) between rides, park gate, shops. (Queue spacing *along* the path is now done — see "Queue
    discipline" above; what remains is the cross-park routing.)
