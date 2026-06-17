@@ -2,6 +2,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Buffers.Binary;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using SVector3 = System.Numerics.Vector3;   // OpenTPW.Vector3 (global alias) shadows the bare name
 
@@ -43,6 +44,62 @@ public class RideKeyframeFileTests
 			o += 20;
 		}
 		return d;
+	}
+
+	// Builds a frame with one surface carrying a rotation track (0xFFFF marker) and a contiguous scale
+	// track (0x0000 marker) — exercises the per-track marker + gap-bounding (a scale key time can
+	// exceed the next track's start, which must not be misread as extra keys).
+	private static byte[] BuildFrameRotAndScale( (int time, Quaternion q)[] rot, (int time, SVector3 s)[] scale )
+	{
+		var d = new byte[0x600];
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( 0, 4 ), 0x1CD15D46 );
+		int trailer = 0x100, records = 0x140, rotTrack = 0x200, scaleTrack = 0x300;
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( 0x98, 4 ), (uint)trailer );
+		BinaryPrimitives.WriteUInt16LittleEndian( d.AsSpan( trailer + 0x12, 2 ), 1 );
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( trailer + 0x2c, 4 ), (uint)records );
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( records + 0x04, 4 ), RideKeyframeFile.FlagRotation | RideKeyframeFile.FlagScale );
+		BinaryPrimitives.WriteUInt16LittleEndian( d.AsSpan( records + 0x10, 2 ), 5 );
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( records + 0x1c, 4 ), (uint)rotTrack );
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( records + 0x20, 4 ), (uint)scaleTrack );
+
+		int o = rotTrack;
+		foreach ( var (time, q) in rot )
+		{
+			BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( o, 4 ), 0xFFFF0000u | (uint)time );
+			BinaryPrimitives.WriteSingleLittleEndian( d.AsSpan( o + 4, 4 ), q.W );
+			BinaryPrimitives.WriteSingleLittleEndian( d.AsSpan( o + 8, 4 ), q.X );
+			BinaryPrimitives.WriteSingleLittleEndian( d.AsSpan( o + 12, 4 ), q.Y );
+			BinaryPrimitives.WriteSingleLittleEndian( d.AsSpan( o + 16, 4 ), q.Z );
+			o += 20;
+		}
+		o = scaleTrack;
+		foreach ( var (time, s) in scale )
+		{
+			BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( o, 4 ), (uint)time );   // 0x0000 marker in high u16
+			BinaryPrimitives.WriteSingleLittleEndian( d.AsSpan( o + 4, 4 ), s.X );
+			BinaryPrimitives.WriteSingleLittleEndian( d.AsSpan( o + 8, 4 ), s.Y );
+			BinaryPrimitives.WriteSingleLittleEndian( d.AsSpan( o + 12, 4 ), s.Z );
+			o += 16;
+		}
+		return d;
+	}
+
+	[TestMethod]
+	public void ParsesScaleTrackAndComposesWithRotation()
+	{
+		// Like space_bouncy: a "grow-in" scale 0.1 -> 1 alongside a rotation track.
+		var rot = new[] { (0, RotZ( 0 )), (10, RotZ( 90 )) };
+		var scale = new[] { (0, new SVector3( 0.1f )), (10, SVector3.One ) };
+		var kf = new RideKeyframeFile( BuildFrameRotAndScale( rot, scale ) );
+
+		var s = kf.Surfaces.Single();
+		Assert.AreEqual( 2, s.Rotation.Count );
+		Assert.AreEqual( 2, s.Scale.Count, "scale track (0x0000 marker) should parse" );
+		Assert.AreEqual( 0.1f, s.Scale[0].Value.X, 1e-4f );
+
+		// Midpoint scale lerps to ~0.55.
+		var mid = RideKeyframeFile.SampleVector( s.Scale, 5f, SVector3.One );
+		Assert.AreEqual( 0.55f, mid.X, 1e-3f );
 	}
 
 	private static Quaternion RotZ( float deg ) =>

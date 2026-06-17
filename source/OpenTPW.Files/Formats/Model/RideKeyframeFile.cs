@@ -83,6 +83,30 @@ public sealed class RideKeyframeFile
 		if ( records <= 0 || count <= 0 || count > 4096 )
 			return;
 
+		// Tracks are laid out contiguously in the data region, so a track ends where the next one
+		// begins. Collect every track/data offset (each record's translation +0x18, rotation +0x1c,
+		// scale +0x20, vertex-morph +0x28) plus the trailer, so each track can be bounded by the next
+		// offset above it — the marker-and-monotonic-time scan alone would over-read identity tracks
+		// into adjacent record data (which can look like a valid key).
+		var bounds = new SortedSet<int> { trailer };
+		for ( int i = 0; i < count; i++ )
+		{
+			int rec = records + i * 0x40;
+			if ( rec + 0x40 > d.Length )
+				break;
+			foreach ( var off in new[] { (int)U32( rec + 0x18 ), (int)U32( rec + 0x1c ), (int)U32( rec + 0x20 ), (int)U32( rec + 0x28 ) } )
+				if ( off > 0 && off < d.Length )
+					bounds.Add( off );
+		}
+
+		int NextBound( int off )
+		{
+			foreach ( var b in bounds )
+				if ( b > off )
+					return b;
+			return d.Length;
+		}
+
 		for ( int i = 0; i < count; i++ )
 		{
 			int rec = records + i * 0x40;
@@ -91,10 +115,15 @@ public sealed class RideKeyframeFile
 
 			var anim = new SurfaceAnim { SurfaceIndex = U16( rec + 0x10 ), Flags = U32( rec + 0x04 ) };
 
-			ReadTrack( d, (int)U32( rec + 0x18 ), 3, U32, F32, ( t, v ) => anim.Translation.Add( (t, new SVector3( v[0], v[1], v[2] )) ) );
+			// A key's header dword is (marker << 16) | time: the high u16 is the interpolation-type
+			// marker — 0xFFFF for a rotation (quaternion) track, 0x0000 for a linear vec3 track
+			// (translation / scale). The low u16 is the keyframe time. A track is read until the next
+			// track offset, the marker mismatches, or the time stops increasing.
+			int transOff = (int)U32( rec + 0x18 ), rotOff = (int)U32( rec + 0x1c ), scaleOff = (int)U32( rec + 0x20 );
+			ReadTrack( d, transOff, NextBound( transOff ), 3, 0x0000, U32, F32, ( t, v ) => anim.Translation.Add( (t, new SVector3( v[0], v[1], v[2] )) ) );
 			// Rotation quaternion is stored (w, x, y, z); System.Numerics.Quaternion is (x, y, z, w).
-			ReadTrack( d, (int)U32( rec + 0x1c ), 4, U32, F32, ( t, v ) => anim.Rotation.Add( (t, Quaternion.Normalize( new Quaternion( v[1], v[2], v[3], v[0] ) )) ) );
-			ReadTrack( d, (int)U32( rec + 0x20 ), 3, U32, F32, ( t, v ) => anim.Scale.Add( (t, new SVector3( v[0], v[1], v[2] )) ) );
+			ReadTrack( d, rotOff, NextBound( rotOff ), 4, 0xFFFF, U32, F32, ( t, v ) => anim.Rotation.Add( (t, Quaternion.Normalize( new Quaternion( v[1], v[2], v[3], v[0] ) )) ) );
+			ReadTrack( d, scaleOff, NextBound( scaleOff ), 3, 0x0000, U32, F32, ( t, v ) => anim.Scale.Add( (t, new SVector3( v[0], v[1], v[2] )) ) );
 
 			if ( anim.HasAnimation )
 			{
@@ -106,20 +135,21 @@ public sealed class RideKeyframeFile
 		}
 	}
 
-	// Reads keyframes starting at <paramref name="off"/>: each key is a 0xFFFF-tagged time dword
-	// (low u16 = time) followed by <paramref name="floats"/> float components. Keys run until the
-	// 0xFFFF sentinel is absent or the time stops increasing (the next track begins / data ends).
-	private static void ReadTrack( byte[] d, int off, int floats, Func<int, uint> U32, Func<int, float> F32, Action<float, float[]> emit )
+	// Reads keyframes starting at <paramref name="off"/>: each key is a header dword
+	// (marker &lt;&lt; 16 | time) followed by <paramref name="floats"/> float components. Keys run
+	// while the high u16 matches <paramref name="marker"/> and the time strictly increases (the next
+	// track begins, or data ends, otherwise).
+	private static void ReadTrack( byte[] d, int off, int end, int floats, uint marker, Func<int, uint> U32, Func<int, float> F32, Action<float, float[]> emit )
 	{
 		if ( off <= 0 )
 			return;
 
 		int stride = 4 + floats * 4;
 		float prev = -1f;
-		for ( int o = off; o + stride <= d.Length; o += stride )
+		for ( int o = off; o + stride <= d.Length && o + stride <= end; o += stride )
 		{
 			uint hdr = U32( o );
-			if ( (hdr >> 16) != 0xFFFF )
+			if ( (hdr >> 16) != marker )
 				break;
 
 			float t = hdr & 0xFFFF;

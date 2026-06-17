@@ -74,16 +74,36 @@ coexist; only morph surfaces need a dynamic vertex path.
   part's base rotation (replacing the bob for those surfaces). **Verified in-game**: the `monkey`
   ride's animated surface visibly rotates from the real decoded track.
 
+## Done — translation + scale composition
+
+- ✅ **Key-header marker decoded**: a key's header dword is `(marker << 16) | time`. The high u16 is
+  the interpolation type — `0xFFFF` = rotation (quaternion, 4 floats, slerp), `0x0000` = linear vec3
+  (translation/scale, 3 floats, lerp). The loader now reads all three track types with the right
+  marker.
+- ✅ **Robust track bounding**: tracks are contiguous, so each is bounded by the next track offset
+  (collected across all records) plus the marker + strictly-increasing-time rule — fixes the
+  identity-track over-read that otherwise pulled adjacent record data in as bogus keys.
+- ✅ **TRS composition in the engine**: `RideEngine` composes scale (multiply, Y/Z-swizzled onto the
+  part's base scale) and translation (additive, swizzled) alongside rotation, **per-track looped**
+  (each track wraps over its own last-key time for looping anims, clamps for one-shots) so a short
+  rotation track keeps spinning while a full-length identity scale stays a no-op.
+- ✅ **Validated**: parse confirmed against real data — `space_bouncy` grow-in (`0.07→1.0`),
+  `space_bumper` vertical squash (`1,0.71,1`/`1,0.53,1`). Verified in-game on `space_hoverbot` (Main,
+  10 animated surfaces): visible breathing-scale + multi-part rotation. Unit test added for the
+  `0x0000` scale-marker parse + lerp eval.
+
+> Finding: **translation tracks are absent/identity across all sampled rides** (4 worlds) — rides
+> animate by rotation and scale only. Translation is wired for completeness but is a no-op in practice.
+
 ## Remaining
 
 1. **Vertex-morph** track (flag `0x1000`): decode the per-vertex `vec3` keyframe data (rec dword
    `[0xa]` pointer) and lerp it into a dynamic vertex buffer — the only part needing a morph vertex
    path. (Rotation/translation/scale ride on the existing per-mesh transform.)
-2. **Translation + scale** track composition (currently only rotation is applied); confirm the
-   axis-swizzle/compose order and pivot against more rides, and tune the playback rate vs. the
-   original's units (`KeyframeRate`).
-3. Handle multi-frame channels' extra files (`m2..m7`) — merge any tracks they carry (monkey's are in
-   `m1`); and surfaces with two records targeting the same index (both arms).
+2. Tune the playback rate vs. the original's time units (`KeyframeRate`); confirm pivot/compose order
+   on more rides.
+3. Handle multi-frame channels' extra files (`m2..m7`) and surfaces with two records targeting the
+   same index (both arms).
 4. Load the `7`-prefixed LOD set for distant rides; ignore `P`-prefixed preview models in-world.
 
 ## Acceptance

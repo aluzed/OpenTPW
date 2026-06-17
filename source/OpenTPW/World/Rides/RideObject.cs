@@ -29,5 +29,5 @@ public sealed class RideObject
 	/// == base-model surface index, so a keyframe track for surface N drives <c>Parts[N]</c>. BasePos
 	/// / BaseRot are the loaded transform that animation composes onto.
 	/// </summary>
-	public List<(ModelEntity Entity, Vector3 BasePos, System.Numerics.Quaternion BaseRot)> Parts { get; } = new();
+	public List<(ModelEntity Entity, Vector3 BasePos, System.Numerics.Quaternion BaseRot, Vector3 BaseScale)> Parts { get; } = new();
 }

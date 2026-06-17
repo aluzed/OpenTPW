@@ -66,7 +66,7 @@ public sealed class RideEngine : IRideEngine
 	{
 		var body = new RideObject { Id = SelfId, Type = -1 };
 		foreach ( var e in parts )
-			body.Parts.Add( (e, e.Position, e.Rotation) );
+			body.Parts.Add( (e, e.Position, e.Rotation, e.Scale) );
 
 		objects[SelfId] = body;
 
@@ -104,7 +104,7 @@ public sealed class RideEngine : IRideEngine
 			return;
 
 		// Despawn its visual parts (the Entity list isn't otherwise pruned on delete).
-		foreach ( var (entity, _, _) in obj.Parts )
+		foreach ( var (entity, _, _, _) in obj.Parts )
 			Entity.All.Remove( entity );
 	}
 
@@ -205,32 +205,52 @@ public sealed class RideEngine : IRideEngine
 		}
 	}
 
-	// Drives each animated surface's part by its rotation track, evaluated at the channel time looped
-	// over the track duration. The keyframe quaternion is in model space (Z up), swizzled to our
-	// world (Y/Z swapped, W negated — the same swizzle the loader applies to the mesh transform) and
-	// composed onto the part's loaded base rotation.
-	private void ApplyKeyframes( RideObject obj, RideKeyframeFile kf, float t )
+	// Drives each animated surface's part by its keyframe tracks. The model-space TRS is swizzled to
+	// our world (Y/Z swapped — the same swizzle the loader applies to the mesh transform; rotation W
+	// is negated to match) and composed onto the part's loaded base transform. Each track loops over
+	// its own last-key time (looping anims) or clamps to its end (one-shots), so a short rotation
+	// track keeps spinning while a full-length identity scale track stays a no-op.
+	private void ApplyKeyframes( RideObject obj, RideKeyframeFile kf, float elapsed )
 	{
-		var loopT = kf.Duration > 0 ? ( t * KeyframeRate ) % kf.Duration : 0f;
+		var clock = elapsed * KeyframeRate;
 
 		foreach ( var sa in kf.Surfaces )
 		{
-			if ( sa.SurfaceIndex < 0 || sa.SurfaceIndex >= obj.Parts.Count || sa.Rotation.Count == 0 )
+			if ( sa.SurfaceIndex < 0 || sa.SurfaceIndex >= obj.Parts.Count || !sa.HasAnimation )
 				continue;
 
-			var q = RideKeyframeFile.SampleRotation( sa.Rotation, loopT );
-			var qWorld = new System.Numerics.Quaternion( q.X, q.Z, q.Y, -q.W );
+			var (entity, basePos, baseRot, baseScale) = obj.Parts[sa.SurfaceIndex];
 
-			var (entity, _, baseRot) = obj.Parts[sa.SurfaceIndex];
-			entity.Rotation = baseRot * qWorld;
+			if ( sa.Rotation.Count > 0 )
+			{
+				var q = RideKeyframeFile.SampleRotation( sa.Rotation, TrackTime( clock, sa.Rotation[^1].Time, obj.AnimLoop ) );
+				entity.Rotation = baseRot * new System.Numerics.Quaternion( q.X, q.Z, q.Y, -q.W );
+			}
+
+			if ( sa.Scale.Count > 0 )
+			{
+				var s = RideKeyframeFile.SampleVector( sa.Scale, TrackTime( clock, sa.Scale[^1].Time, obj.AnimLoop ), System.Numerics.Vector3.One );
+				entity.Scale = new Vector3( baseScale.X * s.X, baseScale.Y * s.Z, baseScale.Z * s.Y );
+			}
+
+			if ( sa.Translation.Count > 0 )
+			{
+				var tr = RideKeyframeFile.SampleVector( sa.Translation, TrackTime( clock, sa.Translation[^1].Time, obj.AnimLoop ), System.Numerics.Vector3.Zero );
+				entity.Position = basePos + new Vector3( tr.X, tr.Z, tr.Y );
+			}
 		}
 	}
+
+	// Maps the animation clock onto a single track's [0, last] domain: wrap for a looping anim, clamp
+	// for a one-shot. A zero-length track collapses to 0.
+	private static float TrackTime( float clock, float last, bool loop ) =>
+		last <= 0 ? 0f : ( loop ? clock % last : MathF.Min( clock, last ) );
 
 	private static void ApplyBob( RideObject obj, float t )
 	{
 		// Procedural placeholder for channels we have no decoded keyframes for: a gentle vertical bob.
 		var bob = MathF.Sin( t * 2f ) * BobAmplitude;
-		foreach ( var (entity, basePos, _) in obj.Parts )
+		foreach ( var (entity, basePos, _, _) in obj.Parts )
 			entity.Position = basePos + new Vector3( 0, 0, bob );
 	}
 
@@ -244,10 +264,11 @@ public sealed class RideEngine : IRideEngine
 	private static void StopAnim( RideObject o )
 	{
 		o.AnimId = null;
-		foreach ( var (entity, basePos, baseRot) in o.Parts )
+		foreach ( var (entity, basePos, baseRot, baseScale) in o.Parts )
 		{
 			entity.Position = basePos;
 			entity.Rotation = baseRot;
+			entity.Scale = baseScale;
 		}
 	}
 

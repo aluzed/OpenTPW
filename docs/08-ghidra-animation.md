@@ -146,10 +146,14 @@ tracks**, interpolated by animation time — a per-surface, multi-track system.
 converted with `__ftol`), it walks the track's entries (entry stride selected by a **type** arg:
 `1→4 B`, `2→0x14=20 B`, `4→0x10=16 B`), reads each entry's leading `u16` as the **keyframe time**,
 finds the two keys bracketing now, and returns the bracketing indices + a lerp factor
-`t = (now − prevTime) / (nextTime − prevTime)`. So the `0xFFFF`-tagged dwords we saw are
-`time | 0xFFFF0000` keyframe headers: the **low `u16` is the keyframe time** (`0,10,20,30…`), the high
-`0xFFFF` is just a sentinel. A stride-20 entry = `[time dword][4 floats]` — exactly our `0x158`
-quaternion data.
+`t = (now − prevTime) / (nextTime − prevTime)`. Each keyframe header dword is `(marker << 16) | time`:
+the **low `u16` is the keyframe time** (`0,10,20,30…`) and the **high `u16` is the interpolation
+type** — **`0xFFFF` = a rotation track** (4-float quaternion, stride 20, slerped) and **`0x0000` = a
+linear vec3 track** (translation/scale, 3 floats, stride 16, lerped). A stride-20 `0xFFFF` entry =
+`[time][quaternion]` is exactly our `0x158` data; a stride-16 `0x0000` entry = `[time][vec3]` is a
+scale/translation key (e.g. `space_bouncy`'s `0.07→1.0` grow-in). Tracks are laid out contiguously, so
+a track is bounded by the next track's offset (plus the marker + strictly-increasing-time rule) — the
+marker scan alone over-reads an identity track into adjacent record data.
 
 **The apply — `FUN_00471860`** (per surface; `FUN_004679d0` calls it for every surface). A flags word
 on the surface's anim descriptor (`desc[1]`) selects which tracks run, and it composes them:
