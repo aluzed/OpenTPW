@@ -8,10 +8,13 @@ namespace OpenTPW;
 [Flags]
 public enum MaterialFlags
 {
-	None,
+	None = 0,
 
-	DisableDepthTest,
-	DisableDepthWrite,
+	DisableDepthTest = 1,
+	DisableDepthWrite = 2,
+
+	/// <summary>Render both faces (no backface culling) — for heightfield terrain whose winding isn't uniform.</summary>
+	DoubleSided = 4,
 
 	DisableDepth = DisableDepthTest | DisableDepthWrite
 }
@@ -244,7 +247,7 @@ public partial class Material : Asset
 			),
 
 			RasterizerState = new RasterizerStateDescription(
-				FaceCullMode.Back,
+				flags.HasFlag( MaterialFlags.DoubleSided ) ? FaceCullMode.None : FaceCullMode.Back,
 				PolygonFillMode.Solid,
 				FrontFace.Clockwise,
 				true,

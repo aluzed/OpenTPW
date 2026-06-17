@@ -25,25 +25,16 @@ public class Level
 	{
 		SunLight = new Sun() { Position = new( 0, 100, 100 ) };
 
-		LoadProgress.Report( "Loading water...", 0.08f );
-		_ = new Water() { Scale = new Vector3( 10000f ) };
-
 		LoadProgress.Report( "Loading sky...", 0.12f );
 		_ = new Sky();
 
-		// The islands are the bulk of the load; each reports per-mesh sub-progress (LobbyIsland)
-		// within the bar range assigned here. The central (400,400) slot is used by the dev park demo
-		// below instead of the Jungle island.
-		LoadProgress.BeginPhase( 0.45f, 0.70f );
-		_ = new LobbyIsland( new Vector3( 600, 400, 0 ), "Hallow" );
+		// (The lobby's giant water plane is omitted in the dev park demo below — the real terrain mesh
+		// has its own water surfaces, and a 10000-unit plane at z=0 would submerge/occlude the park.)
 
-		LoadProgress.BeginPhase( 0.70f, 0.92f );
-		_ = new LobbyIsland( new Vector3( 600, 600, 0 ), "Fantasy" );
-
-		// Dev test: a real park placement grid (jungle's 95×84 tile heightfield, from Standard.sam),
-		// with several rides placed at tile coordinates and sitting on the ground — replacing the
-		// earlier single floated ride. Authentic terrain-heightfield rendering is a follow-up; the plot
-		// below is a flat stand-in. Guarded so a load failure never breaks the lobby.
+		// Dev test: render the real jungle park terrain (terrain.wad/base.md2 — 272 meshes, the actual
+		// landscape), with several rides placed at tile coordinates on its surface. Replaces the lobby
+		// islands here. Guarded so a load failure falls back to the lobby orbit camera.
+		LoadProgress.BeginPhase( 0.45f, 0.92f );
 		try
 		{
 			SetupDevPark();
@@ -51,44 +42,44 @@ public class Level
 		catch ( Exception e )
 		{
 			Log.Warning( $"dev park failed to load: {e.Message}" );
+			Camera.SetCameraMode<LobbyCameraMode>();
 		}
-
-		Camera.SetCameraMode<LobbyCameraMode>();
 	}
 
-	// Dev demonstration of the placement grid: build the jungle park grid, lay down a flat plot, and
-	// place a few rides at tile coordinates on the ground. See PlacementGrid / docs T-032.
+	// Dev demonstration: render the real jungle terrain mesh and place a few rides on its surface via
+	// the placement grid. See ParkTerrain / PlacementGrid / docs T-032.
 	private static void SetupDevPark()
 	{
-		var parkCentre = new Vector3( 400, 400, 0 );
+		LoadProgress.Report( "Loading park terrain...", 0.5f );
+		var terrain = new ParkTerrain( "levels/jungle/terrain" );
+
+		// Centre the placement grid on the terrain's dense centroid (robust to stray distant meshes).
 		var standard = new SettingsFile( "/levels/jungle/Standard.sam" );
-		var grid = PlacementGrid.FromLevelSettings( standard, tileSize: 16f, worldCenter: parkCentre );
+		var centre = terrain.Centroid;
+		var grid = PlacementGrid.FromLevelSettings( standard, tileSize: 16f, worldCenter: new Vector3( centre.X, centre.Y, 0 ) );
 
-		// A flat park plot to place rides on (stand-in for the heightfield terrain mesh).
-		const int plot = 18;
-		var groundMat = new Material<ObjectUniformBuffer>( "content/shaders/3d.shader" );
-		try { groundMat.Set( "Color", new Texture( "levels/jungle/terrain/textures/jgr_bas1.wct", TextureFlags.Repeat ) ); }
-		catch { groundMat.Set( "Color", Texture.Missing ); }
-		_ = new ModelEntity
-		{
-			Model = Primitives.Plane.GenerateModel( groundMat, new Point2( plot, plot ) ),
-			Position = parkCentre.WithZ( 0.05f ),
-			Scale = new Vector3( grid.TileSize / 2f ), // a plane repeat is 2 units, so this makes one repeat == one tile
-		};
+		// Overview camera framing the park around the centroid.
+		ParkOverviewCameraMode.Target = new Vector3( centre.X, centre.Y, centre.Z );
+		ParkOverviewCameraMode.Radius = 240f;
+		ParkOverviewCameraMode.Height = centre.Z + 200f;
+		Camera.SetCameraMode<ParkOverviewCameraMode>();
 
-		// Place a few rides at tile coordinates near the grid centre, each on a 4×4 footprint.
+		// Place a few rides at tile coordinates near the centre, dropped onto the terrain surface.
+		LoadProgress.Report( "Placing rides...", 0.9f );
 		int cx = grid.Width / 2, cy = grid.Height / 2;
 		var rides = new (string path, int tx, int ty)[]
 		{
 			("levels/jungle/rides/totem", cx - 4, cy - 4),
-			("levels/jungle/rides/monkey", cx + 1, cy - 4),
-			("levels/jungle/rides/wateride", cx - 4, cy + 1),
+			("levels/jungle/rides/monkey", cx + 2, cy - 4),
+			("levels/jungle/rides/wateride", cx - 4, cy + 2),
 		};
 		foreach ( var (path, tx, ty) in rides )
 		{
 			if ( !grid.TryPlace( tx, ty, 4, 4 ) )
 				continue;
-			try { _ = new Ride( path, grid.TileToWorld( tx, ty, 4, 4 ) ); }
+			var w = grid.TileToWorld( tx, ty, 4, 4 );
+			var wz = w.WithZ( terrain.SampleHeight( w.X, w.Y ) );
+			try { _ = new Ride( path, wz ); }
 			catch ( Exception e ) { Log.Warning( $"[park] ride '{path}' failed: {e.Message}" ); }
 		}
 	}

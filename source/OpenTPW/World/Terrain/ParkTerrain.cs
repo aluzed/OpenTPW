@@ -1,0 +1,123 @@
+using System.Numerics;
+
+namespace OpenTPW;
+
+/// <summary>
+/// The real park terrain: the level's <c>base.md2</c> from <c>terrain.wad</c> (the jungle landscape —
+/// 272 meshes, the height baked into the geometry). Rendered with the <see cref="LobbyIsland"/>
+/// pattern (per-mesh material + <c>.wct</c> textures from the WAD's <c>stexture/</c> + <c>spathtex/</c>
+/// folders). Also keeps the world-space vertices so rides can be dropped onto the surface via
+/// <see cref="SampleHeight"/>. The placement grid (<see cref="PlacementGrid"/>) maps tiles onto the
+/// terrain's XY extent (<see cref="Min"/>/<see cref="Max"/>).
+/// </summary>
+public sealed class ParkTerrain : Entity
+{
+	private readonly List<OpenTPW.Vector3> worldVerts = new();
+
+	/// <summary>World-space XY bounds of the terrain (Z is height).</summary>
+	public OpenTPW.Vector3 Min { get; private set; } = new( float.MaxValue );
+	public OpenTPW.Vector3 Max { get; private set; } = new( float.MinValue );
+
+	/// <summary>Average vertex position — a robust centre that ignores stray distant scenery meshes.</summary>
+	public OpenTPW.Vector3 Centroid { get; private set; }
+
+	public ParkTerrain( string terrainPath )
+	{
+		var modelFile = new ModelFile( $"{terrainPath}/base.md2" );
+		Log.Info( $"[terrain] {terrainPath}/base.md2: {modelFile.Meshes.Count} mesh(es)" );
+
+		// Cache textures by name — the terrain reuses the same ground/path tiles across many meshes,
+		// so without this we'd upload hundreds of duplicate GPU textures.
+		var texCache = new Dictionary<string, Texture>( StringComparer.OrdinalIgnoreCase );
+
+		foreach ( var mesh in modelFile.Meshes )
+		{
+			// Double-sided: the terrain heightfield's triangle winding isn't uniform after the Y/Z
+			// swizzle, so back-face culling would drop much of the ground (verified). See MaterialFlags.
+			var material = new Material<ObjectUniformBuffer>( "content/shaders/test.shader", MaterialFlags.DoubleSided );
+			var textures = new List<Texture>();
+			for ( int i = 0; i < 16; ++i )
+				textures.Add( mesh.Materials.Length <= i ? Texture.Missing : LoadTexture( texCache, terrainPath, mesh.Materials[i].Name ) );
+			material.Set( "Color", [.. textures] );
+
+			var vertices = new Vertex[mesh.Vertices.Length];
+			for ( int i = 0; i < mesh.Vertices.Length; ++i )
+				vertices[i] = new Vertex
+				{
+					Position = new OpenTPW.Vector3( mesh.Vertices[i].Position.X, mesh.Vertices[i].Position.Z, mesh.Vertices[i].Position.Y ),
+					Normal = mesh.Normals[i],
+					TexCoords = mesh.TexCoords[i],
+					TexIndex = (int)mesh.Vertices[i].TextureIndex,
+					MatFlags = mesh.Materials[(int)mesh.Vertices[i].TextureIndex].Flags
+				};
+
+			var model = new Model( vertices, mesh.Indices, material );
+			Matrix4x4.Decompose( mesh.TransformMatrix, out var scl, out var rot, out var pos );
+			var mPos = new OpenTPW.Vector3( pos.X, pos.Z, pos.Y );
+			var mRot = new Quaternion( rot.X, rot.Z, rot.Y, -rot.W );
+			var mScl = new OpenTPW.Vector3( scl.X, scl.Z, scl.Y );
+
+			_ = new ModelEntity { Model = model, Scale = mScl, Rotation = mRot, Position = mPos };
+
+			// Record world-space vertex positions for height sampling + bounds.
+			var modelMatrix = Matrix4x4.CreateScale( mScl.GetSystemVector3() )
+				* Matrix4x4.CreateFromQuaternion( mRot )
+				* Matrix4x4.CreateTranslation( mPos.GetSystemVector3() );
+			foreach ( var v in vertices )
+			{
+				var w = System.Numerics.Vector3.Transform( v.Position.GetSystemVector3(), modelMatrix );
+				worldVerts.Add( new OpenTPW.Vector3( w.X, w.Y, w.Z ) );
+				Min = new OpenTPW.Vector3( MathF.Min( Min.X, w.X ), MathF.Min( Min.Y, w.Y ), MathF.Min( Min.Z, w.Z ) );
+				Max = new OpenTPW.Vector3( MathF.Max( Max.X, w.X ), MathF.Max( Max.Y, w.Y ), MathF.Max( Max.Z, w.Z ) );
+			}
+		}
+
+		if ( worldVerts.Count > 0 )
+		{
+			var sum = new System.Numerics.Vector3();
+			foreach ( var v in worldVerts )
+				sum += v.GetSystemVector3();
+			sum /= worldVerts.Count;
+			Centroid = new OpenTPW.Vector3( sum.X, sum.Y, sum.Z );
+		}
+
+		Log.Info( $"[terrain] world bounds X[{Min.X:0},{Max.X:0}] Y[{Min.Y:0},{Max.Y:0}] Z[{Min.Z:0},{Max.Z:0}] centroid({Centroid.X:0},{Centroid.Y:0},{Centroid.Z:0})" );
+	}
+
+	// Terrain textures live in the WAD under stexture/ (scenery) or spathtex/ (paths); try both, then
+	// fall back to the missing-texture placeholder so geometry still renders.
+	private static Texture LoadTexture( Dictionary<string, Texture> cache, string terrainPath, string name )
+	{
+		name = name.Trim( '\0', ' ' );
+		if ( cache.TryGetValue( name, out var cached ) )
+			return cached;
+
+		Texture result = Texture.Missing;
+		foreach ( var sub in new[] { "stexture", "spathtex" } )
+		{
+			try { result = new Texture( $"{terrainPath}/{sub}/{name}.wct", TextureFlags.Repeat ); break; }
+			catch { /* try next folder */ }
+		}
+
+		cache[name] = result;
+		return result;
+	}
+
+	/// <summary>Terrain height (world Z) at world (<paramref name="x"/>,<paramref name="y"/>) — nearest vertex.</summary>
+	public float SampleHeight( float x, float y )
+	{
+		float bestDistSq = float.MaxValue, height = 0f;
+		foreach ( var v in worldVerts )
+		{
+			var dx = v.X - x;
+			var dy = v.Y - y;
+			var d = dx * dx + dy * dy;
+			if ( d < bestDistSq )
+			{
+				bestDistSq = d;
+				height = v.Z;
+			}
+		}
+		return height;
+	}
+}

@@ -68,11 +68,15 @@ is what makes a ride *do* anything, and it backs the remaining VM opcodes (T-007
 3. ☐ **Lights** — `ENABLELIGHT`/`DISABLELIGHT`/`SETLIGHT`/`COLOURLIGHT` (needs a multi-light render path).
 4. ☐ **Walk/limbo** — needs a peep/visitor system.
 5. ☐ **Scream / coaster** — `STARTSCREAM`/`TOUR`/`COAST`/`TURBO`/`BUMP` (depends on peeps + track).
-6. ⚠️ **Park placement grid** — `PlacementGrid` added (tile↔world, footprint, occupancy; jungle's
-   95×84 grid dims read from `Standard.sam`'s `MapInfo.HeightfieldWidth/Height`, unit-tested). Rides
-   are placed at tile coordinates on the ground (dev demo: a flat plot + 3 rides), replacing the single
-   floated ride. Remaining: render the authentic terrain heightfield (`terrain.wad`/`2dmap.tga`), wire
-   `RideInfo` footprints, and a build/placement UI.
+6. ⚠️ **Real park terrain + placement grid** — `PlacementGrid` (tile↔world, footprint, occupancy;
+   jungle's 95×84 dims from `Standard.sam`, unit-tested) + `ParkTerrain` rendering the real jungle
+   landscape (`terrain.wad`/`base.MD2`, 272 meshes — textured ground, water, paths) with rides placed
+   on its surface (height-sampled) via the grid. The terrain needed **double-sided** rendering
+   (`MaterialFlags.DoubleSided`) — its heightfield winding isn't uniform after the Y/Z swizzle, so
+   back-face culling dropped most of it. Remaining: the `base.lnd`/`*.map` (TP2M attribute) data and a
+   proper terrain heightfield mesh (vs the scenery in `base.MD2`); robust grid↔terrain alignment (the
+   bounds have outlier scenery meshes — uses the centroid for now); wire `RideInfo` footprints; a
+   build/placement UI; and lobby-vs-park scene separation (the demo reuses the lobby scene).
 7. ☐ Sound-code→asset mapping via `.MAP` ([T-016]); fold `EVENT`/`SETREVERB`/`DIPMUSIC` into sound.
 
 ## Affected files
