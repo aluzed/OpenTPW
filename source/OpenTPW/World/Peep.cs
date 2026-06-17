@@ -22,6 +22,7 @@ public sealed class Peep : ModelEntity
 	private const float LitterPenaltyPerSec = 1.5f;  // happiness lost per second per nearby litter (capped)
 	private const float HungerPerSec = 2f;           // hunger builds while in the park (0..100)
 	private const float HungerThreshold = 55f;        // detour to a shop for a snack at this point
+	private const float WalkFps = 8f;                // walk-cycle frames per second
 
 	// A small palette of clothing colours so the crowd reads as varied people.
 	private static readonly (byte R, byte G, byte B)[] Palette =
@@ -48,6 +49,12 @@ public sealed class Peep : ModelEntity
 	private float energy = MaxEnergy;
 	private float hunger;
 
+	// Sprite animation state (real sprite path only).
+	private readonly float spriteHeight;
+	private int facing;          // 0..7 movement direction sector → directional walk cycle
+	private float walkPhase;     // advances while moving; indexes the walk cycle
+	private bool movedThisFrame;
+
 	private static int recycles; // park-wide count of visitors that left and were replaced (diagnostics)
 
 	public Peep( ParkTerrain terrain, IReadOnlyList<RideQueue> queues, Vector3 spawn, int colorIndex )
@@ -56,19 +63,21 @@ public sealed class Peep : ModelEntity
 		this.queues = queues;
 		home = spawn;
 
-		// Prefer the real decoded peep sprite; fall back to a flat-colour billboard if it can't load.
-		if ( PeepSprite.Model is { } sprite )
+		// Prefer the real decoded peep sprite (per-frame models, directional walk cycles); fall back to a
+		// flat-colour billboard if it can't load.
+		spriteHeight = 15f + (float)Random.Shared.NextDouble() * 3f;
+		if ( PeepSprite.Loaded )
 		{
-			billboard = sprite;
-			float height = 15f + (float)Random.Shared.NextDouble() * 3f;
-			Scale = new Vector3( height * PeepSprite.Aspect, 1f, height );
+			billboard = PeepSprite.FrameModel( 0 );
+			Model = billboard;
+			ApplySprite();
 		}
 		else
 		{
 			billboard = SharedModel( colorIndex );
+			Model = billboard;
 			Scale = new Vector3( 3f, 1f, 5f + (float)Random.Shared.NextDouble() * 2f );
 		}
-		Model = billboard;
 		speed = 8f + (float)Random.Shared.NextDouble() * 7f;
 		Position = spawn;
 		ParkFinances.Current?.TakeEntryFee(); // pays the gate on arrival
@@ -104,6 +113,7 @@ public sealed class Peep : ModelEntity
 			if ( WalkToward( home ) )
 				Recycle();
 			FaceCamera();
+			ApplySprite();
 			return;
 		}
 
@@ -118,6 +128,7 @@ public sealed class Peep : ModelEntity
 				PickRoute();
 			}
 			FaceCamera();
+			ApplySprite();
 			return;
 		}
 
@@ -181,6 +192,7 @@ public sealed class Peep : ModelEntity
 			happiness = Math.Max( 0f, happiness - WaitPenaltyPerSec * Time.Delta );
 
 		FaceCamera();
+		ApplySprite();
 	}
 
 	// True once a peep is tired out or fed up — time to head for the exit.
@@ -210,14 +222,49 @@ public sealed class Peep : ModelEntity
 	}
 
 	// Walk toward a world point (XY only), dropping onto the terrain. Returns true once within reach.
+	// Tracks the movement direction (for the directional sprite) and whether we actually moved.
 	private bool WalkToward( Vector3 target )
 	{
 		var to = new Vector3( target.X - Position.X, target.Y - Position.Y, 0 );
 		bool arrived = to.Length < 2.5f;
+		movedThisFrame = !arrived;
 		if ( !arrived )
+		{
 			Position += to.Normal * speed * Time.Delta;
+			facing = DirSector( to.X, to.Y );
+		}
 		DropToGround();
 		return arrived;
+	}
+
+	// World movement angle → one of 8 compass sectors (0 = +X, counter-clockwise).
+	private static int DirSector( float dx, float dy )
+	{
+		int s = (int)MathF.Round( MathF.Atan2( dy, dx ) / (MathF.PI / 4f) );
+		return ((s % 8) + 8) % 8;
+	}
+
+	// Picks the current sprite frame from the facing direction + walk phase and sizes the billboard to
+	// the frame's aspect. No-op on the flat-billboard fallback path.
+	private void ApplySprite()
+	{
+		if ( !PeepSprite.Loaded )
+			return;
+
+		var anims = PeepSprite.Anims;
+		int frame = 0;
+		if ( anims.Count > 0 )
+		{
+			var a = anims[facing % anims.Count];
+			if ( movedThisFrame )
+				walkPhase += WalkFps * Time.Delta;
+			else
+				walkPhase = 0f; // stand on the cycle's first frame when idle
+			frame = a.Start + ( a.Count > 0 ? (int)walkPhase % a.Count : 0 );
+		}
+
+		Model = PeepSprite.FrameModel( frame );
+		Scale = new Vector3( spriteHeight * PeepSprite.FrameAspect( frame ), 1f, spriteHeight );
 	}
 
 	/// <summary>An entertainer lifts this peep's mood (capped at full); a happier peep stays longer.</summary>
