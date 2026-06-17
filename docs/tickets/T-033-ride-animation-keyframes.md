@@ -95,11 +95,24 @@ coexist; only morph surfaces need a dynamic vertex path.
 > Finding: **translation tracks are absent/identity across all sampled rides** (4 worlds) — rides
 > animate by rotation and scale only. Translation is wired for completeness but is a no-op in practice.
 
-## Remaining
+## Vertex-morph track — format decoded (see docs/08), wiring remaining
 
-1. **Vertex-morph** track (flag `0x1000`): decode the per-vertex `vec3` keyframe data (rec dword
-   `[0xa]` pointer) and lerp it into a dynamic vertex buffer — the only part needing a morph vertex
-   path. (Rotation/translation/scale ride on the existing per-mesh transform.)
+Reverse-engineered from `FUN_004714a0` (the flag-`0x1000` morph apply). It is common —
+**~154 of 595 animated ride files** carry real multi-frame morph. Format:
+
+- One record per frame (`dword[0]`=frame index); `dword[0xa]` → that frame's morph block.
+- Vertices are **quantised**: a packed 32-bit int with three **10-bit signed** components, dequantised
+  `component = signed10 * scaleAxis + offsetAxis` (per-block bounding-box scale `+0x20/24/28`, offset
+  `+0x14/18/1c`). Block `+0xc` → sub-struct with keyframe times (`+0x08`), vertex count (`+0x16`), a
+  vertex-index array (`+0x18`), and the packed-int array (`+0x20`); two bracketing keys are blended.
+- Result is written into the surface's render vertex buffer → needs a **dynamic vertex buffer**
+  (`Model` already supports `Device.UpdateBuffer`, so per-frame CPU dequant + re-upload is feasible).
+
+### Remaining
+
+1. **Wire vertex morph**: parse the nested block→sub-struct layout, dequantise + blend the two
+   bracketing keyframes each frame, remap via the vertex-index array onto our `ModelFile` vertex
+   order, and re-upload through `Model`. (Adds organic deformation, e.g. `fantasy/bbugs`.)
 2. Tune the playback rate vs. the original's time units (`KeyframeRate`); confirm pivot/compose order
    on more rides.
 3. Handle multi-frame channels' extra files (`m2..m7`) and surfaces with two records targeting the

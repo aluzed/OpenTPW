@@ -173,6 +173,36 @@ their surfaces. (`0.7071` = sin 45°.) A separate system, **animating textures**
 `ANIMATINGTEXTURES`), scrolls UVs procedurally — that's water/conveyor flow, not part of this keyframe
 path.
 
+### Vertex-morph format (decoded; not yet wired)
+
+The vertex-morph track is the one track type not yet implemented in OpenTPW (rotation, translation and
+scale are done — they ride on the per-mesh transform). It is common — **~154 of 595 animated ride
+files** carry real multi-frame morph (across all four worlds). Its layout, decoded from the morph
+apply `FUN_004714a0` (the flag-`0x1000`-without-`0x4000` path; the inline lerp in `FUN_00471860` is the
+rarer `0x4000` variant):
+
+- A morphing surface has **one record per frame** (record `dword[0]` = frame index, `dword[0x5]` =
+  frame+1), each record's `dword[0xa]` pointing to that frame's morph block.
+- **Vertices are quantised**: each is a packed 32-bit int holding three **10-bit signed** components —
+  `X = sext(packed[0:9])`, `Y = sext(packed[10:19])`, `Z = sext(packed[20:29])` (the code does
+  `(packed << 0x16) >> 0x16` etc.). Each is dequantised as `component = signed10 * scaleAxis +
+  offsetAxis`, with a per-block **bounding-box** scale (`block+0x20/24/28`) and offset
+  (`block+0x14/18/1c`).
+- The block's `+0xc` points to a sub-struct with: keyframe **times** array (`+0x08`, u16 times),
+  current key index (`+0x10`), vertex count (`+0x16`), a **vertex-index** array (`+0x18`, mapping
+  packed verts → the surface's vertex-buffer slots), and the packed-int array (`+0x20`). A `+0`/flag
+  `& 2` indicates two keyframes present, which `FUN_004711d0` blends.
+- The result is written **directly into the surface's render vertex buffer** (`out[0x18]`, SoA-of-4:
+  X/Y/Z at `+0/+0x10/+0x20`, stride `0x30` per group of 4) — so morph needs a **dynamic vertex
+  buffer**. In OpenTPW `Model` already updates its buffer via `Device.UpdateBuffer`, so a per-frame CPU
+  dequantise + re-upload is feasible.
+
+**Remaining to wire it (T-033):** map the nested block→sub-struct file layout into a parser (the
+fields above are file offsets, relocated at runtime), dequantise + blend the two bracketing keyframes
+per frame, remap via the vertex-index array onto our `ModelFile` vertex order, and re-upload through
+`Model`. Deferred for now — rotation+scale cover the visible motion of most rides; morph adds organic
+deformation (e.g. `fantasy/bbugs`).
+
 **Consequence for the engine.** The clean target is a per-surface animation evaluator that, each frame:
 finds the bracketing keys per track (the `FUN_00470b60` logic), interpolates rotation (slerp/lerp on
 the quaternion), scale and translation, and composes T·R·S onto the surface's transform (which maps to
@@ -208,6 +238,8 @@ quantisation it references) so the engine can morph the base mesh through the re
 | `FUN_00471860` | **Per-surface pose apply**: runs the surface's vertex-morph / rotation / scale / translation tracks (flags in `desc[1]`) and composes the result |
 | `FUN_004679d0` | Iterates a model's surfaces and calls `FUN_00471860` for each |
 | `FUN_00470b60` | **Keyframe interpolator**: finds the two keys bracketing the current time and returns the lerp factor (entry stride by track type: `4`/`20`/`16` B) |
+| `FUN_004714a0` | **Vertex-morph apply** (flag `0x1000`): dequantises 10-bit-packed per-vertex positions (×scale + offset), blends two keyframes, writes the surface vertex buffer |
+| `FUN_004711d0` | Computes the two-keyframe blend weights for the morph |
 | `FUN_00474490` | Builds a rotation matrix from the interpolated quaternion (rotation track) |
 | `FUN_00467310` | **Animating textures** (`ANIMATINGTEXTURES`): procedural UV scroll — a *separate* system from keyframes |
 | `FUN_00470b30` | Marks a frame surface dirty (sets flag `0x20` on the model) — not the vertex fold |
