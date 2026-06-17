@@ -68,7 +68,7 @@ public class Level
 		// ride's Info.Shape) on the grid and dropped onto the terrain surface.
 		LoadProgress.Report( "Placing rides...", 0.9f );
 		var paths = new[] { "levels/jungle/rides/totem", "levels/jungle/rides/monkey", "levels/jungle/rides/wateride" };
-		var queues = new List<IReadOnlyList<Vector3>>(); // each ride's queue path waypoints (outer end → entrance)
+		var queues = new List<RideQueue>(); // each ride's queue (waypoints + exit + capacity)
 		int tx = grid.Width / 2 - 7, ty = grid.Height / 2 - 2;
 		foreach ( var path in paths )
 		{
@@ -86,9 +86,16 @@ public class Level
 			{
 				var ride = new Ride( path, wz );
 				PlaceEntranceExitMarkers( ride, grid, terrain, tx, ty );
-				var queue = SpawnQueuePath( ride, grid, terrain, tx, ty );
-				if ( queue != null )
-					queues.Add( queue );
+				var waypoints = SpawnQueuePath( ride, grid, terrain, tx, ty );
+				if ( waypoints != null )
+				{
+					// Where riders reappear: the exit cell stand point (fall back to the entrance).
+					var exit = ride.Shape.Exit is { } x
+						? grid.PointToWorld( tx + x.X + ride.ExitAppearPos.X, ty + x.Y + ride.ExitAppearPos.Y )
+						: waypoints[^1];
+					exit = exit.WithZ( terrain.SampleHeight( exit.X, exit.Y ) );
+					queues.Add( new RideQueue( waypoints, exit, rideDuration: 5f, capacity: 4 ) );
+				}
 			}
 			catch ( Exception e ) { Log.Warning( $"[park] ride '{path}' failed: {e.Message}" ); }
 

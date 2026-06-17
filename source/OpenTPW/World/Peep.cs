@@ -3,9 +3,10 @@ namespace OpenTPW;
 /// <summary>
 /// A park visitor. Renders as an upright camera-facing billboard (a placeholder until the authentic
 /// peep sprites — <c>esprites.wad</c>'s <c>.TPC</c>/<c>.FPC</c>, a custom encoded image format — are
-/// decoded). It <b>follows the queue paths</b>: it picks a ride's queue, walks to its outer end then
-/// up its waypoints to the ride entrance, pauses ("rides"), then heads off to another ride's queue.
-/// Always dropped onto the terrain surface; the billboard yaws (about world up) to face the camera.
+/// decoded). It follows a ride's <see cref="RideQueue"/> to the entrance, <b>boards</b> when a slot is
+/// free (hides while the ride runs, occupying a rider slot so a queue forms when the ride is full),
+/// then <b>reappears at the exit</b> and heads off to another ride. Always dropped onto the terrain
+/// surface; the billboard yaws (about world up) to face the camera.
 /// </summary>
 public sealed class Peep : ModelEntity
 {
@@ -18,19 +19,22 @@ public sealed class Peep : ModelEntity
 	private static Model[]? sharedModels;
 
 	private readonly ParkTerrain terrain;
-	private readonly IReadOnlyList<IReadOnlyList<Vector3>> queues;
+	private readonly IReadOnlyList<RideQueue> queues;
 	private readonly float speed;
+	private readonly Model billboard;
 
-	private IReadOnlyList<Vector3>? route;
+	private RideQueue? route;
 	private int routeIndex;
-	private float pause;
+	private float rideTimer;
+	private bool riding;
 
-	public Peep( ParkTerrain terrain, IReadOnlyList<IReadOnlyList<Vector3>> queues, Vector3 spawn, int colorIndex )
+	public Peep( ParkTerrain terrain, IReadOnlyList<RideQueue> queues, Vector3 spawn, int colorIndex )
 	{
 		this.terrain = terrain;
 		this.queues = queues;
 
-		Model = SharedModel( colorIndex );
+		billboard = SharedModel( colorIndex );
+		Model = billboard;
 		Scale = new Vector3( 3f, 1f, 5f + (float)Random.Shared.NextDouble() * 2f );
 		speed = 8f + (float)Random.Shared.NextDouble() * 7f;
 		Position = spawn;
@@ -40,26 +44,47 @@ public sealed class Peep : ModelEntity
 
 	protected override void OnUpdate()
 	{
-		if ( pause > 0f )
-			pause -= Time.Delta;                 // "riding" at the entrance
-		else if ( route != null && routeIndex < route.Count )
+		// On the ride: hidden, waiting out the ride duration, then reappear at the exit and re-route.
+		if ( riding )
 		{
-			var dest = route[routeIndex];
+			rideTimer -= Time.Delta;
+			if ( rideTimer <= 0f )
+			{
+				riding = false;
+				route!.Riders--;
+				Model = billboard;
+				Position = route.ExitPoint;
+				PickRoute();
+			}
+			return;
+		}
+
+		if ( route == null )
+		{
+			PickRoute();
+			return;
+		}
+
+		if ( routeIndex < route.Waypoints.Count )
+		{
+			// Walk toward the next queue waypoint.
+			var dest = route.Waypoints[routeIndex];
 			var to = new Vector3( dest.X - Position.X, dest.Y - Position.Y, 0 );
 			if ( to.Length < 2.5f )
-			{
-				// Reached this waypoint; advance, and when the queue ends (the ride entrance) pause then re-route.
-				if ( ++routeIndex >= route.Count )
-				{
-					pause = 1.5f + (float)Random.Shared.NextDouble() * 2.5f;
-					PickRoute();
-				}
-			}
+				routeIndex++;
 			else
 				Position += to.Normal * speed * Time.Delta;
 		}
-		else
-			PickRoute();
+		else if ( route.HasFreeSlot )
+		{
+			// At the entrance with a free slot — board: occupy a rider slot and hide for the ride.
+			route.Riders++;
+			riding = true;
+			rideTimer = route.RideDuration;
+			Model = null;
+			return;
+		}
+		// else: ride full — wait at the entrance (a queue builds up).
 
 		DropToGround();
 
