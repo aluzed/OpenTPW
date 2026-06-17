@@ -115,6 +115,10 @@ public class Level
 			_ = new Peep( terrain, queues, spawn, i );
 		}
 		Log.Info( $"[park] spawned 40 visitors following {queues.Count} queues" );
+
+		// A couple of entertainers roam the park, drawing wages and cheering nearby visitors (see Staff).
+		for ( int i = 0; i < 2; i++ )
+			_ = new Staff( terrain, new Vector3( centre.X, centre.Y, 0 ), roam: 90f );
 	}
 
 	// Visualises a ride's entrance/exit cells (from its Info.Shape) as small markers on the terrain —
@@ -220,7 +224,7 @@ public class Level
 		if ( Environment.GetEnvironmentVariable( "OPENTPW_ECON_DEBUG" ) != null && ParkFinances.Current is { } f && Time.Now > nextEconLog )
 		{
 			nextEconLog = Time.Now + 5f;
-			Log.Info( $"[econ] money={f.Money:0}  ride+={f.RideRevenue:0}  entry+={f.EntryRevenue:0}  upkeep-={f.UpkeepPaid:0}" );
+			Log.Info( $"[econ] money={f.Money:0}  ride+={f.RideRevenue:0}  entry+={f.EntryRevenue:0}  upkeep-={f.UpkeepPaid:0}  wages-={f.WagesPaid:0}" );
 		}
 	}
 

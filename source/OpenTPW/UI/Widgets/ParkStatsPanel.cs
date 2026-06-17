@@ -33,6 +33,7 @@ internal sealed class ParkStatsPanel : Panel
 			$"TICKETS {fin.RideRevenue:0}",
 			$"GATE {fin.EntryRevenue:0}",
 			$"UPKEEP {fin.UpkeepPaid:0}",
+			$"WAGES {fin.WagesPaid:0}",
 			$"VISITORS {visitors}",
 		};
 

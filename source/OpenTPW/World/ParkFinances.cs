@@ -18,6 +18,7 @@ public sealed class ParkFinances
 	public float RideRevenue { get; private set; }
 	public float EntryRevenue { get; private set; }
 	public float UpkeepPaid { get; private set; }
+	public float WagesPaid { get; private set; }
 
 	public ParkFinances( float starting, float entryFee )
 	{
@@ -44,5 +45,12 @@ public sealed class ParkFinances
 	{
 		Money -= amount;
 		UpkeepPaid += amount;
+	}
+
+	/// <summary>Ongoing staff wages.</summary>
+	public void PayWages( float amount )
+	{
+		Money -= amount;
+		WagesPaid += amount;
 	}
 }

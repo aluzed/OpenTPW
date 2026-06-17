@@ -168,6 +168,9 @@ public sealed class Peep : ModelEntity
 		return arrived;
 	}
 
+	/// <summary>An entertainer lifts this peep's mood (capped at full); a happier peep stays longer.</summary>
+	public void Cheer( float amount ) => happiness = Math.Min( 100f, happiness + amount );
+
 	private void DropToGround() => Position = Position.WithZ( terrain.SampleHeight( Position.X, Position.Y ) );
 
 	// Cylindrical billboard: yaw about world up so the quad's +Y face points at the camera.

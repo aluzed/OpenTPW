@@ -57,8 +57,12 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
   books balance (verified: from 10000 → 10609 over ~50 s = +400 gate +383 tickets −174 upkeep). Ride
   prices / entry fee are derived defaults (the original lets the player set them) pending a build/manage UI.
 - **Park-stats HUD**: a top-left readout (`ParkStatsPanel`) shows the live balance and flows
-  (MONEY / TICKETS / GATE / UPKEEP) plus the VISITORS count, so the economy and crowd are visible on
-  screen rather than only in logs. No-op without a park (harmless in the plain lobby).
+  (MONEY / TICKETS / GATE / UPKEEP / WAGES) plus the VISITORS count, so the economy and crowd are
+  visible on screen rather than only in logs. No-op without a park (harmless in the plain lobby).
+- **Staff (entertainers)**: `Staff` entities roam the park (bright-orange billboards), draw a **wage**
+  every second (`ParkFinances.PayWages`, shown as WAGES) and lift the **happiness** of nearby visitors
+  (`Peep.Cheer`), so a happier crowd stays longer and buys more tickets. Verified: wages drain the
+  balance (2 staff ≈ 3/s) and the books still reconcile. First slice of staff — handymen/guards next.
 
 ## Remaining
 
@@ -73,7 +77,8 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
    blocked on the `.MAP` audio catalog (T-016): the script-driven sounds currently resolve through an
    approximate index (e.g. the monkey plays `urinal.mp2`), so a per-board cue would just repeat that
    wrong mapping until T-016 lands.
-4. **Staff + shops**: ride choice, needs, turnover, and the core **economy** (gate fee, ride tickets,
-   upkeep — above) are done; still to do is **staff** (guards/handymen/entertainers and their wages),
-   **shops** with hunger/thirst needs driving spending, and a player-facing build/manage UI to set ride
-   prices, the entry fee, and research/upgrades (the `Upgrades[*]`/`CostOf*` fields are parsed already).
+4. **More staff + shops**: ride choice, needs, turnover, the core **economy** (gate fee, ride tickets,
+   upkeep, **wages**) and roaming **entertainers** are done (above); still to do are **handymen/guards**
+   (litter & safety mechanics), **shops** with hunger/thirst needs driving spending, and a player-facing
+   build/manage UI to set ride prices, the entry fee, and research/upgrades (the `Upgrades[*]`/`CostOf*`
+   fields are parsed already).
