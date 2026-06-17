@@ -42,14 +42,28 @@ The frame format is now reversed (loader `FUN_0046d6d0`, cross-checked against `
   vertex region. The bulk **`0xb8` .. `[0x98]`** is the frame's **vertex-position payload** (verified
   real model-space floats). A frame only carries the surfaces that move, so sizes vary.
 
+## Validation finding (loader validated first, before engine code)
+
+Decoding `monkeym1`'s payload **refutes the vertex-morph hypothesis**: a record's offsets point to a
+**sparse indexed list** — `0xFFFF0000 | index` markers (indices step `0,10,20,30…`) each followed by
+four **unit-magnitude, quaternion-like** floats (`(1,0,0,0)`, `(0.7071,0,0,0.7071)`, `(0,0,0,1)`), not
+model-space positions. Both `monkeym1` records target base surface 5 (`m_arm`) — consistent with
+**per-surface rotational animation**, not a replacement vertex set.
+
+→ Ride animation should be modelled as **per-surface transform/rotation animation** (maps onto the
+per-mesh `TransformMatrix` we already apply), *not* a vertex-morph path with dynamic buffers. This
+de-risk pass means we will not build the wrong architecture.
+
 ## Remaining
 
-1. Implement a keyframe loader: flat-load + relocate (mirror `FUN_0046d6d0`), read the `0x98` trailer
-   to map each frame surface → base surface, and produce per-surface `Vector3[]` overriding the base
-   positions. Validate by morphing `monkey` Main (`m1..m7`) and eyeballing against the original.
-2. Renderer morph: lerp base↔frame vertex positions over the channel's frame sequence (CPU lerp into
-   the vertex buffer, or a two-pose vertex shader) at the channel frame rate; loop Main.
-3. Load the `7`-prefixed LOD set for distant rides; ignore `P`-prefixed preview models in-world.
+1. Decompile the **runtime pose-apply function** (the consumer of the model's `0x98` animation
+   pointer during rendering) to pin down the vec4 semantics: quaternion vs. axis form, per-vertex vs.
+   per-bone, and how it composes with the base pose.
+2. Implement the keyframe loader on that basis (flat-load + relocate per `FUN_0046d6d0`; read the
+   `0x98` trailer; decode each surface's sparse quaternion list).
+3. Apply per-frame transforms to the ride's `ModelEntity` parts over the channel frame sequence (loop
+   Main); validate against `monkey` (arms swing) / `totem`.
+4. Load the `7`-prefixed LOD set for distant rides; ignore `P`-prefixed preview models in-world.
 
 ## Acceptance
 

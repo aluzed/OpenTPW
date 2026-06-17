@@ -132,9 +132,32 @@ bytes of `monkeym1.MD2` / `monkeyc.MD2` pins the layout down:
   vary (`monkeym1` 2.9 KB carries a few surfaces; `monkeyc` 33 KB carries most of the model).
 
 So a complete keyframe loader must: load the frame via the same flat-load+relocate path, read the
-`0x98` trailer to map each frame surface → base surface, and overwrite those surfaces' vertex
-positions from the `0xb8` region. That surface-relink + the renderer morph (lerp base↔frame over the
-channel's frame sequence) is the remaining T-033 work; the structural layout above is now known.
+`0x98` trailer to map each frame surface → base surface, and apply that surface's payload. The trailer
+holds `count` (at `+0x12`) surface records of `0x40` bytes each (array at `+0x2c`); each record's
+`+0x10` is the base surface index, `+0xc` an element count, and `+0x18`/`+0x1c`/`+0x20` are three
+offsets into the data region.
+
+### Validation finding — the payload is sparse rotation data, NOT vertex positions
+
+Decoding `monkeym1`'s record data region settles what the payload actually is, and it is **not** plain
+vertex-morph positions:
+
+- The data at a record's offsets is a **sparse indexed list**. Each entry is a `0xFFFF`-tagged marker
+  dword `0xFFFF0000 | index` (observed indices `0, 10, 20, 30 …` — they step through the surface's
+  vertices) followed by **four floats of unit magnitude**: `(1,0,0,0)`, `(0.7071,0,0,0.7071)`,
+  `(0,0,0,1)` — i.e. **normalised, quaternion-like** values (`0.7071` = sin 45°), not model-space
+  coordinates.
+- The clean `0.7071`/`±1`/`~0` structure across `0x158`–`0x218`, two records both pointing at base
+  surface 5 (`m_arm` / the monkey's arms), is consistent with **per-surface rotational animation**
+  (the arms swing), encoded sparsely per vertex, rather than a full replacement vertex set.
+
+**Consequence for the engine.** Ride keyframes are best modelled as **per-surface transform / rotation
+animation**, which maps onto the per-mesh `TransformMatrix` we already parse and apply — *not* as a
+vertex-morph path needing dynamic vertex buffers. The exact semantics of the vec4 (quaternion vs. axis
+form, per-vertex vs. per-bone, and how it composes with the base pose) need the **runtime pose-apply
+function** decompiled to pin down before implementing — building a loader on the morph assumption would
+have been the wrong architecture. That decompile + the transform-animation path is the remaining T-033
+work; the file structure and the *nature* of the payload are now known.
 
 This is classic Quake-II-style MD2 vertex-morph animation, but with each keyframe stored in its own
 file instead of appended into one. (It also explains the earlier finding that a single shipping
