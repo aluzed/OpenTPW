@@ -11,12 +11,16 @@ public class Ride : Entity
 {
 	public RideVM VM { get; private set; }
 
+	/// <summary>The ride's tile footprint (from its <c>.sam</c> Info.Shape) — how many grid tiles it occupies.</summary>
+	public RideShape Shape { get; }
+
 	private readonly RideEngine engine = new();
 
 	public Ride( string rideArchive, Vector3 position )
 	{
 		Position = position;
 		var rideName = Path.GetFileNameWithoutExtension( rideArchive );
+		Shape = RideShape.Load( rideArchive, rideName );
 
 		// Script (the VFS resolves the path into the .wad; matching is case-insensitive — T-014).
 		VM = new RideVM( FileSystem.OpenRead( $"{rideArchive}/{rideName}.rse" ) );
