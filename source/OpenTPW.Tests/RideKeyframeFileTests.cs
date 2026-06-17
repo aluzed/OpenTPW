@@ -1,0 +1,104 @@
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
+using System.Buffers.Binary;
+using System.IO;
+using System.Numerics;
+using SVector3 = System.Numerics.Vector3;   // OpenTPW.Vector3 (global alias) shadows the bare name
+
+namespace OpenTPW.Tests;
+
+[TestClass]
+public class RideKeyframeFileTests
+{
+	// Builds a minimal keyframe file matching the reverse-engineered layout (docs/08): a header with
+	// the magic and a 0x98 anim pointer, a trailer (count + record array), one surface record with a
+	// rotation track, and a rotation track of (0xFFFF-tagged time, (w,x,y,z) quaternion) keys.
+	private static byte[] BuildFrame( int surfaceIndex, (int time, Quaternion q)[] rotKeys )
+	{
+		var d = new byte[0x400];
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( 0, 4 ), 0x1CD15D46 ); // magic
+
+		int trailer = 0x100;
+		int records = 0x140;
+		int rotTrack = 0x200;
+
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( 0x98, 4 ), (uint)trailer );    // anim pointer
+		BinaryPrimitives.WriteUInt16LittleEndian( d.AsSpan( trailer + 0x12, 2 ), 1 );      // record count
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( trailer + 0x2c, 4 ), (uint)records ); // record array
+
+		// One surface record (0x40 bytes).
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( records + 0x04, 4 ), RideKeyframeFile.FlagRotation ); // flags
+		BinaryPrimitives.WriteUInt16LittleEndian( d.AsSpan( records + 0x10, 2 ), (ushort)surfaceIndex );          // surface index
+		BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( records + 0x1c, 4 ), (uint)rotTrack );                // rotation track offset
+
+		// Rotation track: stride 20 = [0xFFFF|time][4 floats w,x,y,z].
+		int o = rotTrack;
+		foreach ( var (time, q) in rotKeys )
+		{
+			BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( o, 4 ), 0xFFFF0000u | (uint)time );
+			BinaryPrimitives.WriteSingleLittleEndian( d.AsSpan( o + 4, 4 ), q.W );  // stored (w, x, y, z)
+			BinaryPrimitives.WriteSingleLittleEndian( d.AsSpan( o + 8, 4 ), q.X );
+			BinaryPrimitives.WriteSingleLittleEndian( d.AsSpan( o + 12, 4 ), q.Y );
+			BinaryPrimitives.WriteSingleLittleEndian( d.AsSpan( o + 16, 4 ), q.Z );
+			o += 20;
+		}
+		return d;
+	}
+
+	private static Quaternion RotZ( float deg ) =>
+		Quaternion.CreateFromAxisAngle( SVector3.UnitZ, deg * MathF.PI / 180f );
+
+	[TestMethod]
+	public void ParsesRotationTrackKeysAndTimes()
+	{
+		// A full 360° turn about Z, like monkeym1's m_arm (surface 5): t=0..40.
+		var keys = new[] { (0, RotZ( 0 )), (10, RotZ( 90 )), (20, RotZ( 180 )), (30, RotZ( 270 )), (40, RotZ( 360 )) };
+		var kf = new RideKeyframeFile( BuildFrame( 5, keys ) );
+
+		Assert.AreEqual( 1, kf.Surfaces.Count );
+		var s = kf.Surfaces[0];
+		Assert.AreEqual( 5, s.SurfaceIndex );
+		Assert.AreEqual( 5, s.Rotation.Count, "should read exactly 5 keys (sentinel + monotonic time)" );
+		Assert.AreEqual( 40f, kf.Duration );
+		Assert.AreEqual( 0f, s.Rotation[0].Time );
+		Assert.AreEqual( 20f, s.Rotation[2].Time );
+	}
+
+	[TestMethod]
+	public void StopsAtTimeWrap()
+	{
+		// Two concatenated tracks (the second wraps back to t=0) — only the first should be read.
+		var keys = new[] { (0, RotZ( 0 )), (10, RotZ( 90 )), (0, RotZ( 0 )), (10, RotZ( 90 )) };
+		var kf = new RideKeyframeFile( BuildFrame( 5, keys ) );
+		Assert.AreEqual( 2, kf.Surfaces[0].Rotation.Count, "must stop when the keyframe time decreases" );
+	}
+
+	[TestMethod]
+	public void SampleRotationInterpolatesAndClamps()
+	{
+		var keys = new (float, Quaternion)[] { (0f, RotZ( 0 )), (10f, RotZ( 90 )) };
+
+		// Clamp below/above the range.
+		AssertQuat( RotZ( 0 ), RideKeyframeFile.SampleRotation( keys, -5f ) );
+		AssertQuat( RotZ( 90 ), RideKeyframeFile.SampleRotation( keys, 99f ) );
+
+		// Midpoint slerps to ~45°.
+		AssertQuat( RotZ( 45 ), RideKeyframeFile.SampleRotation( keys, 5f ) );
+	}
+
+	[TestMethod]
+	public void EmptyOrBadDataYieldsNoAnimation()
+	{
+		Assert.AreEqual( 0, new RideKeyframeFile( new byte[0x20] ).Surfaces.Count );      // too short / no magic
+		var noAnim = new byte[0x100];
+		BinaryPrimitives.WriteUInt32LittleEndian( noAnim.AsSpan( 0, 4 ), 0x1CD15D46 );     // magic but anim ptr 0 (base model)
+		Assert.AreEqual( 0, new RideKeyframeFile( noAnim ).Surfaces.Count );
+	}
+
+	private static void AssertQuat( Quaternion expected, Quaternion actual )
+	{
+		// Quaternions q and -q are the same rotation; compare via dot magnitude.
+		float dot = MathF.Abs( Quaternion.Dot( Quaternion.Normalize( expected ), Quaternion.Normalize( actual ) ) );
+		Assert.IsTrue( dot > 0.999f, $"expected {expected}, got {actual} (|dot|={dot})" );
+	}
+}
