@@ -91,12 +91,18 @@ passing a `ScriptDefs.Animations` value: the engine plays that channel's keyfram
 
 Ride WADs also carry prefixed variants of the same names:
 
-- **`7` prefix** (`7monkeym1`, `7Bird`, `7wateride`) — the **low-detail (LOD)** model set, used when
-  the ride is far from camera.
-- **`P` prefix** (`Ptotem`, `Pwateride`) — a **preview/portrait** model (the icon shown in the
-  build menu).
+- **`P` prefix** (`Ptotem`, `Pwateride`, `PGOKARTS`, …) — a **preview** model, shown in the build
+  menu, *not* in-world. 95 across the four worlds; confirmed by the `PreviewAnimType` string in
+  `tp.exe`. OpenTPW loads a ride's in-world model by its exact base name (`<name>.md2`), so these
+  preview models are never rendered in the park.
 - Trailing **`m`** on coaster track pieces (`wr_trckbm`, `wr_ringM`) is a *different* `m` — those are
   separate track-segment objects in a coaster ride (`wateride`), not the Main animation channel.
+
+> **No separate LOD model set.** An earlier draft listed a `7`-prefix "low-detail" set — that was a
+> raw-byte regex artifact (a `0x37` count/flag byte adjacent to names like `Bird.MD2`), not real
+> files. Proper WAD extraction across all 76 rides finds **zero** `7`-prefix `.md2` files, and `tp.exe`
+> has no `lod`/`lores`/`detail` model strings or a LOD path format (the model loader only ever uses
+> `%s%s%c.md2` / `%s%s%c%d.md2`). The original has no distance-based model swap; OpenTPW needs none.
 
 ### Frame files are vertex keyframes, not standalone models — verified
 

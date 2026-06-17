@@ -162,7 +162,11 @@ and driven from real ride data. 51 tests pass.
    (e.g. totem Main: m1→part 0/11, m2→14, m3→13, … m10→16). `Ride.LoadKeyframes` now loads all of a
    channel's frame files and `RideKeyframeFile.Merge`s their surfaces, so the whole ride animates (not
    just the first file's parts). Verified in-game: totem Main went from ~3 to 12 animated surfaces.
-3. Load the `7`-prefixed LOD set for distant rides; ignore `P`-prefixed preview models in-world.
+3. ✅ **LOD / preview models** — investigated: there is **no separate LOD model set** (the `7`-prefix
+   "LOD" in an earlier note was a raw-byte regex artifact; proper extraction across all 76 rides finds
+   zero `7*.md2`, and `tp.exe` has no LOD strings or path format). The real `P`-prefix files are
+   **preview** models (build menu, `PreviewAnimType`) — already excluded in-world since the ride loads
+   its exact base name. Corrected in docs/08.
 4. Surfaces with two records on the same index (e.g. monkey's two arms): currently last-writer-wins
    per slot; fine visually, revisit if the relink distinguishes them.
 5. Per-frame full-buffer re-upload is fine for ride-sized meshes; revisit if a hot path needs it.

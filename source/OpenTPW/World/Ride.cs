@@ -48,6 +48,10 @@ public class Ride : Entity
 			Log.Warning( $"[ride] settings unavailable: {e.Message}" );
 		}
 
+		// The in-world model is the exact base name (`<name>.md2`). WADs also ship `P<name>.md2`
+		// preview models for the build menu (see docs/08-ghidra-animation.md) — loading by exact base
+		// name keeps those out of the park. There is no separate LOD model set (the original has no
+		// distance-based model swap).
 		LoadModel( $"{rideArchive}/{rideName}.md2", rideArchive );
 
 		// Discover the ride's real animation channels from the WAD (see docs/08-ghidra-animation.md):
