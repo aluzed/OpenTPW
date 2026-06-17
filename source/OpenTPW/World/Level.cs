@@ -68,6 +68,7 @@ public class Level
 		// ride's Info.Shape) on the grid and dropped onto the terrain surface.
 		LoadProgress.Report( "Placing rides...", 0.9f );
 		var paths = new[] { "levels/jungle/rides/totem", "levels/jungle/rides/monkey", "levels/jungle/rides/wateride" };
+		var queues = new List<IReadOnlyList<Vector3>>(); // each ride's queue path waypoints (outer end → entrance)
 		int tx = grid.Width / 2 - 7, ty = grid.Height / 2 - 2;
 		foreach ( var path in paths )
 		{
@@ -85,19 +86,24 @@ public class Level
 			{
 				var ride = new Ride( path, wz );
 				PlaceEntranceExitMarkers( ride, grid, terrain, tx, ty );
-				SpawnQueuePath( ride, grid, terrain, tx, ty );
+				var queue = SpawnQueuePath( ride, grid, terrain, tx, ty );
+				if ( queue != null )
+					queues.Add( queue );
 			}
 			catch ( Exception e ) { Log.Warning( $"[park] ride '{path}' failed: {e.Message}" ); }
 
 			tx += shape.Width + 1; // 1-tile gap before the next ride
 		}
 
-		// Spawn a crowd of wandering visitors around the park centre so it feels alive.
+		// Spawn a crowd of visitors that follow the queue paths to the rides (see Peep).
 		LoadProgress.Report( "Spawning visitors...", 0.95f );
-		float wander = 180f;
 		for ( int i = 0; i < 40; i++ )
-			_ = new Peep( terrain, centre.WithZ( 0 ), wander, i );
-		Log.Info( "[park] spawned 40 visitors" );
+		{
+			var a = i / 40f * MathF.PI * 2f;
+			var spawn = new Vector3( centre.X + MathF.Cos( a ) * 120f, centre.Y + MathF.Sin( a ) * 120f, 0 );
+			_ = new Peep( terrain, queues, spawn, i );
+		}
+		Log.Info( $"[park] spawned 40 visitors following {queues.Count} queues" );
 	}
 
 	// Visualises a ride's entrance/exit cells (from its Info.Shape) as small markers on the terrain —
@@ -121,10 +127,12 @@ public class Level
 	// from the footprint edge the entrance sits on, each reserved on the grid and rendered as a flat
 	// path quad on the terrain. (The 3D queue-fence meshes — questra/quebnd in queue.wad — are a
 	// follow-up; this is the walkable path peeps queue along.)
-	private static void SpawnQueuePath( Ride ride, PlacementGrid grid, ParkTerrain terrain, int tx, int ty, int length = 6 )
+	// Returns the queue's walk waypoints, ordered from the outer end up to the ride entrance (so peeps
+	// can follow them), or null if the ride has no entrance.
+	private static IReadOnlyList<Vector3>? SpawnQueuePath( Ride ride, PlacementGrid grid, ParkTerrain terrain, int tx, int ty, int length = 6 )
 	{
 		if ( ride.Shape.Entrance is not { } e )
-			return;
+			return null;
 
 		// Outward direction = away from the footprint edge the entrance is on.
 		int dx = 0, dy = 0;
@@ -137,20 +145,29 @@ public class Level
 		var material = new Material<ObjectUniformBuffer>( "content/shaders/3d.shader" );
 		material.Set( "Color", LoadPathTexture() );
 
+		Vector3 OnGround( Vector3 w ) => w.WithZ( terrain.SampleHeight( w.X, w.Y ) );
+
+		var laid = new List<Vector3>();
 		for ( int i = 1; i <= length; i++ )
 		{
 			int cx = tx + e.X + dx * i, cy = ty + e.Y + dy * i;
 			if ( !grid.TryPlace( cx, cy, 1, 1 ) )
 				break; // ran off the grid or hit another object
 
-			var w = grid.TileToWorld( cx, cy );
+			var w = OnGround( grid.TileToWorld( cx, cy ) );
+			laid.Add( w );
 			_ = new ModelEntity
 			{
 				Model = Primitives.Plane.GenerateModel( material ),
-				Position = w.WithZ( terrain.SampleHeight( w.X, w.Y ) + 0.15f ),
+				Position = w.WithZ( w.Z + 0.15f ),
 				Scale = new Vector3( grid.TileSize / 2f ),
 			};
 		}
+
+		// Walk order: outer end → inner tiles → the entrance stand point.
+		laid.Reverse();
+		laid.Add( OnGround( grid.PointToWorld( tx + e.X + ride.EntryStandPos.X, ty + e.Y + ride.EntryStandPos.Y ) ) );
+		return laid;
 	}
 
 	private static Texture LoadPathTexture()

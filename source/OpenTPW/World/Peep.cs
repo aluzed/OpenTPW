@@ -3,9 +3,9 @@ namespace OpenTPW;
 /// <summary>
 /// A park visitor. Renders as an upright camera-facing billboard (a placeholder until the authentic
 /// peep sprites — <c>esprites.wad</c>'s <c>.TPC</c>/<c>.FPC</c>, a custom encoded image format — are
-/// decoded) and wanders the park terrain: it walks toward a random point within its home radius, then
-/// picks a new one, staying dropped onto the terrain surface. The billboard yaws (about world up) to
-/// face the camera each frame.
+/// decoded). It <b>follows the queue paths</b>: it picks a ride's queue, walks to its outer end then
+/// up its waypoints to the ride entrance, pauses ("rides"), then heads off to another ride's queue.
+/// Always dropped onto the terrain surface; the billboard yaws (about world up) to face the camera.
 /// </summary>
 public sealed class Peep : ModelEntity
 {
@@ -18,33 +18,48 @@ public sealed class Peep : ModelEntity
 	private static Model[]? sharedModels;
 
 	private readonly ParkTerrain terrain;
-	private readonly Vector3 home;
-	private readonly float wanderRadius;
+	private readonly IReadOnlyList<IReadOnlyList<Vector3>> queues;
 	private readonly float speed;
-	private Vector3 target;
 
-	public Peep( ParkTerrain terrain, Vector3 home, float wanderRadius, int colorIndex )
+	private IReadOnlyList<Vector3>? route;
+	private int routeIndex;
+	private float pause;
+
+	public Peep( ParkTerrain terrain, IReadOnlyList<IReadOnlyList<Vector3>> queues, Vector3 spawn, int colorIndex )
 	{
 		this.terrain = terrain;
-		this.home = home;
-		this.wanderRadius = wanderRadius;
+		this.queues = queues;
 
 		Model = SharedModel( colorIndex );
 		Scale = new Vector3( 3f, 1f, 5f + (float)Random.Shared.NextDouble() * 2f );
-		speed = 6f + (float)Random.Shared.NextDouble() * 8f;
-		Position = home;
-		target = PickTarget();
+		speed = 8f + (float)Random.Shared.NextDouble() * 7f;
+		Position = spawn;
+		PickRoute();
 		DropToGround();
 	}
 
 	protected override void OnUpdate()
 	{
-		// Walk toward the target on the ground plane; pick a new one once close.
-		var to = new Vector3( target.X - Position.X, target.Y - Position.Y, 0 );
-		if ( to.Length < 2f )
-			target = PickTarget();
+		if ( pause > 0f )
+			pause -= Time.Delta;                 // "riding" at the entrance
+		else if ( route != null && routeIndex < route.Count )
+		{
+			var dest = route[routeIndex];
+			var to = new Vector3( dest.X - Position.X, dest.Y - Position.Y, 0 );
+			if ( to.Length < 2.5f )
+			{
+				// Reached this waypoint; advance, and when the queue ends (the ride entrance) pause then re-route.
+				if ( ++routeIndex >= route.Count )
+				{
+					pause = 1.5f + (float)Random.Shared.NextDouble() * 2.5f;
+					PickRoute();
+				}
+			}
+			else
+				Position += to.Normal * speed * Time.Delta;
+		}
 		else
-			Position += to.Normal * speed * Time.Delta;
+			PickRoute();
 
 		DropToGround();
 
@@ -56,11 +71,11 @@ public sealed class Peep : ModelEntity
 
 	private void DropToGround() => Position = Position.WithZ( terrain.SampleHeight( Position.X, Position.Y ) );
 
-	private Vector3 PickTarget()
+	// Pick a random ride's queue to head for; its waypoints run from the outer end up to the entrance.
+	private void PickRoute()
 	{
-		double a = Random.Shared.NextDouble() * Math.PI * 2.0;
-		double r = Random.Shared.NextDouble() * wanderRadius;
-		return new Vector3( home.X + (float)(Math.Cos( a ) * r), home.Y + (float)(Math.Sin( a ) * r), 0 );
+		route = queues.Count > 0 ? queues[Random.Shared.Next( queues.Count )] : null;
+		routeIndex = 0;
 	}
 
 	private static Model SharedModel( int colorIndex )
