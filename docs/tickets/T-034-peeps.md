@@ -21,9 +21,13 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
 - **Queue-path following**: each ride exposes a `RideQueue` (ordered waypoints outer end → entrance,
   the exit world point, ride duration, capacity); a peep walks to a queue's outer end, follows the
   waypoints to the entrance, then…
-- **Boarding**: …boards when a rider slot is free (occupies one of the ride's `Capacity` slots, so a
-  queue builds at the entrance when the ride is full), hides for the ride duration, reappears at the
-  **exit** cell, and re-routes to another ride. The dev park runs 40 peeps over 3 queues (capacity 4 each).
+- **Boarding tied to the ride**: a peep boards when a rider slot is free (occupies one of the ride's
+  `Capacity` slots — sourced from the ride's `UsageInfo.MaxCapacity` — so a queue builds at the
+  entrance when the ride is full), hides for the ride duration, reappears at the **exit** cell, and
+  re-routes. **Occupancy drives the ride's animation**: a ride sits idle (`RideEngine.SetActive(false)`)
+  until its first rider boards (`RideQueue.Board()` → `SetActive(true)`) and idles again when the last
+  rider leaves (`RideQueue.Leave()`), so empty rides are still and busy ones move. The dev park runs
+  40 peeps over 3 queues, each at the ride's real capacity.
 
 ## Remaining
 
@@ -31,7 +35,8 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
    (direction + walk-cycle frames) instead of coloured billboards.
 2. **Full path network**: a walkable path graph + A* so peeps route over real paths (not straight
    lines) between rides, park gate, shops; space the queue *along* the path rather than piling at the entrance.
-3. **Tie boarding to the ride**: trigger the ride's load/start/unload animation + sound on boarding,
-   and source capacity/duration from the ride's `UsageInfo` (currently fixed 4 / 5 s).
+3. **Ride load/unload cycle**: play the ride's load/start/unload animation channels + boarding sound
+   per cycle (occupancy currently just runs/idles the body loop), and source ride duration from the
+   ride script/`UsageInfo` rather than the fixed 5 s.
 4. **Needs/stats** (hunger/fatigue/happiness), staff (guards/handymen/entertainers), and the
    peep→ride excitement/income loop.

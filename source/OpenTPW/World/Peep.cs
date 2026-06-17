@@ -51,7 +51,7 @@ public sealed class Peep : ModelEntity
 			if ( rideTimer <= 0f )
 			{
 				riding = false;
-				route!.Riders--;
+				route!.Leave();
 				Model = billboard;
 				Position = route.ExitPoint;
 				PickRoute();
@@ -78,7 +78,7 @@ public sealed class Peep : ModelEntity
 		else if ( route.HasFreeSlot )
 		{
 			// At the entrance with a free slot — board: occupy a rider slot and hide for the ride.
-			route.Riders++;
+			route.Board();
 			riding = true;
 			rideTimer = route.RideDuration;
 			Model = null;

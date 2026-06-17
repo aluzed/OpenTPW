@@ -85,6 +85,7 @@ public class Level
 			try
 			{
 				var ride = new Ride( path, wz );
+				ride.SetActive( false ); // idle until a peep boards (occupancy drives the animation)
 				PlaceEntranceExitMarkers( ride, grid, terrain, tx, ty );
 				var waypoints = SpawnQueuePath( ride, grid, terrain, tx, ty );
 				if ( waypoints != null )
@@ -94,7 +95,7 @@ public class Level
 						? grid.PointToWorld( tx + x.X + ride.ExitAppearPos.X, ty + x.Y + ride.ExitAppearPos.Y )
 						: waypoints[^1];
 					exit = exit.WithZ( terrain.SampleHeight( exit.X, exit.Y ) );
-					queues.Add( new RideQueue( waypoints, exit, rideDuration: 5f, capacity: 4 ) );
+					queues.Add( new RideQueue( ride, waypoints, exit, rideDuration: 5f, capacity: ride.Capacity ) );
 				}
 			}
 			catch ( Exception e ) { Log.Warning( $"[park] ride '{path}' failed: {e.Message}" ); }

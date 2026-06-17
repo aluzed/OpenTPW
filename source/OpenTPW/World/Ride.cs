@@ -20,6 +20,12 @@ public class Ride : Entity
 	/// <summary>Fractional position within the exit cell where peeps appear (default centre).</summary>
 	public (float X, float Y) ExitAppearPos { get; private set; } = (0.5f, 0.5f);
 
+	/// <summary>How many peeps the ride holds at once (from <c>UsageInfo.MaxCapacity</c>).</summary>
+	public int Capacity { get; private set; } = 8;
+
+	/// <summary>Run (true) or idle (false) the ride's animation — driven by occupancy (see RideQueue / Peep).</summary>
+	public void SetActive( bool active ) => engine.SetActive( active );
+
 	private readonly RideEngine engine = new();
 
 	public Ride( string rideArchive, Vector3 position )
@@ -55,6 +61,7 @@ public class Ride : Entity
 			// Sub-tile positions within the entrance/exit cells (where peeps stand / appear), default centre.
 			EntryStandPos = (ReadFloat( settings, "UsageInfo.EntryCellStandPosX", 0.5f ), ReadFloat( settings, "UsageInfo.EntryCellStandPosY", 0.5f ));
 			ExitAppearPos = (ReadFloat( settings, "UsageInfo.ExitCellAppearPosX", 0.5f ), ReadFloat( settings, "UsageInfo.ExitCellAppearPosY", 0.5f ));
+			Capacity = Math.Max( 1, ReadInt( settings, "UsageInfo.MaxCapacity", 8 ) );
 
 			Log.Info( $"[ride] loaded '{Name}' from {rideArchive} (footprint {Shape.Width}x{Shape.Height}, entrance {Shape.Entrance?.ToString() ?? "none"}, exit {Shape.Exit?.ToString() ?? "none"})" );
 		}
@@ -136,6 +143,9 @@ public class Ride : Entity
 
 	private static float ReadFloat( SettingsFile settings, string key, float fallback ) =>
 		float.TryParse( settings[key], System.Globalization.CultureInfo.InvariantCulture, out var v ) ? v : fallback;
+
+	private static int ReadInt( SettingsFile settings, string key, int fallback ) =>
+		int.TryParse( settings[key], out var v ) ? v : fallback;
 
 	// Probes the WAD for each animation channel's keyframe files and returns anim id -> frame count.
 	// A channel is a numbered sequence (<base><c>1.md2, <base><c>2.md2, …) or a single frame

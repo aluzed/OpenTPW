@@ -215,8 +215,32 @@ public sealed class RideEngine : IRideEngine
 
 		if ( chosen >= 0 )
 		{
+			bodyLoopAnim = chosen;
 			StartAnim( body, chosen, loop: true );
 			Log.Info( $"[ride] body looping {(ScriptDefs.Animations)chosen} (keyframed)" );
+		}
+	}
+
+	private int bodyLoopAnim = -1;
+
+	/// <summary>
+	/// Runs (true) or idles (false) the ride body's looping motion — used to tie a ride's animation to
+	/// its occupancy, so an empty ride sits still and a ride with riders moves. Resuming restarts the
+	/// channel <see cref="StartBestBodyAnim"/> chose; idling returns the body to its rest pose.
+	/// </summary>
+	public void SetActive( bool active )
+	{
+		if ( !objects.TryGetValue( SelfId, out var body ) )
+			return;
+
+		if ( active )
+		{
+			if ( body.AnimId == null && bodyLoopAnim >= 0 )
+				StartAnim( body, bodyLoopAnim, loop: true );
+		}
+		else if ( body.AnimId != null )
+		{
+			StopAnim( body );
 		}
 	}
 

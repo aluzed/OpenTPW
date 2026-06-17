@@ -8,21 +8,39 @@ namespace OpenTPW;
 /// </summary>
 public sealed class RideQueue
 {
+	public Ride Ride { get; }
 	public IReadOnlyList<Vector3> Waypoints { get; }
 	public Vector3 ExitPoint { get; }
 	public float RideDuration { get; }
 	public int Capacity { get; }
 
-	/// <summary>How many peeps are currently on the ride.</summary>
-	public int Riders { get; set; }
+	private int riders;
 
-	public RideQueue( IReadOnlyList<Vector3> waypoints, Vector3 exitPoint, float rideDuration, int capacity )
+	public RideQueue( Ride ride, IReadOnlyList<Vector3> waypoints, Vector3 exitPoint, float rideDuration, int capacity )
 	{
+		Ride = ride;
 		Waypoints = waypoints;
 		ExitPoint = exitPoint;
 		RideDuration = rideDuration;
 		Capacity = capacity;
 	}
 
-	public bool HasFreeSlot => Riders < Capacity;
+	/// <summary>How many peeps are currently on the ride.</summary>
+	public int Riders => riders;
+	public bool HasFreeSlot => riders < Capacity;
+
+	/// <summary>A peep boards: take a slot and start the ride running.</summary>
+	public void Board()
+	{
+		riders++;
+		Ride?.SetActive( true );
+	}
+
+	/// <summary>A peep's ride finishes: free its slot, idling the ride once it is empty.</summary>
+	public void Leave()
+	{
+		riders = Math.Max( 0, riders - 1 );
+		if ( riders == 0 )
+			Ride?.SetActive( false );
+	}
 }
