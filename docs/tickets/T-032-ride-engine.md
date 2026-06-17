@@ -66,7 +66,8 @@ is what makes a ride *do* anything, and it backs the remaining VM opcodes (T-007
 1. ✅ **Ride keyframe animation** — rotation, translation/scale and vertex morph all decoded and driven
    from real ride data at the authentic 30 FPS rate, with multi-frame channel merge — [T-033](T-033-ride-animation-keyframes.md).
 3. ☐ **Lights** — `ENABLELIGHT`/`DISABLELIGHT`/`SETLIGHT`/`COLOURLIGHT` (needs a multi-light render path).
-4. ☐ **Walk/limbo** — needs a peep/visitor system.
+4. ⚠️ **Walk/limbo** — needs a peep/visitor system, now started ([T-034](T-034-peeps.md): a wandering
+   visitor crowd; path/queue following + ride interaction remain).
 5. ☐ **Scream / coaster** — `STARTSCREAM`/`TOUR`/`COAST`/`TURBO`/`BUMP` (depends on peeps + track).
 6. ⚠️ **Real park terrain + placement grid** — `PlacementGrid` (tile↔world, footprint, occupancy;
    jungle's 95×84 dims from `Standard.sam`, unit-tested) + `ParkTerrain` rendering the real jungle

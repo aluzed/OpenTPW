@@ -91,6 +91,13 @@ public class Level
 
 			tx += shape.Width + 1; // 1-tile gap before the next ride
 		}
+
+		// Spawn a crowd of wandering visitors around the park centre so it feels alive.
+		LoadProgress.Report( "Spawning visitors...", 0.95f );
+		float wander = 180f;
+		for ( int i = 0; i < 40; i++ )
+			_ = new Peep( terrain, centre.WithZ( 0 ), wander, i );
+		Log.Info( "[park] spawned 40 visitors" );
 	}
 
 	// Visualises a ride's entrance/exit cells (from its Info.Shape) as small markers on the terrain —
