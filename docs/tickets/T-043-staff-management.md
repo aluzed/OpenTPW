@@ -2,9 +2,30 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine / UI
-- **Status**: ☐ To do
+- **Status**: ⚠️ Core done — hire (charge cost) + place-on-tile for all four staff types via the build
+  catalog, wages drawn per head, verified in-game. Pick-up/re-place, fire, and patrol-zone assignment
+  remain.
 - **Parent**: [T-038](T-038-park-management-ui.md). **Needs**: [T-040](T-040-build-mode-foundation.md).
   **Related**: [T-039](T-039-peep-needs-staff-depth.md).
+
+## Done
+
+- **Researcher** role added (feeds [T-044](T-044-research-upgrades.md)); `Staff.Role` exposed. Roster:
+  Entertainer (cheer), Handyman (litter), Guard (litter deterrence), Researcher (wanders; research is
+  off-screen). Researcher has no dedicated sprite in this WAD → flat lab-coat billboard fallback.
+- **Hire + place**: staff are catalog entries (no grid footprint — mobile); selecting one and clicking
+  a tile spawns the staff there and charges its hire cost (`ParkFinances.PayBuild`/`CanAfford`).
+- **Wages**: each `Staff` draws `WagePerSecond` (shown as WAGES). The park starts with **no** staff —
+  the player hires them.
+- **HUD**: STAFF count + the four staff entries (with hire costs) in the build palette.
+- **Verified in-game** (`OPENTPW_AUTOPLACE` exercising the commit path): hiring entertainer + handyman +
+  researcher → STAFF 3, money debited by the hire costs (800+600+1500), wages then drawn.
+
+## Remaining (follow-up)
+
+- **Fire / pick-up / re-place** (needs staff selection + teardown — like T-041 sell).
+- **Patrol-zone assignment** (links to [T-039](T-039-peep-needs-staff-depth.md)); hire cost/wage from
+  the real `AllStaffConstants` config rather than fixed defaults.
 
 ## Context
 

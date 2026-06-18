@@ -2,8 +2,9 @@ using Veldrid;
 
 namespace OpenTPW;
 
-/// <summary>One placeable thing in the build catalog (a ride by WAD path, or a shop when RidePath is null).</summary>
-public readonly record struct BuildCatalogItem( string Name, string? RidePath, int Width, int Height, float Cost );
+/// <summary>One placeable catalog entry: a ride (RidePath set), a shop (all null), or a staff member to
+/// hire (Staff set). Staff occupy no grid cell; rides/shops reserve their footprint.</summary>
+public readonly record struct BuildCatalogItem( string Name, string? RidePath, StaffRole? Staff, int Width, int Height, float Cost );
 
 /// <summary>
 /// Build/manage mode (T-040 foundation + T-041 placement). Each frame it projects the cursor to the
@@ -145,7 +146,8 @@ public sealed class BuildMode : Entity
 			return;
 		}
 
-		bool canPlace = grid.CanPlace( tx, ty, item.Width, item.Height );
+		// Staff don't reserve a cell (they walk anywhere) — only need to be on-grid; rides/shops must fit.
+		bool canPlace = item.Staff != null ? grid.InBounds( tx, ty ) : grid.CanPlace( tx, ty, item.Width, item.Height );
 		bool affordable = ParkFinances.Current?.CanAfford( item.Cost ) ?? true;
 		bool ok = canPlace && affordable;
 

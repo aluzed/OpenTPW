@@ -25,6 +25,7 @@ internal sealed class ParkStatsPanel : Panel
 			return;
 
 		int visitors = Entity.All.Count( e => e is Peep );
+		int staff = Entity.All.Count( e => e is Staff );
 
 		// One line per stat, stepping down from the top-left.
 		var lines = new List<string>
@@ -35,7 +36,7 @@ internal sealed class ParkStatsPanel : Panel
 			$"FOOD {fin.FoodRevenue:0}",
 			$"UPKEEP {fin.UpkeepPaid:0}",
 			$"WAGES {fin.WagesPaid:0}",
-			$"VISITORS {visitors}",
+			$"VISITORS {visitors}   STAFF {staff}",
 			$"LITTER {Litter.Active.Count}",
 			$"ADMISSION {fin.EntryFee:0}  ([ ] adjust)",
 		};

@@ -9,6 +9,8 @@ public enum StaffRole
 	Handyman,
 	/// <summary>Patrols the park; visitors near a guard don't drop litter.</summary>
 	Guard,
+	/// <summary>Researches ride upgrades (see T-044); for now wanders and draws a wage.</summary>
+	Researcher,
 }
 
 /// <summary>
@@ -47,6 +49,7 @@ public sealed class Staff : ModelEntity
 	}
 
 	private readonly StaffRole role;
+	public StaffRole Role => role;
 	private readonly ParkTerrain terrain;
 	private readonly Vector3 center;
 	private readonly float roam;
@@ -89,7 +92,8 @@ public sealed class Staff : ModelEntity
 		switch ( role )
 		{
 			case StaffRole.Handyman: DoHandyman(); break;
-			case StaffRole.Guard: WanderStep(); break; // patrol
+			case StaffRole.Guard: WanderStep(); break;     // patrol
+			case StaffRole.Researcher: WanderStep(); break; // research is off-screen (T-044)
 			default: DoEntertainer(); break;
 		}
 
@@ -105,6 +109,7 @@ public sealed class Staff : ModelEntity
 	{
 		StaffRole.Handyman => SpriteSheet.Load( "esprites/Generic/Handymen", "SPR_HA" ),
 		StaffRole.Guard => SpriteSheet.Load( "esprites/Generic/Guards", "SPR_GU" ),
+		StaffRole.Researcher => null, // no dedicated sprite in this WAD — flat billboard fallback
 		_ => SpriteSheet.Load( "esprites/Fantasy/Entertainers", EntertainerSprites[Random.Shared.Next( EntertainerSprites.Length )] ),
 	};
 
@@ -222,6 +227,7 @@ public sealed class Staff : ModelEntity
 		{
 			StaffRole.Handyman => ((byte)40, (byte)90, (byte)220),
 			StaffRole.Guard => ((byte)30, (byte)30, (byte)70),
+			StaffRole.Researcher => ((byte)235, (byte)235, (byte)245), // lab-coat white
 			_ => ((byte)255, (byte)140, (byte)0),
 		};
 		var model = Billboard.Make( r, g, b );

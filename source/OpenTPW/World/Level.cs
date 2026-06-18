@@ -77,7 +77,10 @@ public class Level
 			int cx = grid.Width / 2, cy = grid.Height / 2;
 			Log.Info( $"[build] autoplace totem={CommitPlacement( catalog[0], grid, terrain, cx - 6, cy - 2 )} "
 				+ $"monkey={CommitPlacement( catalog[1], grid, terrain, cx + 1, cy - 2 )} "
-				+ $"shop={CommitPlacement( catalog[3], grid, terrain, cx - 6, cy + 4 )}" );
+				+ $"shop={CommitPlacement( catalog[3], grid, terrain, cx - 6, cy + 4 )} "
+				+ $"ent={CommitPlacement( catalog[4], grid, terrain, cx, cy + 2 )} "
+				+ $"hand={CommitPlacement( catalog[5], grid, terrain, cx + 2, cy + 2 )} "
+				+ $"rsch={CommitPlacement( catalog[7], grid, terrain, cx + 4, cy + 2 )}" );
 		}
 
 		// Spawn a crowd; with no rides yet they wander until the player builds one (then they queue).
@@ -89,21 +92,15 @@ public class Level
 			_ = new Peep( terrain, parkQueues, spawn, i );
 		}
 		Log.Info( $"[park] build mode ready ({catalog.Count} catalog items), {parkQueues.Count} queues" );
-
-		// Staff roam the park, drawing wages: entertainers cheer nearby visitors, handymen pick up the
-		// litter visitors drop (which otherwise sours the crowd). See Staff / Litter.
-		var staffHome = new Vector3( centre.X, centre.Y, 0 );
-		_ = new Staff( StaffRole.Entertainer, terrain, staffHome, roam: 90f );
-		_ = new Staff( StaffRole.Entertainer, terrain, staffHome, roam: 90f );
-		_ = new Staff( StaffRole.Handyman, terrain, staffHome, roam: 90f );
-		_ = new Staff( StaffRole.Handyman, terrain, staffHome, roam: 90f );
-		_ = new Staff( StaffRole.Guard, terrain, staffHome, roam: 90f );
+		// Staff start empty too — the player hires entertainers/handymen/guards/researchers from the
+		// catalog (T-043), each charged a hire cost and then drawing wages.
 	}
 
 	// The park's ride queues — placed rides register here so peeps (which hold this list) can use them.
 	private static List<RideQueue> parkQueues = new();
 
-	// Build catalog: the jungle rides (footprint from RideShape, cost from the ride's .sam) + a food shop.
+	// Build catalog: jungle rides (footprint from RideShape, cost from the .sam) + a food shop + hireable
+	// staff (no footprint — placed on a tile and charged a hire cost, T-043).
 	private static List<BuildCatalogItem> BuildCatalog()
 	{
 		var list = new List<BuildCatalogItem>();
@@ -111,9 +108,13 @@ public class Level
 		{
 			var name = Path.GetFileName( path );
 			var shape = RideShape.Load( path, name );
-			list.Add( new BuildCatalogItem( name, path, shape.Width, shape.Height, ReadRideCost( path, name ) ) );
+			list.Add( new BuildCatalogItem( name, path, null, shape.Width, shape.Height, ReadRideCost( path, name ) ) );
 		}
-		list.Add( new BuildCatalogItem( "shop", null, 2, 2, 500f ) );
+		list.Add( new BuildCatalogItem( "shop", null, null, 2, 2, 500f ) );
+		list.Add( new BuildCatalogItem( "entertainer", null, StaffRole.Entertainer, 1, 1, 800f ) );
+		list.Add( new BuildCatalogItem( "handyman", null, StaffRole.Handyman, 1, 1, 600f ) );
+		list.Add( new BuildCatalogItem( "guard", null, StaffRole.Guard, 1, 1, 1000f ) );
+		list.Add( new BuildCatalogItem( "researcher", null, StaffRole.Researcher, 1, 1, 1500f ) );
 		return list;
 	}
 
@@ -127,13 +128,23 @@ public class Level
 		catch { return 2000f; }
 	}
 
-	// Commit a placement at tile (tx,ty): validate + reserve the grid, spawn the ride/shop, charge the cost.
+	// Commit a placement at tile (tx,ty): validate + (for rides/shops) reserve the grid, spawn, charge.
 	private static bool CommitPlacement( BuildCatalogItem item, PlacementGrid grid, ParkTerrain terrain, int tx, int ty )
 	{
 		var fin = ParkFinances.Current;
-		if ( !grid.CanPlace( tx, ty, item.Width, item.Height ) || (fin != null && !fin.CanAfford( item.Cost )) )
+		if ( fin != null && !fin.CanAfford( item.Cost ) )
 			return false;
-		if ( !grid.TryPlace( tx, ty, item.Width, item.Height ) )
+
+		// Staff are mobile — hire + drop at the tile, no grid reservation.
+		if ( item.Staff is { } role )
+		{
+			var c = grid.TileToWorld( tx, ty );
+			_ = new Staff( role, terrain, c.WithZ( 0 ), roam: 70f );
+			fin?.PayBuild( item.Cost );
+			return true;
+		}
+
+		if ( !grid.CanPlace( tx, ty, item.Width, item.Height ) || !grid.TryPlace( tx, ty, item.Width, item.Height ) )
 			return false;
 
 		bool ok = item.RidePath == null
