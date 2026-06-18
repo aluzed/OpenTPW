@@ -149,8 +149,8 @@ public sealed class Peep : ModelEntity
 		energy -= EnergyDrainPerSec * Time.Delta;
 
 		// Visitors occasionally drop litter, and standing among litter sours the mood (until a handyman
-		// clears it). Both raise the chance the peep heads home unhappy.
-		if ( Random.Shared.NextDouble() < LitterChancePerSec * Time.Delta )
+		// clears it). Both raise the chance the peep heads home unhappy. A nearby guard deters littering.
+		if ( Random.Shared.NextDouble() < LitterChancePerSec * Time.Delta && !Staff.GuardNear( Position ) )
 			_ = new Litter( Position );
 		int nearbyLitter = CountNearbyLitter();
 		if ( nearbyLitter > 0 )

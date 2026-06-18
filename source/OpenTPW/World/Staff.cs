@@ -7,6 +7,8 @@ public enum StaffRole
 	Entertainer,
 	/// <summary>Seeks out and picks up dropped litter.</summary>
 	Handyman,
+	/// <summary>Patrols the park; visitors near a guard don't drop litter.</summary>
+	Guard,
 }
 
 /// <summary>
@@ -22,10 +24,27 @@ public sealed class Staff : ModelEntity
 	private const float CheerPerSecond = 8f;   // happiness lifted per second for visitors in range
 	private const float ReachDistance = 3f;    // how close counts as "arrived" / "picked up"
 	private const float WalkFps = 8f;          // walk-cycle frames per second
+	private const float GuardDeterRadius = 45f; // visitors within this of a guard don't litter
 
 	// One shared billboard model per role (built once), so the crowd reads staff roles by colour.
 	private static readonly Dictionary<StaffRole, Model> roleModels = new();
 	private static readonly string[] EntertainerSprites = { "SPR_FL", "SPR_GN", "SPR_LA" };
+
+	// Active guards, so peeps can cheaply check whether one is nearby (litter deterrence).
+	private static readonly List<Staff> guards = new();
+
+	/// <summary>True if a patrolling guard is within <paramref name="radius"/> of the point.</summary>
+	public static bool GuardNear( Vector3 p, float radius = GuardDeterRadius )
+	{
+		float r2 = radius * radius;
+		foreach ( var g in guards )
+		{
+			float dx = g.Position.X - p.X, dy = g.Position.Y - p.Y;
+			if ( dx * dx + dy * dy <= r2 )
+				return true;
+		}
+		return false;
+	}
 
 	private readonly StaffRole role;
 	private readonly ParkTerrain terrain;
@@ -49,6 +68,9 @@ public sealed class Staff : ModelEntity
 		this.center = center;
 		this.roam = roam;
 
+		if ( role == StaffRole.Guard )
+			guards.Add( this );
+
 		sheet = RoleSprite( role );
 		fallback = RoleModel( role );
 		spriteHeight = 16f;
@@ -64,10 +86,12 @@ public sealed class Staff : ModelEntity
 	{
 		ParkFinances.Current?.PayWages( WagePerSecond * Time.Delta );
 
-		if ( role == StaffRole.Handyman )
-			DoHandyman();
-		else
-			DoEntertainer();
+		switch ( role )
+		{
+			case StaffRole.Handyman: DoHandyman(); break;
+			case StaffRole.Guard: WanderStep(); break; // patrol
+			default: DoEntertainer(); break;
+		}
 
 		// Cylindrical billboard: yaw about world up so the quad faces the camera.
 		var cam = Camera.Position;
@@ -77,9 +101,12 @@ public sealed class Staff : ModelEntity
 		ApplySprite();
 	}
 
-	private static SpriteSheet? RoleSprite( StaffRole role ) => role == StaffRole.Handyman
-		? SpriteSheet.Load( "esprites/Generic/Handymen", "SPR_HA" )
-		: SpriteSheet.Load( "esprites/Fantasy/Entertainers", EntertainerSprites[Random.Shared.Next( EntertainerSprites.Length )] );
+	private static SpriteSheet? RoleSprite( StaffRole role ) => role switch
+	{
+		StaffRole.Handyman => SpriteSheet.Load( "esprites/Generic/Handymen", "SPR_HA" ),
+		StaffRole.Guard => SpriteSheet.Load( "esprites/Generic/Guards", "SPR_GU" ),
+		_ => SpriteSheet.Load( "esprites/Fantasy/Entertainers", EntertainerSprites[Random.Shared.Next( EntertainerSprites.Length )] ),
+	};
 
 	// Picks the current sprite frame from the facing direction + walk phase, sizing the billboard.
 	private void ApplySprite()
@@ -190,8 +217,13 @@ public sealed class Staff : ModelEntity
 		if ( roleModels.TryGetValue( role, out var m ) )
 			return m;
 
-		// Entertainer = bright orange, Handyman = blue, so roles are distinguishable in the crowd.
-		var (r, g, b) = role == StaffRole.Handyman ? ((byte)40, (byte)90, (byte)220) : ((byte)255, (byte)140, (byte)0);
+		// Distinct fallback colours per role: entertainer orange, handyman blue, guard dark navy.
+		var (r, g, b) = role switch
+		{
+			StaffRole.Handyman => ((byte)40, (byte)90, (byte)220),
+			StaffRole.Guard => ((byte)30, (byte)30, (byte)70),
+			_ => ((byte)255, (byte)140, (byte)0),
+		};
 		var model = Billboard.Make( r, g, b );
 		roleModels[role] = model;
 		return model;

@@ -151,9 +151,12 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
      `Staff` use their real sprites (handyman `Generic/Handymen/SPR_HA`, entertainer a random
      `Fantasy/Entertainers/SPR_*`), animated + directional like peeps. All ~10 sheets (~1900 frames)
      load in ~1 s. **Verified in-game: a varied, animated crowd of kids + costumed staff.**
-   - **Remaining (minor polish):** guard sprites once guards exist; optionally rotate the
-     direction→segment mapping to the camera so facing matches screen-space exactly; the `.FPC`
-     companion (same format) is likely a shadow/alt set.
+   - **✅ Guards:** added a `StaffRole.Guard` that patrols (wanders + wages) with the real
+     `Generic/Guards/SPR_GU` sprite (260 frames), and a thematic effect — visitors within
+     `GuardDeterRadius` of a guard don't drop litter (`Staff.GuardNear`). The dev park spawns one guard.
+   - **Remaining (minor polish):** optionally rotate the direction→segment mapping to the camera so
+     facing matches screen-space exactly; use idle/sit segments when queuing; the `.FPC` companion
+     (same format) is likely a shadow/alt set.
 2. **Full path network**: a walkable path graph + A* so peeps route over real paths (not straight
    lines) between rides, park gate, shops. (Queue spacing *along* the path is now done — see "Queue
    discipline" above; what remains is the cross-park routing.)

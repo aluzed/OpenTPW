@@ -123,6 +123,7 @@ public class Level
 		_ = new Staff( StaffRole.Entertainer, terrain, staffHome, roam: 90f );
 		_ = new Staff( StaffRole.Handyman, terrain, staffHome, roam: 90f );
 		_ = new Staff( StaffRole.Handyman, terrain, staffHome, roam: 90f );
+		_ = new Staff( StaffRole.Guard, terrain, staffHome, roam: 90f );
 
 		// A couple of food stalls flanking the rides; hungry visitors detour to the nearest (see Shop / Peep).
 		_ = new Shop( terrain, new Vector3( centre.X - 70f, centre.Y + 40f, 0 ) );
