@@ -53,7 +53,12 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-031](T-031-game-audio.md) | 🟡 Feature | ⚠️ Mostly | Game audio: lobby music (minimp3), UI click SFX, music volume keys, cross-platform build; ambience/settings-UI remain |
 | [T-032](T-032-ride-engine.md) | 🟡 Feature | ⚠️ In progress | Ride engine: VM→engine seam + sound + a ride rendered/running in-scene (slice 1); anim/lights/peeps/park remain |
 | [T-033](T-033-ride-animation-keyframes.md) | 🟡 Feature | ✅ Core done | Ride animation: rotation + translation/scale + vertex-morph keyframes all RE'd and driven from real ride data, verified in-game; polish remains — see docs/08 |
-| [T-034](T-034-peeps.md) | 🟡 Feature | ⚠️ Started | Peeps: wandering visitor crowd (billboard placeholders) on the park terrain; authentic sprites (esprites.wad) + path/queue following + ride interaction remain |
+| [T-034](T-034-peeps.md) | 🟡 Feature | ⚠️ Mostly | Peeps: full crowd loop — real animated `esprites.wad` sprites (TPC codec RE'd), directional walk cycles, queueing, riding, needs, economy, staff (entertainers/handymen/guards); polish split → T-035–T-039 |
+| [T-035](T-035-peep-sprite-polish.md) | ⚪ Polish | ☐ To do | Peep sprite polish: camera-relative facing, idle/sit poses, `.FPC` shadow, hotspot anchoring |
+| [T-036](T-036-peep-pathfinding.md) | 🟡 Feature | ☐ To do | Peep pathfinding: walkable path graph + A* (route over paths, not straight lines) |
+| [T-037](T-037-ride-cycle-sound.md) | 🟡 Feature | ☐ To do | Ride boarding/unloading SFX (blocked on T-016 `.MAP` catalog) + duration from script |
+| [T-038](T-038-park-management-ui.md) | 🟡 Feature | ☐ To do | Park management UI: build/placement, ride prices + entry fee, staff hiring, research/upgrades, finances panel |
+| [T-039](T-039-peep-needs-staff-depth.md) | 🟡 Feature | ☐ To do | Peep needs & staff depth: thirst/drink stalls, vandalism↔guards, ride ratings, balance |
 
 Priority legend: 🔴 blocking · 🟠 important · 🟡 desirable/feature · ⚪ technical debt/polish.
 Status legend: ✅ done · ⚠️ partial · ☐ to do · 🗂️ split into focused tickets · ⏸️ deferred.

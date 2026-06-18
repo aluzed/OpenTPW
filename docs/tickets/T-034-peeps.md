@@ -2,9 +2,14 @@
 
 - **Priority**: 🟡 Feature (the park's life — backs queues, ride usage, excitement/fatigue, income)
 - **Type**: Engine / format RE
-- **Status**: ⚠️ Started — a wandering visitor crowd with placeholder billboards; authentic sprites,
-  pathfinding and ride/queue interaction remain.
-- **Related**: [T-032](T-032-ride-engine.md) (ride engine — roadmap "walk/limbo" needed a peep system).
+- **Status**: ⚠️ Mostly done — full crowd loop: real animated `esprites.wad` sprites (TPC codec
+  reverse-engineered), directional walk cycles, queueing, riding, needs (happiness/energy/hunger),
+  economy (gate/tickets/food/upkeep/wages) and staff (entertainers/handymen/guards). Remaining polish
+  is split into **[T-035](T-035-peep-sprite-polish.md)–[T-039](T-039-peep-needs-staff-depth.md)**.
+- **Related**: [T-032](T-032-ride-engine.md) (ride engine — roadmap "walk/limbo" needed a peep system);
+  follow-ups [T-035](T-035-peep-sprite-polish.md), [T-036](T-036-peep-pathfinding.md),
+  [T-037](T-037-ride-cycle-sound.md), [T-038](T-038-park-management-ui.md),
+  [T-039](T-039-peep-needs-staff-depth.md).
 
 ## What exists
 
@@ -154,20 +159,17 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
    - **✅ Guards:** added a `StaffRole.Guard` that patrols (wanders + wages) with the real
      `Generic/Guards/SPR_GU` sprite (260 frames), and a thematic effect — visitors within
      `GuardDeterRadius` of a guard don't drop litter (`Staff.GuardNear`). The dev park spawns one guard.
-   - **Remaining (minor polish):** optionally rotate the direction→segment mapping to the camera so
-     facing matches screen-space exactly; use idle/sit segments when queuing; the `.FPC` companion
-     (same format) is likely a shadow/alt set.
-2. **Full path network**: a walkable path graph + A* so peeps route over real paths (not straight
-   lines) between rides, park gate, shops. (Queue spacing *along* the path is now done — see "Queue
-   discipline" above; what remains is the cross-park routing.)
-3. **Per-cycle boarding sound**: the animation cycle and a real ride **duration** are wired (above —
-   the duration is one full pass of the ride's running animation, ~11 s monkey / ~14 s totem, falling
-   back to `Info.DurationUnit`). Still to do is playing the boarding/unloading **sound** per cycle —
-   blocked on the `.MAP` audio catalog (T-016): the script-driven sounds currently resolve through an
-   approximate index (e.g. the monkey plays `urinal.mp2`), so a per-board cue would just repeat that
-   wrong mapping until T-016 lands.
-4. **Guards + build/manage UI**: ride choice, needs, turnover, the **economy** (gate, tickets, food,
-   upkeep, wages), **entertainers**, **handymen + litter**, and **hunger + shops** are done (above);
-   still to do are **guards** (safety/vandalism), a richer thirst need, and a player-facing build/manage
-   UI to place rides/shops and set prices, the entry fee, and research/upgrades (the `Upgrades[*]`/
-   `CostOf*` fields are parsed already).
+## Follow-ups (split into focused tickets)
+
+The core peep loop is done; the remaining polish/features are tracked separately:
+
+- **[T-035](T-035-peep-sprite-polish.md)** — sprite polish: camera-relative facing, idle/sit/queue
+  poses, `.FPC` shadow layer, per-frame hotspot anchoring.
+- **[T-036](T-036-peep-pathfinding.md)** — walkable path graph + A* so peeps route over real paths
+  instead of straight lines (queue spacing *along* the path is already done).
+- **[T-037](T-037-ride-cycle-sound.md)** — per-cycle boarding/unloading SFX (blocked on the `.MAP`
+  audio catalog, [T-016](T-016-map-entry-records.md)) + ride duration from the script if encoded.
+- **[T-038](T-038-park-management-ui.md)** — build/placement UI, ride prices + entry fee, staff
+  hiring, research/upgrades (`Upgrades[*]`/`CostOf*`), finances panel.
+- **[T-039](T-039-peep-needs-staff-depth.md)** — thirst/drink stalls, vandalism↔guards, ride ratings,
+  staff behaviour, economy balance.
