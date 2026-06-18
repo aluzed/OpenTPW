@@ -61,11 +61,11 @@ public class Level
 		var centre = terrain.Centroid;
 		var grid = PlacementGrid.FromLevelSettings( standard, tileSize: 16f, worldCenter: new Vector3( centre.X, centre.Y, 0 ) );
 
-		// Overview camera framing the park around the centroid.
-		ParkOverviewCameraMode.Target = new Vector3( centre.X, centre.Y, centre.Z );
-		ParkOverviewCameraMode.Radius = 240f;
-		ParkOverviewCameraMode.Height = centre.Z + 200f;
-		Camera.SetCameraMode<ParkOverviewCameraMode>();
+		// Player-controlled build/manage camera focused on the park centroid (T-040), plus the build-mode
+		// foundation (cursor→tile picking + highlight + click dispatch).
+		BuildCameraMode.Focus = new Vector3( centre.X, centre.Y, centre.Z );
+		Camera.SetCameraMode<BuildCameraMode>();
+		_ = new BuildMode( grid, terrain );
 
 		// Lay a few rides out in a row near the centre, each reserving its real tile footprint (from the
 		// ride's Info.Shape) on the grid and dropped onto the terrain surface.

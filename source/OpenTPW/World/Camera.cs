@@ -7,6 +7,9 @@ public static class Camera
 	public static Vector3 Position => CameraMode?.Position ?? Vector3.Zero;
 	public static Rotation Rotation => CameraMode?.Rotation ?? Rotation.Identity;
 
+	/// <summary>Vertical field of view in degrees (used for cursor→world ray picking).</summary>
+	public static float FieldOfView => CameraMode?.FieldOfView ?? 90f;
+
 	public static Matrix4x4 ViewMatrix { get; set; }
 	public static Matrix4x4 ProjMatrix { get; set; }
 

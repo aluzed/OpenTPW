@@ -2,7 +2,9 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine / UI
-- **Status**: ☐ To do
+- **Status**: ✅ Core done — controllable in-park camera, cursor→tile picking + highlight, and a
+  mode/click dispatch skeleton are in and verified in-game. Tool plug-ins (selection panels, multi-tile
+  footprint hover) land with T-041+.
 - **Parent**: [T-038](T-038-park-management-ui.md). **Blocks**: T-041, T-042, T-043, T-044, T-045.
 
 ## Context

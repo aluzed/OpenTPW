@@ -59,7 +59,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-037](T-037-ride-cycle-sound.md) | 🟡 Feature | ☐ To do | Ride boarding/unloading SFX (blocked on T-016 `.MAP` catalog) + duration from script |
 | [T-038](T-038-park-management-ui.md) | 🟡 Feature | 🗂️ Umbrella | Park management & build mode — split into T-040–T-045 (mode/ACTION state machine RE'd from `tp.exe`) |
 | [T-039](T-039-peep-needs-staff-depth.md) | 🟡 Feature | ☐ To do | Peep needs & staff depth: thirst/drink stalls, vandalism↔guards, ride ratings, balance |
-| [T-040](T-040-build-mode-foundation.md) | 🟡 Feature | ☐ To do | Build/manage **foundation**: in-park camera, mouse→tile picking, mode/`ACTION_*` dispatch (blocks T-041–T-045) |
+| [T-040](T-040-build-mode-foundation.md) | 🟡 Feature | ✅ Core done | Build/manage **foundation**: controllable in-park camera + mouse→tile picking + highlight + click dispatch (verified in-game) — blocks T-041–T-045 |
 | [T-041](T-041-ride-shop-placement.md) | 🟡 Feature | ☐ To do | Ride & shop placement tool: catalog → footprint preview → place/rotate/sell (replaces dev layout) · needs T-040 |
 | [T-042](T-042-economy-controls-loans.md) | 🟡 Feature | ☐ To do | Economy controls: ride prices, admission fee, finances panel, loans + bankruptcy · needs T-040 |
 | [T-043](T-043-staff-management.md) | 🟡 Feature | ☐ To do | Staff hiring/placement/firing (entertainers/mechanics/guards/researchers), wages · needs T-040 |
