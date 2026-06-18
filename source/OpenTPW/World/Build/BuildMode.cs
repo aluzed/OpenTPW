@@ -86,6 +86,8 @@ public sealed class BuildMode : Entity
 	/// <summary>Whether the coaster track-laying tool is active, and how many segments are laid (T-045).</summary>
 	public bool LayingTrack => track != null;
 	public int TrackSegments => track?.SegmentCount ?? 0;
+	/// <summary>Whether the track being laid forms a complete circuit (back to the station entry).</summary>
+	public bool TrackClosed => track?.IsClosed ?? false;
 
 	// Track-laying tool: highlight the candidate tile (green if it extends the track), lay on click.
 	private void UpdateTrack( int tx, int ty )

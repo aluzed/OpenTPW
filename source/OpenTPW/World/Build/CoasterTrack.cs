@@ -16,9 +16,14 @@ public sealed class CoasterTrack
 	private readonly List<(int X, int Y)> tiles = new();
 	private readonly List<ModelEntity> parts = new(); // 2 per laid segment (track quad + pylon)
 	private readonly CoasterTrain train;
+	private readonly (int X, int Y)? trackInTile; // the station's '<' entry connector, where the loop closes
 
 	public (int X, int Y) Head => tiles[^1];
 	public int SegmentCount => tiles.Count - 1; // the first tile is the station connector anchor
+
+	/// <summary>True once the track has been laid back to the station's entry connector — a full circuit
+	/// (the train then runs a continuous loop instead of shuttling).</summary>
+	public bool IsClosed { get; private set; }
 
 	public CoasterTrack( Ride coaster, PlacementGrid grid, ParkTerrain terrain )
 	{
@@ -31,6 +36,14 @@ public sealed class CoasterTrack
 		// Anchor at the station's track-out connector (fall back to track-in / centre).
 		var c = coaster.Shape.TrackOut ?? coaster.Shape.TrackIn ?? (coaster.TileW / 2, coaster.TileH / 2);
 		tiles.Add( (coaster.TileX + c.X, coaster.TileY + c.Y) );
+
+		// The entry connector (if any, and distinct from the anchor) is where laying back closes the loop.
+		if ( coaster.Shape.TrackIn is { } ti )
+		{
+			var inTile = (coaster.TileX + ti.X, coaster.TileY + ti.Y);
+			if ( inTile != tiles[0] )
+				trackInTile = inTile;
+		}
 
 		// The shuttle train hides itself until at least one segment is laid (path has < 2 points).
 		train = new CoasterTrain( this, grid.TileSize, coaster.Archive );
@@ -57,10 +70,12 @@ public sealed class CoasterTrack
 		train.Despawn();
 	}
 
-	/// <summary>Can the track be extended onto tile (tx,ty)? (on-grid, 4-adjacent to the head, no overlap).</summary>
+	/// <summary>Can the track be extended onto tile (tx,ty)? (on-grid, 4-adjacent to the head, no overlap,
+	/// and not already a closed circuit). Laying onto the station's entry connector is allowed — it closes
+	/// the loop.</summary>
 	public bool CanExtend( int tx, int ty )
 	{
-		if ( !grid.InBounds( tx, ty ) || tiles.Contains( (tx, ty) ) )
+		if ( IsClosed || !grid.InBounds( tx, ty ) || tiles.Contains( (tx, ty) ) )
 			return false;
 		var (hx, hy) = Head;
 		return Math.Abs( tx - hx ) + Math.Abs( ty - hy ) == 1;
@@ -72,6 +87,8 @@ public sealed class CoasterTrack
 			return false;
 		tiles.Add( (tx, ty) );
 		SpawnSegment( tx, ty );
+		if ( (tx, ty) == trackInTile )
+			IsClosed = true; // laid back to the station entry — the circuit is complete
 		return true;
 	}
 
@@ -80,6 +97,7 @@ public sealed class CoasterTrack
 	{
 		if ( tiles.Count <= 1 )
 			return;
+		IsClosed = false; // removing the head reopens a closed circuit (the head was the closing tile)
 		tiles.RemoveAt( tiles.Count - 1 );
 		for ( int k = 0; k < 2 && parts.Count > 0; k++ )
 		{

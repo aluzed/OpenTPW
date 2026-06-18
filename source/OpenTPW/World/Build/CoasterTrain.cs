@@ -49,7 +49,12 @@ public sealed class CoasterTrain : Entity
 			return;
 		}
 
-		// Cumulative arc length along the polyline.
+		// A closed circuit runs as a ring (append the start so the last edge wraps back to it); an open
+		// track shuttles (down and back). Cumulative arc length drives constant-speed motion either way.
+		bool closed = track.IsClosed;
+		if ( closed )
+			path.Add( path[0] );
+
 		var cum = new float[path.Count];
 		for ( int i = 1; i < path.Count; i++ )
 			cum[i] = cum[i - 1] + path[i].Distance( path[i - 1] );
@@ -57,7 +62,7 @@ public sealed class CoasterTrain : Entity
 		if ( length < 1e-3f )
 			return;
 
-		float period = 2f * length; // down the track and back (shuttle)
+		float period = closed ? length : 2f * length;
 		dist = (dist + Speed * Time.Delta) % period;
 
 		for ( int i = 0; i < cars.Length; i++ )
@@ -65,8 +70,8 @@ public sealed class CoasterTrain : Entity
 			float u = (dist - i * spacing) % period;
 			if ( u < 0 ) u += period;
 
-			// Reflect the second half so the car retraces the open track, facing travel direction.
-			bool returning = u > length;
+			// Open track: reflect the second half so the car retraces it, facing travel direction.
+			bool returning = !closed && u > length;
 			float d = returning ? period - u : u;
 
 			var (pos, tan) = Sample( path, cum, d );

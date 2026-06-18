@@ -4,9 +4,9 @@
 - **Type**: Engine / UI / reverse engineering
 - **Status**: ⚠️ Slices 1–3a done — the coaster **station** is placeable via the build catalog and
   renders/queues like any ride, a **track-laying tool** extends elevated track segments from the
-  station's `>` connector, and a **shuttle train of real `CrocCar.MD2` cars** runs the laid segments.
-  Remaining: 3D *curved* pieces from `.hmp` + a closed-loop `GENERATETRACK`, peep boarding + scream
-  (slice 3b), below.
+  station's `>` connector and **closes into a circuit** at the `<` entry connector, and a **train of
+  real `CrocCar.MD2` cars** runs the track (shuttling when open, a continuous loop when closed).
+  Remaining: 3D *curved* pieces from `.hmp`, peep boarding + scream (slice 3b), below.
 - **Parent**: [T-038](T-038-park-management-ui.md). **Needs**: [T-041](T-041-ride-shop-placement.md).
   **Related**: [T-032](T-032-ride-engine.md), [T-033](T-033-ride-animation-keyframes.md).
 
@@ -63,17 +63,20 @@
   stays procedural; that's a separate decode.)
 - `CoasterTrack` spawns the train in its ctor (it hides itself until ≥1 segment is laid) and exposes
   `WorldPath()` + a `Despawn()` teardown.
-- Verified via `OPENTPW_AUTOPLACE`: `CrocCar loaded (134 verts, 76 tris)`, the train runs the
-  7-segment track with no exceptions across continuous per-frame updates; the elevated track segments
-  + pylons render (confirmed in-frame) and the cars run along them.
+- **Loop closing**: `CoasterTrack` records the station's `<` entry tile; laying the track back onto it
+  sets `IsClosed`, and the train then runs a **continuous loop** (the path wraps last→first) instead of
+  shuttling. `Backtrack` reopens it; the HUD shows `LOOP CLOSED`.
+- Verified via `OPENTPW_AUTOPLACE`: `CrocCar loaded (134 verts, 76 tris)`; an auto-laid ring around the
+  station logs `autotrack segments=9 closed=True`, the looping train runs with no exceptions, and the
+  station + elevated track segments/pylons render (confirmed in-frame).
 
 ## Remaining slices
 
 3b. **3D curved track + rideable CrocCar** — 3D curved track pieces from the `.hmp` templates,
-    a closed-loop `GENERATETRACK` (control path → smooth renderable + rideable track), the car
-    following the track with real physics, peep boarding + scream (ties into the ride engine,
-    T-032/T-033), and `CrocCarM1..3` animation frames. Rotation / `STACKUP/DOWN` elevation editing of
-    segments also lands here.
+    `GENERATETRACK` smoothing (control path → a smooth spline rather than the current tile-stepped
+    polyline), the car following the track with real physics, peep boarding + scream (ties into the
+    ride engine, T-032/T-033), and `CrocCarM1..3` animation frames. Rotation / `STACKUP/DOWN` elevation
+    editing of segments also lands here.
 
 ## Context
 

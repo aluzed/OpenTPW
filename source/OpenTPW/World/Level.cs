@@ -84,19 +84,24 @@ public class Level
 				+ $"hand={CommitPlacement( Item( "handyman" ), grid, terrain, cx + 2, cy + 2 )} "
 				+ $"rsch={CommitPlacement( Item( "researcher" ), grid, terrain, cx + 4, cy + 2 )}" );
 
-			// Lay a short coaster track from the placed coaster's connector (T-045 slice 2); the
-			// CoasterTrack spawns a shuttle train (slice 3) that runs the laid segments automatically.
+			// Lay a coaster track that loops around the station back to its '<' entry connector, so the
+			// CoasterTrack closes into a circuit and its train (slice 3) runs a continuous loop.
 			var coaster = Entity.All.OfType<Ride>().FirstOrDefault( r => r.Shape.HasTrack );
-			if ( coaster != null )
+			if ( coaster != null && coaster.Shape.TrackOut is { } outC && coaster.Shape.TrackIn is { } inC )
 			{
 				var t = new CoasterTrack( coaster, grid, terrain );
-				for ( int k = 0; k < 7; k++ )
-				{
-					var (hx, hy) = t.Head;
-					if ( !t.Extend( hx + 1, hy ) )
+				int ax = coaster.TileX + outC.X, ay = coaster.TileY + outC.Y; // '>' anchor
+				int tx = coaster.TileX + inC.X, ty = coaster.TileY + inC.Y;   // '<' entry tile
+				int top = ay - 2, right = ax + 1, left = tx - 1;              // a ring around the station top
+				var loop = new List<(int X, int Y)>();
+				for ( int y = ay; y >= top; y-- ) loop.Add( (right, y) );       // up the right side
+				for ( int x = right - 1; x >= left; x-- ) loop.Add( (x, top) ); // across the top
+				for ( int y = top + 1; y <= ty; y++ ) loop.Add( (left, y) );    // down the left side
+				loop.Add( (tx, ty) );                                           // into the entry connector
+				foreach ( var (lx, ly) in loop )
+					if ( !t.Extend( lx, ly ) )
 						break;
-				}
-				Log.Info( $"[build] autotrack segments={t.SegmentCount}" );
+				Log.Info( $"[build] autotrack segments={t.SegmentCount} closed={t.IsClosed}" );
 			}
 
 			// Exercise the research → upgrade pipeline (T-044) on the first placed ride.

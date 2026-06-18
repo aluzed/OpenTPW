@@ -51,7 +51,9 @@ internal sealed class ParkStatsPanel : Panel
 		if ( BuildMode.Current is { } build )
 		{
 			if ( build.LayingTrack )
-				lines.Add( $"TRACK: {build.TrackSegments} segs (click lay, B back, T done)" );
+				lines.Add( build.TrackClosed
+					? $"TRACK: {build.TrackSegments} segs - LOOP CLOSED (B back, T done)"
+					: $"TRACK: {build.TrackSegments} segs (click lay, B back, T done)" );
 			else if ( build.SelectedRide is { Shape.HasTrack: true } )
 				lines.Add( "T: lay coaster track" );
 
