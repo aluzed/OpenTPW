@@ -75,14 +75,19 @@
     hand-built mesh can't supply, so **they never actually rendered**. The ribbon uses `unlit.shader`
     (single `Color` texture sampled at the vertex UVs), so the laid track surface is visible for the
     first time.
+- **Riders aboard**: `RideQueue` now back-references its `Ride` (`Ride.Queue` / `Ride.Riders`), so the
+  coaster train carries **visible riders** — bright seat markers (2 per car) shown for as many seats as
+  the coaster's live occupancy fills. Verified in-frame (forced full occupancy): the markers sit on the
+  CrocCar, which renders clearly (red body, green croc head). Scream SFX still awaits the ride engine.
 - Verified via `OPENTPW_AUTOPLACE`: `CrocCar loaded (134 verts, 76 tris)`; an auto-laid ring around the
   station logs `autotrack segments=9 closed=True`, the looping train runs with no exceptions, and the
-  station + elevated track segments/pylons render (confirmed in-frame).
+  smooth textured track ribbon + riders render (confirmed in-frame).
 
 ## Remaining slices
 
-3b. **Rideable CrocCar + authentic pieces** — peep boarding + scream (ties into the ride engine,
-    T-032/T-033), `CrocCarM1..3` animation frames, and (polish) authoring the ribbon profile from the
+3b. **Rideable CrocCar + authentic pieces** — wire real peep boarding (peeps leave the queue *onto* the
+    train rather than the current marker stand-ins) + scream (ties into the ride engine, T-032/T-033),
+    `CrocCarM1..3` animation frames, and (polish) authoring the ribbon profile from the
     `.hmp` templates (rails + cross-ties geometry) rather than a flat textured strip. Rotation /
     `STACKUP/DOWN` elevation editing of segments also lands here.
 

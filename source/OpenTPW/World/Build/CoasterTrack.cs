@@ -13,6 +13,7 @@ public sealed class CoasterTrack
 
 	private readonly PlacementGrid grid;
 	private readonly ParkTerrain terrain;
+	private readonly Ride coaster;
 	private readonly Texture trackTex;
 	private readonly Material<ObjectUniformBuffer> ribbonMat;
 	private readonly List<(int X, int Y)> tiles = new();
@@ -28,10 +29,14 @@ public sealed class CoasterTrack
 	/// (the train then runs a continuous loop instead of shuttling).</summary>
 	public bool IsClosed { get; private set; }
 
+	/// <summary>Live rider count of the parent coaster — the train carries this many and runs while &gt; 0.</summary>
+	public int Riders => coaster.Riders;
+
 	public CoasterTrack( Ride coaster, PlacementGrid grid, ParkTerrain terrain )
 	{
 		this.grid = grid;
 		this.terrain = terrain;
+		this.coaster = coaster;
 
 		try { trackTex = new Texture( $"{coaster.Archive}/gtexture/Trak_sec2.wct", TextureFlags.Repeat ); }
 		catch { trackTex = Texture.Missing; }

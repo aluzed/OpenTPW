@@ -110,6 +110,11 @@ public class Ride : Entity
 	/// <summary>True if the grid tile (tx,ty) is within this ride's footprint.</summary>
 	public bool Covers( int tx, int ty ) => tx >= TileX && tx < TileX + TileW && ty >= TileY && ty < TileY + TileH;
 
+	/// <summary>This ride's boarding queue (set when the queue is created), and its live rider count —
+	/// used by the coaster train to carry visible riders and run only while occupied.</summary>
+	public RideQueue? Queue { get; internal set; }
+	public int Riders => Queue?.Riders ?? 0;
+
 	/// <summary>Run (true) or idle (false) the ride's animation — driven by occupancy (see RideQueue / Peep).</summary>
 	public void SetActive( bool active ) => engine.SetActive( active );
 

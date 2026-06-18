@@ -28,6 +28,7 @@ public sealed class RideQueue
 		Waypoints = waypoints;
 		ExitPoint = exitPoint;
 		RideDuration = rideDuration;
+		ride.Queue = this; // back-reference so the ride (and its coaster train) can read occupancy
 	}
 
 	/// <summary>How many peeps are currently on the ride.</summary>

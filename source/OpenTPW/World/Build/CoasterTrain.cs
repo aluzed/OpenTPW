@@ -1,27 +1,31 @@
 namespace OpenTPW;
 
 /// <summary>
-/// A small train that runs along a laid <see cref="CoasterTrack"/> (T-045 slice 3): a few car bodies
-/// spaced along the track's elevated polyline, advancing by arc length and orienting to the local
-/// tangent. The track is open (not a closed loop yet), so the train **shuttles** — it reflects at each
-/// end and faces its actual travel direction. The car is the ride's real <c>CrocCar.MD2</c> mesh when
-/// it loads (single mesh, 6 materials), falling back to a procedural croc-green box. Peep boarding +
-/// scream are still later in slice 3.
+/// A small train that runs a laid <see cref="CoasterTrack"/> (T-045 slice 3): a few car bodies spaced
+/// along the track's smoothed centre-line, advancing by arc length and orienting to the local tangent
+/// (shuttling on an open track, looping on a closed circuit). The car is the ride's real
+/// <c>CrocCar.MD2</c> mesh when it loads (single mesh, 6 materials), falling back to a procedural box.
+/// The train carries **visible riders** — seat markers reflecting the coaster's live occupancy
+/// (<see cref="CoasterTrack.Riders"/>). Scream SFX awaits the ride engine (T-032).
 /// </summary>
 public sealed class CoasterTrain : Entity
 {
 	private const int CarCount = 3;
+	private const int RidersPerCar = 2;
 	private const float Speed = 16f; // world units / second along the track
 	private static readonly Vector3 Offscreen = new( 0, 0, -100000f );
 
 	private readonly CoasterTrack track;
+	private readonly float tileSize;
 	private readonly float spacing;     // arc-length gap between cars
 	private readonly ModelEntity[] cars;
+	private readonly ModelEntity[] seats; // CarCount*RidersPerCar rider markers
 	private float dist;                 // lead car's distance travelled along the shuttle cycle
 
 	public CoasterTrain( CoasterTrack track, float tileSize, string archive )
 	{
 		this.track = track;
+		this.tileSize = tileSize;
 		spacing = tileSize * 0.9f;
 
 		var (body, scale) = LoadCar( archive, tileSize );
@@ -29,13 +33,22 @@ public sealed class CoasterTrain : Entity
 		cars = new ModelEntity[CarCount];
 		for ( int i = 0; i < CarCount; i++ )
 			cars[i] = new ModelEntity { Model = body, Scale = scale, Position = Offscreen };
+
+		// Bright little markers standing in for seated riders (shown per occupied seat).
+		var seatMat = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader" );
+		seatMat.Set( "Color", new Texture( [250, 210, 80, 255], 1, 1 ) );
+		seats = new ModelEntity[CarCount * RidersPerCar];
+		for ( int i = 0; i < seats.Length; i++ )
+			seats[i] = new ModelEntity { Model = Primitives.Cube.GenerateModel( seatMat ), Scale = new Vector3( tileSize * 0.08f ), Position = Offscreen };
 	}
 
-	/// <summary>Despawn the train's car entities (called when the track is torn down).</summary>
+	/// <summary>Despawn the train's car + rider entities (called when the track is torn down).</summary>
 	public void Despawn()
 	{
 		foreach ( var c in cars )
 			Entity.All.Remove( c );
+		foreach ( var s in seats )
+			Entity.All.Remove( s );
 		Entity.All.Remove( this );
 	}
 
@@ -62,6 +75,7 @@ public sealed class CoasterTrain : Entity
 		float period = closed ? length : 2f * length;
 		dist = (dist + Speed * Time.Delta) % period;
 
+		int occupied = Math.Min( track.Riders, seats.Length ); // how many seat markers to show
 		for ( int i = 0; i < cars.Length; i++ )
 		{
 			float u = (dist - i * spacing) % period;
@@ -77,7 +91,25 @@ public sealed class CoasterTrain : Entity
 			cars[i].Position = pos;
 			// The car body is long along its local +Y, so align +Y (not +X) with the travel tangent.
 			float yaw = MathF.Atan2( tan.Y, tan.X ) - MathF.PI / 2f;
-			cars[i].Rotation = System.Numerics.Quaternion.CreateFromAxisAngle( System.Numerics.Vector3.UnitZ, yaw );
+			var rot = System.Numerics.Quaternion.CreateFromAxisAngle( System.Numerics.Vector3.UnitZ, yaw );
+			cars[i].Rotation = rot;
+
+			// Seat the riders this car carries, side by side across its width (perp to travel).
+			var side = new Vector3( -tan.Y, tan.X, 0f ).Normal;
+			for ( int r = 0; r < RidersPerCar; r++ )
+			{
+				int seat = i * RidersPerCar + r;
+				if ( seat < occupied )
+				{
+					float off = (r == 0 ? 1f : -1f) * tileSize * 0.12f;
+					seats[seat].Position = pos + Vector3.Up * (tileSize * 0.10f) + side * off;
+					seats[seat].Rotation = rot;
+				}
+				else
+				{
+					seats[seat].Position = Offscreen;
+				}
+			}
 		}
 	}
 
