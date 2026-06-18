@@ -115,9 +115,14 @@ public class Ride : Entity
 
 	private readonly RideEngine engine = new();
 
+	/// <summary>The ride's WAD path (e.g. <c>levels/jungle/rides/coaster1</c>) — used to load extra
+	/// assets like coaster track textures (T-045).</summary>
+	public string Archive { get; }
+
 	public Ride( string rideArchive, Vector3 position )
 	{
 		Position = position;
+		Archive = rideArchive;
 		var rideName = Path.GetFileNameWithoutExtension( rideArchive );
 		Shape = RideShape.Load( rideArchive, rideName );
 

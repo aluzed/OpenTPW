@@ -50,6 +50,11 @@ internal sealed class ParkStatsPanel : Panel
 		// Build palette (T-041): number keys pick an item to place, left-click places it.
 		if ( BuildMode.Current is { } build )
 		{
+			if ( build.LayingTrack )
+				lines.Add( $"TRACK: {build.TrackSegments} segs (click lay, B back, T done)" );
+			else if ( build.SelectedRide is { Shape.HasTrack: true } )
+				lines.Add( "T: lay coaster track" );
+
 			if ( build.SelectedRide is { } sel )
 			{
 				lines.Add( $"RIDE {sel.Name} L{sel.UpgradeLevel} cap {sel.Capacity}  price {sel.TicketPrice:0} (,.)" );

@@ -84,6 +84,20 @@ public class Level
 				+ $"hand={CommitPlacement( Item( "handyman" ), grid, terrain, cx + 2, cy + 2 )} "
 				+ $"rsch={CommitPlacement( Item( "researcher" ), grid, terrain, cx + 4, cy + 2 )}" );
 
+			// Lay a short coaster track from the placed coaster's connector (T-045 slice 2).
+			var coaster = Entity.All.OfType<Ride>().FirstOrDefault( r => r.Shape.HasTrack );
+			if ( coaster != null )
+			{
+				var t = new CoasterTrack( coaster, grid, terrain );
+				for ( int k = 0; k < 7; k++ )
+				{
+					var (hx, hy) = t.Head;
+					if ( !t.Extend( hx + 1, hy ) )
+						break;
+				}
+				Log.Info( $"[build] autotrack segments={t.SegmentCount}" );
+			}
+
 			// Exercise the research → upgrade pipeline (T-044) on the first placed ride.
 			var ride = Entity.All.OfType<Ride>().FirstOrDefault();
 			if ( ride != null )

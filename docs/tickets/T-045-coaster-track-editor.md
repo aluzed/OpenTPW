@@ -2,9 +2,10 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine / UI / reverse engineering
-- **Status**: ⚠️ Slice 1 done — the coaster **station** is placeable via the build catalog and
-  renders/queues like any ride. The track editor proper (laying/generating track, running cars) is the
-  large remainder, broken into slices below.
+- **Status**: ⚠️ Slices 1–2 done — the coaster **station** is placeable via the build catalog and
+  renders/queues like any ride, and a **track-laying tool** extends elevated track segments from the
+  station's `>` connector. Track *generation* (curved 3D pieces) + running cars is the remaining
+  slice 3, below.
 - **Parent**: [T-038](T-038-park-management-ui.md). **Needs**: [T-041](T-041-ride-shop-placement.md).
   **Related**: [T-032](T-032-ride-engine.md), [T-033](T-033-ride-animation-keyframes.md).
 
@@ -34,14 +35,26 @@
   2×3, entrance (1,2) / exit (0,2)), which renders, queues peeps and runs its ride animation like the
   other rides — verified in-game.
 
+## Done (slice 2 — track-laying tool)
+
+- `RideShape` parses the `<`/`>` connectors into `TrackIn`/`TrackOut` (`HasTrack`); `Ride` exposes its
+  source `Archive` and `TileX/Y/W/H` + `Covers(tx,ty)`.
+- New `World/Build/CoasterTrack.cs`: a chain of grid tiles anchored at the station's `>` connector.
+  `CanExtend` (on-grid, 4-adjacent to the head, no overlap) / `Extend` / `Backtrack`. Each laid segment
+  spawns an **elevated** track quad (the real `Trak_sec2.wct` texture, 10 units up) on a grey support
+  **pylon** so it reads as a coaster rather than a ground path.
+- `BuildMode` wires the tool: with a coaster selected (Default-tool click), **`T`** toggles track
+  laying from its connector, left-click lays the highlighted tile (green = extendable / red = not),
+  **`B`** backtracks, `T` again finishes. HUD shows the live segment count.
+- Verified deterministically via the `OPENTPW_AUTOPLACE` diagnostic (`autotrack segments=7`): the tool
+  anchors, extends 7 tiles, and spawns the elevated quad+pylon geometry per segment.
+
 ## Remaining slices
 
-1. **Track-piece RE + laying tool** — decode `.hmp` + the track-section/pylon piece set; a tool to
-   place/extend/rotate/raise (`STACKUP/DOWN`) track segments from the station's `<`/`>` connectors
-   (`PLACENORMAL`, `BACKTRACK`, `ROTATE`, `DELETEMULTI`).
-2. **Track generation + running cars** — `GENERATETRACK` (control path → renderable + rideable track);
-   the `CrocCar` follows the generated track (physics), with peep boarding + scream (ties into the
-   ride engine, T-032/T-033).
+3. **Track generation + running cars** — 3D curved track pieces from the `.hmp` templates,
+   `GENERATETRACK` (control path → smooth renderable + rideable track), the `CrocCar` following the
+   track (physics), with peep boarding + scream (ties into the ride engine, T-032/T-033). Rotation /
+   `STACKUP/DOWN` elevation editing of segments also lands here.
 
 ## Context
 

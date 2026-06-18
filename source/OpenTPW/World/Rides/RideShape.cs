@@ -27,13 +27,24 @@ public sealed class RideShape
 	/// <summary>The exit tile (where peeps leave) — the <c>2</c> cell, if any.</summary>
 	public (int X, int Y)? Exit { get; }
 
-	private RideShape( int width, int height, bool[,] cells, (int, int)? entrance, (int, int)? exit )
+	/// <summary>Coaster track connectors — the <c>&lt;</c> (in) and <c>&gt;</c> (out) cells, where a
+	/// player-built track attaches to the station (T-045). Null for non-coaster rides.</summary>
+	public (int X, int Y)? TrackIn { get; }
+	public (int X, int Y)? TrackOut { get; }
+
+	/// <summary>True if this ride is a coaster (its shape has track connectors).</summary>
+	public bool HasTrack => TrackOut != null || TrackIn != null;
+
+	private RideShape( int width, int height, bool[,] cells, (int, int)? entrance, (int, int)? exit,
+		(int, int)? trackIn = null, (int, int)? trackOut = null )
 	{
 		Width = width;
 		Height = height;
 		Cells = cells;
 		Entrance = entrance;
 		Exit = exit;
+		TrackIn = trackIn;
+		TrackOut = trackOut;
 	}
 
 	/// <summary>The default 4×4 footprint, used when a ride ships no parseable shape.</summary>
@@ -82,7 +93,7 @@ public sealed class RideShape
 			return Default;
 
 		var cells = new bool[width, height];
-		(int, int)? entrance = null, exit = null;
+		(int, int)? entrance = null, exit = null, trackIn = null, trackOut = null;
 		for ( int y = 0; y < height; y++ )
 			for ( int x = 0; x < rows[y].Length; x++ )
 			{
@@ -90,14 +101,16 @@ public sealed class RideShape
 				// '.' and space are gaps, not footprint tiles; everything else (incl. S/N/2/E/<>) is a tile.
 				cells[x, y] = !char.IsWhiteSpace( ch ) && ch != '.';
 
-				// Entrance markers: S (station), N (eNtrance), E. Exit marker: 2. Keep the first of each.
+				// Entrance markers: S (station), N (eNtrance), E. Exit marker: 2. Track connectors: < >.
 				if ( entrance == null && (ch is 'S' or 'N' or 'E') )
 					entrance = (x, y);
 				else if ( exit == null && ch == '2' )
 					exit = (x, y);
+				if ( ch == '<' ) trackIn = (x, y);
+				else if ( ch == '>' ) trackOut = (x, y);
 			}
 
-		return new RideShape( width, height, cells, entrance, exit );
+		return new RideShape( width, height, cells, entrance, exit, trackIn, trackOut );
 	}
 
 	/// <summary>Loads and parses a ride's footprint from its WAD <c>.sam</c> (via the VFS).</summary>

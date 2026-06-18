@@ -71,7 +71,9 @@ public sealed class BuildMode : Entity
 		var (tx, ty) = grid.WorldToTile( hit );
 		HoveredTile = grid.InBounds( tx, ty ) ? (tx, ty) : null;
 
-		if ( Selected >= 0 )
+		if ( track != null )
+			UpdateTrack( tx, ty );
+		else if ( Selected >= 0 )
 			UpdatePlacement( tx, ty );
 		else
 			UpdateDefault( tx, ty );
@@ -79,6 +81,28 @@ public sealed class BuildMode : Entity
 
 	/// <summary>The ride currently selected (clicked) in the Default tool — its price is adjustable.</summary>
 	public Ride? SelectedRide { get; private set; }
+
+	private CoasterTrack? track;
+	/// <summary>Whether the coaster track-laying tool is active, and how many segments are laid (T-045).</summary>
+	public bool LayingTrack => track != null;
+	public int TrackSegments => track?.SegmentCount ?? 0;
+
+	// Track-laying tool: highlight the candidate tile (green if it extends the track), lay on click.
+	private void UpdateTrack( int tx, int ty )
+	{
+		if ( HoveredTile == null )
+		{
+			highlight.Position = Offscreen;
+			return;
+		}
+		bool ok = track!.CanExtend( tx, ty );
+		mat.Set( "Color", ok ? green : red );
+		highlight.Scale = new Vector3( grid.TileSize / 2f );
+		var c = grid.TileToWorld( tx, ty );
+		highlight.Position = c.WithZ( terrain.SampleHeight( c.X, c.Y ) + 0.3f );
+		if ( Input.MouseLeftPressed && ok )
+			track.Extend( tx, ty );
+	}
 
 	// Number keys pick a catalog item; Esc/0 cancels; economy keys adjust prices/fee/loans (T-042).
 	private void HandleSelectionKeys()
@@ -119,6 +143,17 @@ public sealed class BuildMode : Entity
 			if ( Hit( Key.L ) ) fin.TakeLoan( 0 );
 			if ( Hit( Key.K ) ) fin.RepayLoan( 0 );
 		}
+
+		// Coaster track tool (T-045): T toggles laying from the selected coaster's connector, B backtracks.
+		if ( Hit( Key.T ) )
+		{
+			if ( track != null )
+				track = null;
+			else if ( SelectedRide is { } cr && cr.Shape.HasTrack )
+				track = new CoasterTrack( cr, grid, terrain );
+		}
+		if ( track != null && Hit( Key.B ) )
+			track.Backtrack();
 
 		prevDown.Clear();
 		foreach ( var k in down )
