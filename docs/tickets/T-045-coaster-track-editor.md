@@ -66,21 +66,25 @@
 - **Loop closing**: `CoasterTrack` records the station's `<` entry tile; laying the track back onto it
   sets `IsClosed`, and the train then runs a **continuous loop** (the path wraps last→first) instead of
   shuttling. `Backtrack` reopens it; the HUD shows `LOOP CLOSED`.
-- **Spline smoothing** (the `GENERATETRACK` idea): the train no longer follows the raw tile-stepped
-  polyline — `CoasterTrain.Smooth` runs a Catmull-Rom through the tile centres (periodic when closed,
-  clamped when open, 8 subdivisions/segment) so the cars **glide through corners** instead of snapping.
-  The rendered quads stay the physical pieces; only the ridden centre-line is curved.
+- **Spline smoothing + smooth track ribbon** (the `GENERATETRACK` idea): the ridden centre-line is now
+  a Catmull-Rom spline through the tile centres (`CoasterTrack.SmoothedPath`, periodic when closed,
+  clamped when open, 8 subdivisions/segment), shared by the train (cars **glide through corners**) and
+  by the **rendered track**, which is a generated textured **ribbon mesh** following that spline (real
+  `Trak_sec2.wct`, repeated along its length) on support pylons — replacing the old per-tile flat quads.
+  - Fix: those old quads used `3d.shader`, which expects a per-vertex-indexed texture *array* a
+    hand-built mesh can't supply, so **they never actually rendered**. The ribbon uses `unlit.shader`
+    (single `Color` texture sampled at the vertex UVs), so the laid track surface is visible for the
+    first time.
 - Verified via `OPENTPW_AUTOPLACE`: `CrocCar loaded (134 verts, 76 tris)`; an auto-laid ring around the
   station logs `autotrack segments=9 closed=True`, the looping train runs with no exceptions, and the
   station + elevated track segments/pylons render (confirmed in-frame).
 
 ## Remaining slices
 
-3b. **3D curved track + rideable CrocCar** — curved 3D track *meshes* from the `.hmp` templates (the
-    rendered pieces, so the visible track follows the now-smooth ridden centre-line), the car following
-    the track with real physics, peep boarding + scream (ties into the ride engine, T-032/T-033), and
-    `CrocCarM1..3` animation frames. Rotation / `STACKUP/DOWN` elevation editing of segments also lands
-    here.
+3b. **Rideable CrocCar + authentic pieces** — peep boarding + scream (ties into the ride engine,
+    T-032/T-033), `CrocCarM1..3` animation frames, and (polish) authoring the ribbon profile from the
+    `.hmp` templates (rails + cross-ties geometry) rather than a flat textured strip. Rotation /
+    `STACKUP/DOWN` elevation editing of segments also lands here.
 
 ## Context
 

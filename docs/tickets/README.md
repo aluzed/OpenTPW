@@ -64,7 +64,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-042](T-042-economy-controls-loans.md) | 🟡 Feature | ⚠️ Core done | Economy controls: settable ride prices + admission fee, loans (take/repay/monthly/bankruptcy), HUD readout (verified); clickable panel+graph remain |
 | [T-043](T-043-staff-management.md) | 🟡 Feature | ⚠️ Core done | Staff hire+place via catalog (entertainer/handyman/guard/researcher), charged + wages (verified); fire/patrol-zones remain |
 | [T-044](T-044-research-upgrades.md) | 🟡 Feature | ⚠️ Core done | Research + ride capacity upgrades: full `Upgrades[*]` parsed, researchers advance research, apply bumps live capacity (verified); per-ride UI remains |
-| [T-045](T-045-coaster-track-editor.md) | 🟡 Feature | ⚠️ Slices 1–3a | Coaster: station placeable/queues + track-laying tool (elevated segments+pylons) closing into a loop at the `<` entry + a train of real CrocCar.MD2 cars (shuttle/loop) gliding a Catmull-Rom smoothed centre-line — done, verified; curved 3D track meshes + peep boarding/scream remain (slice 3b) |
+| [T-045](T-045-coaster-track-editor.md) | 🟡 Feature | ⚠️ Slices 1–3a | Coaster: station + track-laying tool closing into a loop at the `<` entry, rendered as a smooth Catmull-Rom **track ribbon** (real Trak_sec texture, on pylons) with a train of real CrocCar.MD2 cars gliding it — done, verified; peep boarding/scream + .hmp rail profile remain (slice 3b) |
 
 Priority legend: 🔴 blocking · 🟠 important · 🟡 desirable/feature · ⚪ technical debt/polish.
 Status legend: ✅ done · ⚠️ partial · ☐ to do · 🗂️ split into focused tickets · ⏸️ deferred.

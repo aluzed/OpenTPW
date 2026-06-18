@@ -41,23 +41,16 @@ public sealed class CoasterTrain : Entity
 
 	protected override void OnUpdate()
 	{
-		var ctrl = track.WorldPath();
-		if ( ctrl.Count < 2 )
+		// The ridden centre-line is the track's Catmull-Rom spline (already a closed ring when complete),
+		// so the cars glide through corners. A closed circuit loops; an open track shuttles (down + back).
+		var path = track.SmoothedPath();
+		if ( path.Count < 2 )
 		{
 			foreach ( var c in cars )
 				c.Position = Offscreen;
 			return;
 		}
-
-		// Smooth the tile-centre control points into a curved centre-line so the cars glide through
-		// corners instead of snapping (the GENERATETRACK idea — the rendered quads stay the pieces).
 		bool closed = track.IsClosed;
-		var path = Smooth( ctrl, closed, 8 );
-
-		// A closed circuit runs as a ring (append the start so the last edge wraps back to it); an open
-		// track shuttles (down and back). Cumulative arc length drives constant-speed motion either way.
-		if ( closed )
-			path.Add( path[0] );
 
 		var cum = new float[path.Count];
 		for ( int i = 1; i < path.Count; i++ )
@@ -100,40 +93,6 @@ public sealed class CoasterTrain : Entity
 		var a = path[s];
 		var b = path[s + 1];
 		return (a + (b - a) * f, (b - a).Normal);
-	}
-
-	// Catmull-Rom through the control points → a dense, curved centre-line. For a closed ring the
-	// neighbours wrap; for an open track the endpoints are clamped. Each control segment is subdivided
-	// into <sub> points (start-inclusive, end-exclusive); the open case appends the final endpoint.
-	private static List<Vector3> Smooth( IReadOnlyList<Vector3> p, bool closed, int sub )
-	{
-		int n = p.Count;
-		if ( n < 3 )
-			return new List<Vector3>( p ); // too few points to curve — keep it straight
-
-		var outp = new List<Vector3>( (closed ? n : n - 1) * sub + 1 );
-		int segs = closed ? n : n - 1;
-		for ( int i = 0; i < segs; i++ )
-		{
-			var p0 = p[closed ? (i - 1 + n) % n : Math.Max( i - 1, 0 )];
-			var p1 = p[i % n];
-			var p2 = p[(i + 1) % n];
-			var p3 = p[closed ? (i + 2) % n : Math.Min( i + 2, n - 1 )];
-			for ( int s = 0; s < sub; s++ )
-				outp.Add( CatmullRom( p0, p1, p2, p3, (float)s / sub ) );
-		}
-		if ( !closed )
-			outp.Add( p[n - 1] );
-		return outp;
-	}
-
-	private static Vector3 CatmullRom( Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t )
-	{
-		float t2 = t * t, t3 = t2 * t;
-		return 0.5f * (p1 * 2f
-			+ (p2 - p0) * t
-			+ (p0 * 2f - p1 * 5f + p2 * 4f - p3) * t2
-			+ (p1 * 3f - p0 - p2 * 3f + p3) * t3);
 	}
 
 	// The ride's real CrocCar.MD2 (single mesh) built the same way ride meshes are (the LobbyIsland

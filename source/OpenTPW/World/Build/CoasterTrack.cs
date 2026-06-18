@@ -1,10 +1,11 @@
 namespace OpenTPW;
 
 /// <summary>
-/// A player-built coaster track (T-045 slice 2): a chain of grid tiles laid from the station's
-/// <c>&gt;</c> connector, each rendered as an **elevated** track segment (the real <c>Trak_sec</c>
-/// texture) on a support pylon — so it reads as a coaster rather than a ground path. Flat segments for
-/// now; 3D curved pieces (from the <c>.hmp</c> templates) + a running car are slice 3.
+/// A player-built coaster track (T-045): a chain of grid tiles laid from the station's <c>&gt;</c>
+/// connector, which can be closed into a circuit at the <c>&lt;</c> entry. The ridden centre-line is a
+/// Catmull-Rom spline through the tile centres (so the train glides), and the track is **rendered** as a
+/// smooth elevated ribbon (the real <c>Trak_sec</c> texture) following that same spline, on support
+/// pylons. 3D curved piece *meshes* from the <c>.hmp</c> templates + peep boarding are slice 3b.
 /// </summary>
 public sealed class CoasterTrack
 {
@@ -13,10 +14,12 @@ public sealed class CoasterTrack
 	private readonly PlacementGrid grid;
 	private readonly ParkTerrain terrain;
 	private readonly Texture trackTex;
+	private readonly Material<ObjectUniformBuffer> ribbonMat;
 	private readonly List<(int X, int Y)> tiles = new();
-	private readonly List<ModelEntity> parts = new(); // 2 per laid segment (track quad + pylon)
+	private readonly List<ModelEntity> pylons = new(); // one support per laid segment
 	private readonly CoasterTrain train;
 	private readonly (int X, int Y)? trackInTile; // the station's '<' entry connector, where the loop closes
+	private ModelEntity? ribbon;                  // the smooth track surface (regenerated on every change)
 
 	public (int X, int Y) Head => tiles[^1];
 	public int SegmentCount => tiles.Count - 1; // the first tile is the station connector anchor
@@ -32,6 +35,10 @@ public sealed class CoasterTrack
 
 		try { trackTex = new Texture( $"{coaster.Archive}/gtexture/Trak_sec2.wct", TextureFlags.Repeat ); }
 		catch { trackTex = Texture.Missing; }
+		// Unlit (not 3d.shader): unlit samples a single Color texture at the vertex UVs, whereas 3d.shader
+		// expects a per-vertex-indexed texture *array* this hand-built ribbon mesh doesn't supply.
+		ribbonMat = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader", MaterialFlags.DoubleSided );
+		ribbonMat.Set( "Color", trackTex );
 
 		// Anchor at the station's track-out connector (fall back to track-in / centre).
 		var c = coaster.Shape.TrackOut ?? coaster.Shape.TrackIn ?? (coaster.TileW / 2, coaster.TileH / 2);
@@ -45,11 +52,11 @@ public sealed class CoasterTrack
 				trackInTile = inTile;
 		}
 
-		// The shuttle train hides itself until at least one segment is laid (path has < 2 points).
+		// The train hides itself until at least one segment is laid (path has < 2 points).
 		train = new CoasterTrain( this, grid.TileSize, coaster.Archive );
 	}
 
-	/// <summary>The track centre-line as elevated world points (one per laid tile) — the train's path.</summary>
+	/// <summary>The track centre-line as elevated world points (one per laid tile) — the raw control path.</summary>
 	public List<Vector3> WorldPath()
 	{
 		var pts = new List<Vector3>( tiles.Count );
@@ -61,13 +68,17 @@ public sealed class CoasterTrack
 		return pts;
 	}
 
-	/// <summary>Remove all laid segments and the train (called when the track tool is abandoned).</summary>
-	public void Despawn()
+	/// <summary>The ridden centre-line: a Catmull-Rom spline through the control points (closed into a
+	/// ring when the circuit is complete). Both the train and the rendered ribbon follow this.</summary>
+	public List<Vector3> SmoothedPath()
 	{
-		foreach ( var p in parts )
-			Entity.All.Remove( p );
-		parts.Clear();
-		train.Despawn();
+		var ctrl = WorldPath();
+		if ( ctrl.Count < 2 )
+			return ctrl;
+		var path = Smooth( ctrl, IsClosed, 8 );
+		if ( IsClosed )
+			path.Add( path[0] ); // close the ring so the last edge wraps back to the start
+		return path;
 	}
 
 	/// <summary>Can the track be extended onto tile (tx,ty)? (on-grid, 4-adjacent to the head, no overlap,
@@ -86,9 +97,10 @@ public sealed class CoasterTrack
 		if ( !CanExtend( tx, ty ) )
 			return false;
 		tiles.Add( (tx, ty) );
-		SpawnSegment( tx, ty );
+		SpawnPylon( tx, ty );
 		if ( (tx, ty) == trackInTile )
 			IsClosed = true; // laid back to the station entry — the circuit is complete
+		RebuildRibbon();
 		return true;
 	}
 
@@ -99,36 +111,112 @@ public sealed class CoasterTrack
 			return;
 		IsClosed = false; // removing the head reopens a closed circuit (the head was the closing tile)
 		tiles.RemoveAt( tiles.Count - 1 );
-		for ( int k = 0; k < 2 && parts.Count > 0; k++ )
+		if ( pylons.Count > 0 )
 		{
-			Entity.All.Remove( parts[^1] );
-			parts.RemoveAt( parts.Count - 1 );
+			Entity.All.Remove( pylons[^1] );
+			pylons.RemoveAt( pylons.Count - 1 );
 		}
+		RebuildRibbon();
 	}
 
-	private void SpawnSegment( int tx, int ty )
+	/// <summary>Remove all laid segments, the ribbon and the train (called when the track is abandoned).</summary>
+	public void Despawn()
+	{
+		foreach ( var p in pylons )
+			Entity.All.Remove( p );
+		pylons.Clear();
+		if ( ribbon != null )
+			Entity.All.Remove( ribbon );
+		ribbon = null;
+		train.Despawn();
+	}
+
+	// A slim grey pillar from the ground up to the track, under the laid tile's centre.
+	private void SpawnPylon( int tx, int ty )
 	{
 		var c = grid.TileToWorld( tx, ty );
 		float gz = terrain.SampleHeight( c.X, c.Y );
-
-		// Elevated track quad (real track texture).
-		var trackMat = new Material<ObjectUniformBuffer>( "content/shaders/3d.shader" );
-		trackMat.Set( "Color", trackTex );
-		parts.Add( new ModelEntity
-		{
-			Model = Primitives.Plane.GenerateModel( trackMat ),
-			Position = c.WithZ( gz + TrackHeight ),
-			Scale = new Vector3( grid.TileSize / 2f ),
-		} );
-
-		// Support pylon (a slim grey pillar from the ground up to the track).
 		var pylonMat = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader" );
 		pylonMat.Set( "Color", new Texture( [90, 90, 105, 255], 1, 1 ) );
-		parts.Add( new ModelEntity
+		pylons.Add( new ModelEntity
 		{
 			Model = Primitives.Cube.GenerateModel( pylonMat ),
 			Position = c.WithZ( gz + TrackHeight / 2f ),
 			Scale = new Vector3( 1.5f, 1.5f, TrackHeight / 2f ),
 		} );
+	}
+
+	// Generate the smooth track surface as a textured ribbon following the ridden centre-line.
+	private void RebuildRibbon()
+	{
+		var pts = SmoothedPath();
+		if ( pts.Count < 2 )
+		{
+			if ( ribbon != null ) ribbon.Model = null;
+			return;
+		}
+
+		float halfW = grid.TileSize * 0.25f;
+		var verts = new List<Vertex>( pts.Count * 2 );
+		float cum = 0f;
+		for ( int i = 0; i < pts.Count; i++ )
+		{
+			var prev = pts[Math.Max( i - 1, 0 )];
+			var next = pts[Math.Min( i + 1, pts.Count - 1 )];
+			var dir = next - prev;
+			var perp = new Vector3( -dir.Y, dir.X, 0f ).Normal; // horizontal, perpendicular to travel
+			if ( i > 0 ) cum += pts[i].Distance( pts[i - 1] );
+			float v = cum / grid.TileSize; // repeat the texture roughly once per tile of length
+			verts.Add( new Vertex { Position = pts[i] + perp * halfW, Normal = Vector3.Up, TexCoords = new Vector2( 0f, v ) } );
+			verts.Add( new Vertex { Position = pts[i] - perp * halfW, Normal = Vector3.Up, TexCoords = new Vector2( 1f, v ) } );
+		}
+
+		var idx = new List<uint>( (pts.Count - 1) * 6 );
+		for ( int i = 0; i < pts.Count - 1; i++ )
+		{
+			uint a = (uint)(2 * i), b = a + 1, c = a + 2, d = a + 3;
+			idx.Add( a ); idx.Add( b ); idx.Add( c );
+			idx.Add( b ); idx.Add( d ); idx.Add( c );
+		}
+
+		var model = new Model( verts.ToArray(), idx.ToArray(), ribbonMat );
+		if ( ribbon == null )
+			ribbon = new ModelEntity { Model = model };
+		else
+			ribbon.Model = model;
+	}
+
+	// Catmull-Rom through the control points → a dense, curved centre-line. For a closed ring the
+	// neighbours wrap; for an open track the endpoints are clamped. Each control segment is subdivided
+	// into <sub> points (start-inclusive, end-exclusive); the open case appends the final endpoint.
+	private static List<Vector3> Smooth( IReadOnlyList<Vector3> p, bool closed, int sub )
+	{
+		int n = p.Count;
+		if ( n < 3 )
+			return new List<Vector3>( p ); // too few points to curve — keep it straight
+
+		var outp = new List<Vector3>( (closed ? n : n - 1) * sub + 1 );
+		int segs = closed ? n : n - 1;
+		for ( int i = 0; i < segs; i++ )
+		{
+			var p0 = p[closed ? (i - 1 + n) % n : Math.Max( i - 1, 0 )];
+			var p1 = p[i % n];
+			var p2 = p[(i + 1) % n];
+			var p3 = p[closed ? (i + 2) % n : Math.Min( i + 2, n - 1 )];
+			for ( int s = 0; s < sub; s++ )
+				outp.Add( CatmullRom( p0, p1, p2, p3, (float)s / sub ) );
+		}
+		if ( !closed )
+			outp.Add( p[n - 1] );
+		return outp;
+	}
+
+	private static Vector3 CatmullRom( Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t )
+	{
+		float t2 = t * t, t3 = t2 * t;
+		return 0.5f * (p1 * 2f
+			+ (p2 - p0) * t
+			+ (p0 * 2f - p1 * 5f + p2 * 4f - p3) * t2
+			+ (p1 * 3f - p0 - p2 * 3f + p3) * t3);
 	}
 }
