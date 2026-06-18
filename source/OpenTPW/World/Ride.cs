@@ -302,60 +302,67 @@ public class Ride : Entity
 	{
 		try
 		{
-			var modelFile = new ModelFile( md2Path );
-			Log.Info( $"[ride] model {md2Path}: {modelFile.Meshes.Count} mesh(es)" );
-
-			var bodyParts = new List<ModelEntity>();
-			foreach ( var mesh in modelFile.Meshes )
-			{
-				var material = new Material<ObjectUniformBuffer>( "content/shaders/test.shader" );
-				var textures = new List<Texture>();
-				for ( int i = 0; i < 16; ++i )
-				{
-					if ( mesh.Materials.Length <= i )
-					{
-						textures.Add( Texture.Missing );
-						continue;
-					}
-
-					try { textures.Add( new Texture( $"{rideArchive}/textures/{mesh.Materials[i].Name}.wct", TextureFlags.Repeat ) ); }
-					catch { textures.Add( Texture.Missing ); }
-				}
-				material.Set( "Color", [.. textures] );
-
-				var vertices = new List<Vertex>();
-				for ( int i = 0; i < mesh.Vertices.Length; ++i )
-				{
-					vertices.Add( new Vertex
-					{
-						Position = new Vector3( mesh.Vertices[i].Position.X, mesh.Vertices[i].Position.Z, mesh.Vertices[i].Position.Y ),
-						Normal = mesh.Normals[i],
-						TexCoords = mesh.TexCoords[i],
-						TexIndex = (int)mesh.Vertices[i].TextureIndex,
-						MatFlags = mesh.Materials[(int)mesh.Vertices[i].TextureIndex].Flags
-					} );
-				}
-
-				var model = new Model( [.. vertices], mesh.Indices, material );
-				Matrix4x4.Decompose( mesh.TransformMatrix, out var scl, out var rot, out var pos );
-
-				bodyParts.Add( new ModelEntity
-				{
-					Model = model,
-					Scale = new Vector3( scl.X, scl.Z, scl.Y ),
-					Rotation = new Quaternion( rot.X, rot.Z, rot.Y, -rot.W ),
-					Position = new Vector3( pos.X, pos.Z, pos.Y ) + Position,
-				} );
-			}
-
+			var parts = BuildMeshEntities( md2Path, rideArchive );
 			// Register the meshes as the ride body so the engine can animate them (it starts a looping
 			// idle so the model visibly moves and is easy to pick out).
-			engine.RegisterBody( bodyParts );
+			engine.RegisterBody( parts );
 		}
 		catch ( Exception e )
 		{
 			Log.Warning( $"[ride] model load failed ({md2Path}): {e.Message}" );
 		}
+	}
+
+	// Builds a ModelEntity per mesh of an MD2 at this ride's position (the LobbyIsland pattern). Ride
+	// textures live in the WAD under textures/; missing ones fall back to Texture.Missing.
+	private List<ModelEntity> BuildMeshEntities( string md2Path, string rideArchive )
+	{
+		var modelFile = new ModelFile( md2Path );
+		Log.Info( $"[ride] model {md2Path}: {modelFile.Meshes.Count} mesh(es)" );
+
+		var parts = new List<ModelEntity>();
+		foreach ( var mesh in modelFile.Meshes )
+		{
+			var material = new Material<ObjectUniformBuffer>( "content/shaders/test.shader" );
+			var textures = new List<Texture>();
+			for ( int i = 0; i < 16; ++i )
+			{
+				if ( mesh.Materials.Length <= i )
+				{
+					textures.Add( Texture.Missing );
+					continue;
+				}
+
+				try { textures.Add( new Texture( $"{rideArchive}/textures/{mesh.Materials[i].Name}.wct", TextureFlags.Repeat ) ); }
+				catch { textures.Add( Texture.Missing ); }
+			}
+			material.Set( "Color", [.. textures] );
+
+			var vertices = new List<Vertex>();
+			for ( int i = 0; i < mesh.Vertices.Length; ++i )
+			{
+				vertices.Add( new Vertex
+				{
+					Position = new Vector3( mesh.Vertices[i].Position.X, mesh.Vertices[i].Position.Z, mesh.Vertices[i].Position.Y ),
+					Normal = mesh.Normals[i],
+					TexCoords = mesh.TexCoords[i],
+					TexIndex = (int)mesh.Vertices[i].TextureIndex,
+					MatFlags = mesh.Materials[(int)mesh.Vertices[i].TextureIndex].Flags
+				} );
+			}
+
+			var model = new Model( [.. vertices], mesh.Indices, material );
+			Matrix4x4.Decompose( mesh.TransformMatrix, out var scl, out var rot, out var pos );
+
+			parts.Add( new ModelEntity
+			{
+				Model = model,
+				Scale = new Vector3( scl.X, scl.Z, scl.Y ),
+				Rotation = new Quaternion( rot.X, rot.Z, rot.Y, -rot.W ),
+				Position = new Vector3( pos.X, pos.Z, pos.Y ) + Position,
+			} );
+		}
+		return parts;
 	}
 
 	protected override void OnUpdate()

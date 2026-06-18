@@ -15,8 +15,15 @@
   attaches at the `<`/`>` connectors.
 - **Assets**: track-section meshes (`Trak_sec2/3.wct`, `gtexture/`), support **pylons**
   (`StdPylon.MD2` + `StdPylonI/L/R.MD2` variants), the **car** (`CrocCar.MD2` + `CrocCarM1..3.MD2`
-  animation frames), `coaster1.md2` (the 14.9 KB station), and **`coaster1.hmp` / `StdPylon.hmp`**
-  (likely the track/pylon profile/path data — format TBD).
+  animation frames), `coaster1.md2` (the 14.9 KB station, 3 meshes), and **`coaster1.hmp` / `StdPylon.hmp`**.
+- **`.hmp` format (recon)**: header `03 00  1E AB 05 00  64 00  <u16 cols> <u16 rows>  30 00 00 00` then
+  offsets + float anchors (e.g. `coaster1.hmp` 210 B → 20.0/46.1/30.0 dims) then a **grid of tile-type
+  codes** (`13 71 71 … 0C 75 … 37 70 …`) — a per-piece footprint/height template, same code-grid family
+  as the `.map` TP2M attribute maps. `StdPylon.hmp` (75 B) is a 1×1 pylon template.
+- **No pre-baked track mesh**: `coaster1c.md2` (the "course") is **not a standard MD2** — `ModelFile`
+  can't parse it ("read beyond end of stream"), and non-coaster `*c.md2` don't exist. So the track is
+  genuinely **procedural** (`.hmp` template + `Trak_sec`/`StdPylon` pieces along the control path);
+  there's no shortcut of rendering a baked course mesh.
 - **Editor command enum** (`ACTION_COASTER_*`): `PLACENORMAL`(55)/`PLACESPECIAL`(56), `LOFT`(57),
   `ROTATE`(58), `WOBBLE`(59), `MOVE`(60), `STACKUP`(61)/`STACKDOWN`(62), `DELETEMULTI`(63),
   `GENERATETRACK`(67)/`OLD`(64), `BACKTRACK`(65), `SETEDIT`(68)/`OLD`(66).
