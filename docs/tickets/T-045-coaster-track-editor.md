@@ -66,17 +66,21 @@
 - **Loop closing**: `CoasterTrack` records the station's `<` entry tile; laying the track back onto it
   sets `IsClosed`, and the train then runs a **continuous loop** (the path wraps last→first) instead of
   shuttling. `Backtrack` reopens it; the HUD shows `LOOP CLOSED`.
+- **Spline smoothing** (the `GENERATETRACK` idea): the train no longer follows the raw tile-stepped
+  polyline — `CoasterTrain.Smooth` runs a Catmull-Rom through the tile centres (periodic when closed,
+  clamped when open, 8 subdivisions/segment) so the cars **glide through corners** instead of snapping.
+  The rendered quads stay the physical pieces; only the ridden centre-line is curved.
 - Verified via `OPENTPW_AUTOPLACE`: `CrocCar loaded (134 verts, 76 tris)`; an auto-laid ring around the
   station logs `autotrack segments=9 closed=True`, the looping train runs with no exceptions, and the
   station + elevated track segments/pylons render (confirmed in-frame).
 
 ## Remaining slices
 
-3b. **3D curved track + rideable CrocCar** — 3D curved track pieces from the `.hmp` templates,
-    `GENERATETRACK` smoothing (control path → a smooth spline rather than the current tile-stepped
-    polyline), the car following the track with real physics, peep boarding + scream (ties into the
-    ride engine, T-032/T-033), and `CrocCarM1..3` animation frames. Rotation / `STACKUP/DOWN` elevation
-    editing of segments also lands here.
+3b. **3D curved track + rideable CrocCar** — curved 3D track *meshes* from the `.hmp` templates (the
+    rendered pieces, so the visible track follows the now-smooth ridden centre-line), the car following
+    the track with real physics, peep boarding + scream (ties into the ride engine, T-032/T-033), and
+    `CrocCarM1..3` animation frames. Rotation / `STACKUP/DOWN` elevation editing of segments also lands
+    here.
 
 ## Context
 
