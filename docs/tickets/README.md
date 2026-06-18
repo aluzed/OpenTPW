@@ -64,7 +64,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-042](T-042-economy-controls-loans.md) | 🟡 Feature | ⚠️ Core done | Economy controls: settable ride prices + admission fee, loans (take/repay/monthly/bankruptcy), HUD readout (verified); clickable panel+graph remain |
 | [T-043](T-043-staff-management.md) | 🟡 Feature | ⚠️ Core done | Staff hire+place via catalog (entertainer/handyman/guard/researcher), charged + wages (verified); fire/patrol-zones remain |
 | [T-044](T-044-research-upgrades.md) | 🟡 Feature | ⚠️ Core done | Research + ride capacity upgrades: full `Upgrades[*]` parsed, researchers advance research, apply bumps live capacity (verified); per-ride UI remains |
-| [T-045](T-045-coaster-track-editor.md) | 🟡 Feature | ⚠️ Slices 1–2 | Coaster: station placeable/queues (done) + elevated track-laying tool from the `>` connector with pylons (done, `autotrack segments=7`); 3D curved generation + running cars remain (slice 3) |
+| [T-045](T-045-coaster-track-editor.md) | 🟡 Feature | ⚠️ Slices 1–3a | Coaster: station placeable/queues + elevated track-laying tool with pylons + a shuttle train running the laid segments (done, verified); 3D curved generation + real CrocCar + peep boarding remain (slice 3b) |
 
 Priority legend: 🔴 blocking · 🟠 important · 🟡 desirable/feature · ⚪ technical debt/polish.
 Status legend: ✅ done · ⚠️ partial · ☐ to do · 🗂️ split into focused tickets · ⏸️ deferred.

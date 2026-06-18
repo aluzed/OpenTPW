@@ -15,6 +15,7 @@ public sealed class CoasterTrack
 	private readonly Texture trackTex;
 	private readonly List<(int X, int Y)> tiles = new();
 	private readonly List<ModelEntity> parts = new(); // 2 per laid segment (track quad + pylon)
+	private readonly CoasterTrain train;
 
 	public (int X, int Y) Head => tiles[^1];
 	public int SegmentCount => tiles.Count - 1; // the first tile is the station connector anchor
@@ -30,6 +31,30 @@ public sealed class CoasterTrack
 		// Anchor at the station's track-out connector (fall back to track-in / centre).
 		var c = coaster.Shape.TrackOut ?? coaster.Shape.TrackIn ?? (coaster.TileW / 2, coaster.TileH / 2);
 		tiles.Add( (coaster.TileX + c.X, coaster.TileY + c.Y) );
+
+		// The shuttle train hides itself until at least one segment is laid (path has < 2 points).
+		train = new CoasterTrain( this, grid.TileSize );
+	}
+
+	/// <summary>The track centre-line as elevated world points (one per laid tile) — the train's path.</summary>
+	public List<Vector3> WorldPath()
+	{
+		var pts = new List<Vector3>( tiles.Count );
+		foreach ( var (tx, ty) in tiles )
+		{
+			var c = grid.TileToWorld( tx, ty );
+			pts.Add( c.WithZ( terrain.SampleHeight( c.X, c.Y ) + TrackHeight ) );
+		}
+		return pts;
+	}
+
+	/// <summary>Remove all laid segments and the train (called when the track tool is abandoned).</summary>
+	public void Despawn()
+	{
+		foreach ( var p in parts )
+			Entity.All.Remove( p );
+		parts.Clear();
+		train.Despawn();
 	}
 
 	/// <summary>Can the track be extended onto tile (tx,ty)? (on-grid, 4-adjacent to the head, no overlap).</summary>

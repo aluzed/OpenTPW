@@ -2,10 +2,10 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine / UI / reverse engineering
-- **Status**: ⚠️ Slices 1–2 done — the coaster **station** is placeable via the build catalog and
-  renders/queues like any ride, and a **track-laying tool** extends elevated track segments from the
-  station's `>` connector. Track *generation* (curved 3D pieces) + running cars is the remaining
-  slice 3, below.
+- **Status**: ⚠️ Slices 1–3a done — the coaster **station** is placeable via the build catalog and
+  renders/queues like any ride, a **track-laying tool** extends elevated track segments from the
+  station's `>` connector, and a **shuttle train** runs the laid segments. Remaining: 3D *curved*
+  pieces from `.hmp` + a closed-loop `GENERATETRACK`, peep boarding + scream (slice 3b), below.
 - **Parent**: [T-038](T-038-park-management-ui.md). **Needs**: [T-041](T-041-ride-shop-placement.md).
   **Related**: [T-032](T-032-ride-engine.md), [T-033](T-033-ride-animation-keyframes.md).
 
@@ -49,12 +49,24 @@
 - Verified deterministically via the `OPENTPW_AUTOPLACE` diagnostic (`autotrack segments=7`): the tool
   anchors, extends 7 tiles, and spawns the elevated quad+pylon geometry per segment.
 
+## Done (slice 3a — running train)
+
+- New `World/Build/CoasterTrain.cs`: a 3-car train that advances by arc length along the track's
+  elevated centre-line (`CoasterTrack.WorldPath()`), orienting each car to the local tangent. The
+  track is open (not a closed loop yet) so the train **shuttles** — it reflects at each end and faces
+  its actual travel direction. Procedural croc-green boxes; the real `CrocCar.MD2` mesh is slice 3b.
+- `CoasterTrack` spawns the train in its ctor (it hides itself until ≥1 segment is laid) and exposes
+  `WorldPath()` + a `Despawn()` teardown.
+- Verified via `OPENTPW_AUTOPLACE`: the train runs the 7-segment track with no exceptions across
+  continuous per-frame updates; a frame-to-frame motion diff shows the rigid car boxes displaced along
+  the track (distinct from peep flicker), and the green cars are visible on the elevated segments.
+
 ## Remaining slices
 
-3. **Track generation + running cars** — 3D curved track pieces from the `.hmp` templates,
-   `GENERATETRACK` (control path → smooth renderable + rideable track), the `CrocCar` following the
-   track (physics), with peep boarding + scream (ties into the ride engine, T-032/T-033). Rotation /
-   `STACKUP/DOWN` elevation editing of segments also lands here.
+3b. **3D curved track + running CrocCar** — 3D curved track pieces from the `.hmp` templates,
+    a closed-loop `GENERATETRACK` (control path → smooth renderable + rideable track), the real
+    `CrocCar.MD2` mesh following the track (physics), with peep boarding + scream (ties into the ride
+    engine, T-032/T-033). Rotation / `STACKUP/DOWN` elevation editing of segments also lands here.
 
 ## Context
 

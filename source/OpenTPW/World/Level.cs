@@ -84,7 +84,8 @@ public class Level
 				+ $"hand={CommitPlacement( Item( "handyman" ), grid, terrain, cx + 2, cy + 2 )} "
 				+ $"rsch={CommitPlacement( Item( "researcher" ), grid, terrain, cx + 4, cy + 2 )}" );
 
-			// Lay a short coaster track from the placed coaster's connector (T-045 slice 2).
+			// Lay a short coaster track from the placed coaster's connector (T-045 slice 2); the
+			// CoasterTrack spawns a shuttle train (slice 3) that runs the laid segments automatically.
 			var coaster = Entity.All.OfType<Ride>().FirstOrDefault( r => r.Shape.HasTrack );
 			if ( coaster != null )
 			{
