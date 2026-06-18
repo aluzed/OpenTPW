@@ -61,7 +61,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-039](T-039-peep-needs-staff-depth.md) | 🟡 Feature | ☐ To do | Peep needs & staff depth: thirst/drink stalls, vandalism↔guards, ride ratings, balance |
 | [T-040](T-040-build-mode-foundation.md) | 🟡 Feature | ✅ Core done | Build/manage **foundation**: controllable in-park camera + mouse→tile picking + highlight + click dispatch (verified in-game) — blocks T-041–T-045 |
 | [T-041](T-041-ride-shop-placement.md) | 🟡 Feature | ⚠️ Core done | Ride & shop placement: catalog + footprint preview + place-on-click with cost charging + queue registration (empty park, player builds); rotation/sell remain |
-| [T-042](T-042-economy-controls-loans.md) | 🟡 Feature | ☐ To do | Economy controls: ride prices, admission fee, finances panel, loans + bankruptcy · needs T-040 |
+| [T-042](T-042-economy-controls-loans.md) | 🟡 Feature | ⚠️ Core done | Economy controls: settable ride prices + admission fee, loans (take/repay/monthly/bankruptcy), HUD readout (verified); clickable panel+graph remain |
 | [T-043](T-043-staff-management.md) | 🟡 Feature | ☐ To do | Staff hiring/placement/firing (entertainers/mechanics/guards/researchers), wages · needs T-040 |
 | [T-044](T-044-research-upgrades.md) | 🟡 Feature | ☐ To do | Research + ride capacity upgrades (`Upgrades[*]`/`CostOf*`) · needs T-041 + T-042 |
 | [T-045](T-045-coaster-track-editor.md) | 🟡 Feature | ☐ To do | Coaster track editor (`ACTION_COASTER_*`) — large; later · needs T-041 |

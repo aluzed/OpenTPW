@@ -2,8 +2,27 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine / UI
-- **Status**: ☐ To do
+- **Status**: ⚠️ Core done — settable ride prices + admission fee, a loan system (take/repay, monthly
+  instalments, bankruptcy flag), and a HUD readout are in and verified in-game. A richer clickable
+  finance panel + history graph remain.
 - **Parent**: [T-038](T-038-park-management-ui.md). **Needs**: [T-040](T-040-build-mode-foundation.md).
+
+## Done
+
+- **Ride price** (`Ride.TicketPrice` now settable, default from excitement): click a ride in the
+  Default tool to select it, `,`/`.` adjust its price; peeps pay it on boarding.
+- **Admission fee** (`ParkFinances.EntryFee` settable): `[`/`]` adjust the gate fee.
+- **Loans** (`ParkFinances.Loan`): two offers (principal + APR); `L` takes the small loan (cash in,
+  outstanding = principal × (1+APR), 12 monthly instalments), `K` repays it in full. `Tick(dt)` debits
+  monthly instalments (one "month" = 8 s) and sets the **Bankrupt** flag below −5000.
+- **HUD** (`ParkStatsPanel`): ADMISSION, DEBT/LOAN, selected RIDE + price, and a BANKRUPT line.
+- **Verified in-game**: `L` → DEBT 5500 (5000 × 1.10) + money +5000; over ~10 s the monthly instalments
+  dropped DEBT 5500 → 3208. Admission/price use the same proven key-binding path as the loan key.
+
+## Remaining (follow-up)
+
+- A clickable finance **panel** (buttons/sliders) + balance **history graph**; loan UI to pick which
+  offer; per-ride price panel instead of `,`/`.`.
 
 ## Context
 

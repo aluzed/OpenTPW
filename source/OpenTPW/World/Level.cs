@@ -159,6 +159,7 @@ public class Level
 				RideShape.Load( path, Path.GetFileName( path ) ).Height );
 			var ride = new Ride( path, w.WithZ( terrain.SampleHeight( w.X, w.Y ) ) );
 			ride.SetActive( false );
+			ride.TileX = tx; ride.TileY = ty; ride.TileW = ride.Shape.Width; ride.TileH = ride.Shape.Height;
 			PlaceEntranceExitMarkers( ride, grid, terrain, tx, ty );
 			var waypoints = SpawnQueuePath( ride, grid, terrain, tx, ty );
 			if ( waypoints != null )
@@ -282,6 +283,8 @@ public class Level
 		// handymen clearing it), which would otherwise invalidate the enumeration.
 		foreach ( var entity in Entity.All.ToArray() )
 			entity.Update();
+
+		ParkFinances.Current?.Tick( Time.Delta ); // monthly loan instalments + bankruptcy check (T-042)
 
 		// Diagnostic: periodically report the park's balance and the cumulative income/cost flows.
 		if ( Environment.GetEnvironmentVariable( "OPENTPW_ECON_DEBUG" ) != null && ParkFinances.Current is { } f && Time.Now > nextEconLog )

@@ -37,11 +37,21 @@ internal sealed class ParkStatsPanel : Panel
 			$"WAGES {fin.WagesPaid:0}",
 			$"VISITORS {visitors}",
 			$"LITTER {Litter.Active.Count}",
+			$"ADMISSION {fin.EntryFee:0}  ([ ] adjust)",
 		};
+		if ( fin.Debt > 0 )
+			lines.Add( $"DEBT {fin.Debt:0}  (L loan, K repay)" );
+		else
+			lines.Add( "LOAN: L=take  (no debt)" );
+		if ( fin.Bankrupt )
+			lines.Add( "*** BANKRUPT ***" );
 
 		// Build palette (T-041): number keys pick an item to place, left-click places it.
 		if ( BuildMode.Current is { } build )
 		{
+			if ( build.SelectedRide is { } sel )
+				lines.Add( $"RIDE {sel.Name} price {sel.TicketPrice:0}  (, . adjust)" );
+
 			lines.Add( "" );
 			lines.Add( "BUILD (1-N pick, click place, 0/Esc cancel):" );
 			for ( int i = 0; i < build.Catalog.Count; i++ )

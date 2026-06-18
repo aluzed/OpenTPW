@@ -76,26 +76,44 @@ public sealed class BuildMode : Entity
 			UpdateDefault( tx, ty );
 	}
 
-	// Number keys pick a catalog item; Esc / 0 leaves the placement tool.
+	/// <summary>The ride currently selected (clicked) in the Default tool — its price is adjustable.</summary>
+	public Ride? SelectedRide { get; private set; }
+
+	// Number keys pick a catalog item; Esc/0 cancels; economy keys adjust prices/fee/loans (T-042).
 	private void HandleSelectionKeys()
 	{
 		var down = Input.Keyboard.KeysDown;
+		bool Hit( Key k ) => down.Contains( k ) && !prevDown.Contains( k );
+
 		for ( int i = 0; i < NumberKeys.Length && i < Catalog.Count; i++ )
-		{
-			var k = NumberKeys[i];
-			if ( down.Contains( k ) && !prevDown.Contains( k ) )
+			if ( Hit( NumberKeys[i] ) )
 				Selected = i;
-		}
-		if ( (down.Contains( Key.Escape ) && !prevDown.Contains( Key.Escape )) ||
-			 (down.Contains( Key.Number0 ) && !prevDown.Contains( Key.Number0 )) )
+		if ( Hit( Key.Escape ) || Hit( Key.Number0 ) )
 			Selected = -1;
+
+		var fin = ParkFinances.Current;
+		if ( fin != null )
+		{
+			// Admission fee.
+			if ( Hit( Key.BracketLeft ) ) fin.EntryFee = MathF.Max( 0f, fin.EntryFee - 1f );
+			if ( Hit( Key.BracketRight ) ) fin.EntryFee += 1f;
+			// Selected ride's ticket price.
+			if ( SelectedRide != null )
+			{
+				if ( Hit( Key.Comma ) ) SelectedRide.TicketPrice = MathF.Max( 1f, SelectedRide.TicketPrice - 1f );
+				if ( Hit( Key.Period ) ) SelectedRide.TicketPrice += 1f;
+			}
+			// Loans: take / repay the small loan.
+			if ( Hit( Key.L ) ) fin.TakeLoan( 0 );
+			if ( Hit( Key.K ) ) fin.RepayLoan( 0 );
+		}
 
 		prevDown.Clear();
 		foreach ( var k in down )
 			prevDown.Add( k );
 	}
 
-	// Default tool: highlight the single hovered tile; click logs it (selection hook).
+	// Default tool: highlight the hovered tile; click selects the ride covering it (for price control).
 	private void UpdateDefault( int tx, int ty )
 	{
 		if ( HoveredTile == null )
@@ -107,8 +125,14 @@ public sealed class BuildMode : Entity
 		highlight.Scale = new Vector3( grid.TileSize / 2f );
 		var c = grid.TileToWorld( tx, ty );
 		highlight.Position = c.WithZ( terrain.SampleHeight( c.X, c.Y ) + 0.3f );
+
 		if ( Input.MouseLeftPressed )
-			Log.Info( $"[build] click tile ({tx},{ty})" );
+		{
+			SelectedRide = Entity.All.OfType<Ride>().FirstOrDefault( r => r.Covers( tx, ty ) );
+			Log.Info( SelectedRide != null
+				? $"[build] selected {SelectedRide.Name} (price {SelectedRide.TicketPrice:0})"
+				: $"[build] click tile ({tx},{ty})" );
+		}
 	}
 
 	// Placement tool: show the selected item's footprint, green/red by validity, place on click.

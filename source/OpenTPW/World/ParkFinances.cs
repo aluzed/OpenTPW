@@ -13,7 +13,9 @@ public sealed class ParkFinances
 	public static ParkFinances? Current { get; set; }
 
 	public float Money { get; private set; }
-	public float EntryFee { get; }
+
+	/// <summary>The park's gate admission fee (player-settable, T-042).</summary>
+	public float EntryFee { get; set; }
 
 	public float RideRevenue { get; private set; }
 	public float EntryRevenue { get; private set; }
@@ -36,6 +38,85 @@ public sealed class ParkFinances
 	{
 		Money -= amount;
 		BuildSpent += amount;
+	}
+
+	// ── Loans (T-042) ───────────────────────────────────────────────────────────────────────────
+	/// <summary>A bank loan offer: principal in, repaid (with APR) over 12 monthly instalments.</summary>
+	public sealed class Loan
+	{
+		public string Name = "";
+		public float Principal;
+		public float Apr;            // annual percentage rate
+		public float Outstanding;    // remaining to repay (principal + interest), 0 when not bought
+		public float Monthly;        // per-month instalment
+		public bool Bought;
+	}
+
+	private readonly List<Loan> loans = new()
+	{
+		new Loan { Name = "Small", Principal = 5000f, Apr = 10f },
+		new Loan { Name = "Large", Principal = 15000f, Apr = 18f },
+	};
+
+	public IReadOnlyList<Loan> Loans => loans;
+	public float Debt => loans.Where( l => l.Bought ).Sum( l => l.Outstanding );
+
+	/// <summary>True once the balance has dropped below the bankruptcy limit.</summary>
+	public bool Bankrupt { get; private set; }
+
+	private const float BankruptLimit = -5000f;
+	private const float MonthSeconds = 8f; // one in-game "month" of loan repayment
+	private float monthTimer;
+
+	/// <summary>Take a loan: principal is credited now, repaid (principal + APR) over 12 months.</summary>
+	public void TakeLoan( int index )
+	{
+		if ( index < 0 || index >= loans.Count )
+			return;
+		var l = loans[index];
+		if ( l.Bought )
+			return;
+		l.Bought = true;
+		l.Outstanding = l.Principal * (1f + l.Apr / 100f);
+		l.Monthly = l.Outstanding / 12f;
+		Money += l.Principal;
+	}
+
+	/// <summary>Pay off a loan's remaining balance in full (if affordable).</summary>
+	public void RepayLoan( int index )
+	{
+		if ( index < 0 || index >= loans.Count )
+			return;
+		var l = loans[index];
+		if ( !l.Bought || Money < l.Outstanding )
+			return;
+		Money -= l.Outstanding;
+		l.Outstanding = 0f;
+		l.Bought = false;
+	}
+
+	/// <summary>Advances time: debits monthly loan instalments and updates the bankruptcy flag.</summary>
+	public void Tick( float dt )
+	{
+		monthTimer += dt;
+		while ( monthTimer >= MonthSeconds )
+		{
+			monthTimer -= MonthSeconds;
+			foreach ( var l in loans )
+			{
+				if ( !l.Bought )
+					continue;
+				float pay = MathF.Min( l.Monthly, l.Outstanding );
+				Money -= pay;
+				l.Outstanding -= pay;
+				if ( l.Outstanding <= 0.01f )
+				{
+					l.Outstanding = 0f;
+					l.Bought = false;
+				}
+			}
+		}
+		Bankrupt = Money < BankruptLimit;
 	}
 
 	/// <summary>A peep pays to board a ride.</summary>

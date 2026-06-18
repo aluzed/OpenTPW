@@ -37,12 +37,22 @@ public class Ride : Entity
 	/// <summary>The ride's base attraction value (<c>Info.AttractionValue</c>).</summary>
 	public int Attraction { get; private set; } = 25;
 
-	/// <summary>What a peep pays to board, in coins. The original lets the player set this; lacking that,
-	/// it is derived from the ride's excitement (more exciting rides charge more).</summary>
-	public float TicketPrice => MathF.Max( 1f, MathF.Round( Excitement / 10f ) );
+	/// <summary>What a peep pays to board, in coins. Player-settable (T-042); defaults to a value
+	/// derived from the ride's excitement (more exciting rides can charge more).</summary>
+	public float TicketPrice { get; set; } = 5f;
 
 	/// <summary>The ride's running cost per second (its money sink), scaled by how many it seats.</summary>
 	public float UpkeepPerSecond => Capacity * 0.1f;
+
+	/// <summary>The footprint this ride occupies on the placement grid (set when placed) — used to
+	/// select it by clicking a covered tile.</summary>
+	public int TileX { get; set; }
+	public int TileY { get; set; }
+	public int TileW { get; set; }
+	public int TileH { get; set; }
+
+	/// <summary>True if the grid tile (tx,ty) is within this ride's footprint.</summary>
+	public bool Covers( int tx, int ty ) => tx >= TileX && tx < TileX + TileW && ty >= TileY && ty < TileY + TileH;
 
 	/// <summary>Run (true) or idle (false) the ride's animation — driven by occupancy (see RideQueue / Peep).</summary>
 	public void SetActive( bool active ) => engine.SetActive( active );
@@ -86,6 +96,7 @@ public class Ride : Entity
 			DurationUnit = ReadInt( settings, "Info.DurationUnit", 0 );
 			Excitement = Math.Max( 1, ReadInt( settings, "UsageInfo.ExcitementLevel", 50 ) );
 			Attraction = ReadInt( settings, "Info.AttractionValue", 25 );
+			TicketPrice = MathF.Max( 1f, MathF.Round( Excitement / 10f ) );
 
 			Log.Info( $"[ride] loaded '{Name}' from {rideArchive} (footprint {Shape.Width}x{Shape.Height}, entrance {Shape.Entrance?.ToString() ?? "none"}, exit {Shape.Exit?.ToString() ?? "none"})" );
 		}
