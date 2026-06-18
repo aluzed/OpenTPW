@@ -4,8 +4,9 @@ namespace OpenTPW;
 /// A small train that runs along a laid <see cref="CoasterTrack"/> (T-045 slice 3): a few car bodies
 /// spaced along the track's elevated polyline, advancing by arc length and orienting to the local
 /// tangent. The track is open (not a closed loop yet), so the train **shuttles** — it reflects at each
-/// end and faces its actual travel direction. Procedural croc-green boxes for now; the real
-/// <c>CrocCar.MD2</c> mesh + peep boarding + scream are later in slice 3.
+/// end and faces its actual travel direction. The car is the ride's real <c>CrocCar.MD2</c> mesh when
+/// it loads (single mesh, 6 materials), falling back to a procedural croc-green box. Peep boarding +
+/// scream are still later in slice 3.
 /// </summary>
 public sealed class CoasterTrain : Entity
 {
@@ -18,22 +19,16 @@ public sealed class CoasterTrain : Entity
 	private readonly ModelEntity[] cars;
 	private float dist;                 // lead car's distance travelled along the shuttle cycle
 
-	public CoasterTrain( CoasterTrack track, float tileSize )
+	public CoasterTrain( CoasterTrack track, float tileSize, string archive )
 	{
 		this.track = track;
 		spacing = tileSize * 0.9f;
 
-		var mat = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader" );
-		mat.Set( "Color", new Texture( [60, 165, 75, 255], 1, 1 ) );
+		var (body, scale) = LoadCar( archive, tileSize );
 
 		cars = new ModelEntity[CarCount];
 		for ( int i = 0; i < CarCount; i++ )
-			cars[i] = new ModelEntity
-			{
-				Model = Primitives.Cube.GenerateModel( mat ),
-				Scale = new Vector3( tileSize * 0.36f, tileSize * 0.22f, 1.4f ),
-				Position = Offscreen,
-			};
+			cars[i] = new ModelEntity { Model = body, Scale = scale, Position = Offscreen };
 	}
 
 	/// <summary>Despawn the train's car entities (called when the track is torn down).</summary>
@@ -78,7 +73,8 @@ public sealed class CoasterTrain : Entity
 			if ( returning ) tan = -tan;
 
 			cars[i].Position = pos;
-			float yaw = MathF.Atan2( tan.Y, tan.X );
+			// The car body is long along its local +Y, so align +Y (not +X) with the travel tangent.
+			float yaw = MathF.Atan2( tan.Y, tan.X ) - MathF.PI / 2f;
 			cars[i].Rotation = System.Numerics.Quaternion.CreateFromAxisAngle( System.Numerics.Vector3.UnitZ, yaw );
 		}
 	}
@@ -95,5 +91,67 @@ public sealed class CoasterTrain : Entity
 		var a = path[s];
 		var b = path[s + 1];
 		return (a + (b - a) * f, (b - a).Normal);
+	}
+
+	// The ride's real CrocCar.MD2 (single mesh) built the same way ride meshes are (the LobbyIsland
+	// pattern: per-material .wct textures, Y/Z swizzle). Falls back to a green box if it won't load.
+	private static (Model Body, Vector3 Scale) LoadCar( string archive, float tileSize )
+	{
+		try
+		{
+			var mesh = new ModelFile( $"{archive}/CrocCar.MD2" ).Meshes[0];
+
+			var material = new Material<ObjectUniformBuffer>( "content/shaders/test.shader" );
+			var textures = new List<Texture>();
+			for ( int i = 0; i < 16; ++i )
+			{
+				if ( mesh.Materials.Length <= i ) { textures.Add( Texture.Missing ); continue; }
+				try { textures.Add( new Texture( $"{archive}/textures/{mesh.Materials[i].Name}.wct", TextureFlags.Repeat ) ); }
+				catch { textures.Add( Texture.Missing ); }
+			}
+			material.Set( "Color", [.. textures] );
+
+			System.Numerics.Matrix4x4.Decompose( mesh.TransformMatrix, out var scl, out _, out _ );
+			var scale = new Vector3( scl.X, scl.Z, scl.Y );
+
+			// Centre the mesh on its own centroid (in scaled model space) so the car sits *on* the track
+			// point — the MD2 authors the body at its in-ride location, which we don't want here.
+			var centroid = Vector3.Zero;
+			for ( int i = 0; i < mesh.Vertices.Length; ++i )
+				centroid += new Vector3( mesh.Vertices[i].Position.X, mesh.Vertices[i].Position.Z, mesh.Vertices[i].Position.Y );
+			centroid *= 1f / mesh.Vertices.Length;
+
+			var vertices = new List<Vertex>( mesh.Vertices.Length );
+			float halfExtent = 0f; // largest horizontal half-extent, for scaling the car to the grid
+			for ( int i = 0; i < mesh.Vertices.Length; ++i )
+			{
+				var p = new Vector3( mesh.Vertices[i].Position.X, mesh.Vertices[i].Position.Z, mesh.Vertices[i].Position.Y ) - centroid;
+				halfExtent = MathF.Max( halfExtent, MathF.Max( MathF.Abs( p.X ), MathF.Abs( p.Y ) ) );
+				vertices.Add( new Vertex
+				{
+					Position = p,
+					Normal = mesh.Normals[i],
+					TexCoords = mesh.TexCoords[i],
+					TexIndex = (int)mesh.Vertices[i].TextureIndex,
+					MatFlags = mesh.Materials[(int)mesh.Vertices[i].TextureIndex].Flags,
+				} );
+			}
+
+			// Scale the car so its long axis spans ~1.3 of a 16-unit tile (a believable car length).
+			float fit = halfExtent > 1e-3f ? (tileSize * 1.3f) / (2f * halfExtent) : 1f;
+			scale *= fit;
+
+			var model = new Model( [.. vertices], mesh.Indices, material );
+			Log.Info( $"[coaster] CrocCar loaded ({mesh.Vertices.Length} verts, {mesh.Indices.Length / 3} tris, fit x{fit:0.00})" );
+			return (model, scale);
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( $"[coaster] CrocCar load failed ({e.Message}); using a placeholder box" );
+			var mat = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader" );
+			mat.Set( "Color", new Texture( [60, 165, 75, 255], 1, 1 ) );
+			// Long axis along local +Y to match the orientation convention (see OnUpdate).
+			return (Primitives.Cube.GenerateModel( mat ), new Vector3( tileSize * 0.22f, tileSize * 0.36f, 1.4f ));
+		}
 	}
 }

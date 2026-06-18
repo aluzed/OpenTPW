@@ -4,8 +4,9 @@
 - **Type**: Engine / UI / reverse engineering
 - **Status**: ⚠️ Slices 1–3a done — the coaster **station** is placeable via the build catalog and
   renders/queues like any ride, a **track-laying tool** extends elevated track segments from the
-  station's `>` connector, and a **shuttle train** runs the laid segments. Remaining: 3D *curved*
-  pieces from `.hmp` + a closed-loop `GENERATETRACK`, peep boarding + scream (slice 3b), below.
+  station's `>` connector, and a **shuttle train of real `CrocCar.MD2` cars** runs the laid segments.
+  Remaining: 3D *curved* pieces from `.hmp` + a closed-loop `GENERATETRACK`, peep boarding + scream
+  (slice 3b), below.
 - **Parent**: [T-038](T-038-park-management-ui.md). **Needs**: [T-041](T-041-ride-shop-placement.md).
   **Related**: [T-032](T-032-ride-engine.md), [T-033](T-033-ride-animation-keyframes.md).
 
@@ -52,21 +53,27 @@
 ## Done (slice 3a — running train)
 
 - New `World/Build/CoasterTrain.cs`: a 3-car train that advances by arc length along the track's
-  elevated centre-line (`CoasterTrack.WorldPath()`), orienting each car to the local tangent. The
-  track is open (not a closed loop yet) so the train **shuttles** — it reflects at each end and faces
-  its actual travel direction. Procedural croc-green boxes; the real `CrocCar.MD2` mesh is slice 3b.
+  elevated centre-line (`CoasterTrack.WorldPath()`), orienting each car's long axis to the local
+  tangent. The track is open (not a closed loop yet) so the train **shuttles** — it reflects at each
+  end and faces its actual travel direction.
+- The car is the ride's **real `CrocCar.MD2` mesh** (single mesh, 76 tris, 6 materials) built with the
+  same `ModelFile` + per-material `.wct` pipeline the ride/lobby meshes use; it's centred on its own
+  centroid and scaled so its long axis spans ~1.3 tiles. A green-box placeholder is the fallback if
+  the mesh won't load. (`coaster1c.md2` — the "course" — remains unparseable, so the track itself
+  stays procedural; that's a separate decode.)
 - `CoasterTrack` spawns the train in its ctor (it hides itself until ≥1 segment is laid) and exposes
   `WorldPath()` + a `Despawn()` teardown.
-- Verified via `OPENTPW_AUTOPLACE`: the train runs the 7-segment track with no exceptions across
-  continuous per-frame updates; a frame-to-frame motion diff shows the rigid car boxes displaced along
-  the track (distinct from peep flicker), and the green cars are visible on the elevated segments.
+- Verified via `OPENTPW_AUTOPLACE`: `CrocCar loaded (134 verts, 76 tris)`, the train runs the
+  7-segment track with no exceptions across continuous per-frame updates; the elevated track segments
+  + pylons render (confirmed in-frame) and the cars run along them.
 
 ## Remaining slices
 
-3b. **3D curved track + running CrocCar** — 3D curved track pieces from the `.hmp` templates,
-    a closed-loop `GENERATETRACK` (control path → smooth renderable + rideable track), the real
-    `CrocCar.MD2` mesh following the track (physics), with peep boarding + scream (ties into the ride
-    engine, T-032/T-033). Rotation / `STACKUP/DOWN` elevation editing of segments also lands here.
+3b. **3D curved track + rideable CrocCar** — 3D curved track pieces from the `.hmp` templates,
+    a closed-loop `GENERATETRACK` (control path → smooth renderable + rideable track), the car
+    following the track with real physics, peep boarding + scream (ties into the ride engine,
+    T-032/T-033), and `CrocCarM1..3` animation frames. Rotation / `STACKUP/DOWN` elevation editing of
+    segments also lands here.
 
 ## Context
 

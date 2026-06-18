@@ -33,7 +33,7 @@ public sealed class CoasterTrack
 		tiles.Add( (coaster.TileX + c.X, coaster.TileY + c.Y) );
 
 		// The shuttle train hides itself until at least one segment is laid (path has < 2 points).
-		train = new CoasterTrain( this, grid.TileSize );
+		train = new CoasterTrain( this, grid.TileSize, coaster.Archive );
 	}
 
 	/// <summary>The track centre-line as elevated world points (one per laid tile) — the train's path.</summary>
