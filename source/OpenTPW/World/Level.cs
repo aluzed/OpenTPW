@@ -75,12 +75,14 @@ public class Level
 		if ( Environment.GetEnvironmentVariable( "OPENTPW_AUTOPLACE" ) != null )
 		{
 			int cx = grid.Width / 2, cy = grid.Height / 2;
-			Log.Info( $"[build] autoplace totem={CommitPlacement( catalog[0], grid, terrain, cx - 6, cy - 2 )} "
-				+ $"monkey={CommitPlacement( catalog[1], grid, terrain, cx + 1, cy - 2 )} "
-				+ $"shop={CommitPlacement( catalog[3], grid, terrain, cx - 6, cy + 4 )} "
-				+ $"ent={CommitPlacement( catalog[4], grid, terrain, cx, cy + 2 )} "
-				+ $"hand={CommitPlacement( catalog[5], grid, terrain, cx + 2, cy + 2 )} "
-				+ $"rsch={CommitPlacement( catalog[7], grid, terrain, cx + 4, cy + 2 )}" );
+			BuildCatalogItem Item( string name ) => catalog.First( c => c.Name == name );
+			Log.Info( $"[build] autoplace totem={CommitPlacement( Item( "totem" ), grid, terrain, cx - 6, cy - 2 )} "
+				+ $"monkey={CommitPlacement( Item( "monkey" ), grid, terrain, cx + 1, cy - 2 )} "
+				+ $"coaster={CommitPlacement( Item( "coaster1" ), grid, terrain, cx - 6, cy + 4 )} "
+				+ $"shop={CommitPlacement( Item( "shop" ), grid, terrain, cx + 6, cy + 4 )} "
+				+ $"ent={CommitPlacement( Item( "entertainer" ), grid, terrain, cx, cy + 2 )} "
+				+ $"hand={CommitPlacement( Item( "handyman" ), grid, terrain, cx + 2, cy + 2 )} "
+				+ $"rsch={CommitPlacement( Item( "researcher" ), grid, terrain, cx + 4, cy + 2 )}" );
 
 			// Exercise the research → upgrade pipeline (T-044) on the first placed ride.
 			var ride = Entity.All.OfType<Ride>().FirstOrDefault();
@@ -116,7 +118,7 @@ public class Level
 	private static List<BuildCatalogItem> BuildCatalog()
 	{
 		var list = new List<BuildCatalogItem>();
-		foreach ( var path in new[] { "levels/jungle/rides/totem", "levels/jungle/rides/monkey", "levels/jungle/rides/wateride" } )
+		foreach ( var path in new[] { "levels/jungle/rides/totem", "levels/jungle/rides/monkey", "levels/jungle/rides/wateride", "levels/jungle/rides/coaster1" } )
 		{
 			var name = Path.GetFileName( path );
 			var shape = RideShape.Load( path, name );
