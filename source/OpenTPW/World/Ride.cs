@@ -20,8 +20,64 @@ public class Ride : Entity
 	/// <summary>Fractional position within the exit cell where peeps appear (default centre).</summary>
 	public (float X, float Y) ExitAppearPos { get; private set; } = (0.5f, 0.5f);
 
-	/// <summary>How many peeps the ride holds at once (from <c>UsageInfo.MaxCapacity</c>).</summary>
-	public int Capacity { get; private set; } = 8;
+	/// <summary>One research/upgrade level from the ride's <c>Upgrades[*]</c> table.</summary>
+	public readonly record struct UpgradeLevelInfo( int Capacity, float CostResearch, float CostUpgrade );
+
+	private int maxCapacity = 8;
+	private readonly List<UpgradeLevelInfo> upgrades = new();
+
+	/// <summary>How many peeps the ride holds at once — the current upgrade level's capacity
+	/// (<c>Upgrades[level].InitCapacity</c>), falling back to <c>UsageInfo.MaxCapacity</c>.</summary>
+	public int Capacity => upgrades.Count > 0 ? upgrades[Math.Min( UpgradeLevel, upgrades.Count - 1 )].Capacity : maxCapacity;
+
+	/// <summary>The ride's available upgrade levels (level 0 = as built).</summary>
+	public IReadOnlyList<UpgradeLevelInfo> Upgrades => upgrades;
+
+	/// <summary>Current applied upgrade level, and the highest level researched (≥ <see cref="UpgradeLevel"/>).</summary>
+	public int UpgradeLevel { get; private set; }
+	public int ResearchedLevel { get; private set; }
+
+	private const float ResearchDuration = 12f; // researcher-seconds to unlock the next level
+	private bool researching;
+	private float researchProgress;
+
+	public bool HasNextLevel => UpgradeLevel + 1 < upgrades.Count;
+	public bool NextResearched => ResearchedLevel > UpgradeLevel;
+	public bool IsResearching => researching;
+	public float ResearchFraction => researching ? Math.Clamp( researchProgress / ResearchDuration, 0f, 1f ) : 0f;
+	public float NextResearchCost => HasNextLevel ? upgrades[UpgradeLevel + 1].CostResearch : 0f;
+	public float NextUpgradeCost => HasNextLevel ? upgrades[UpgradeLevel + 1].CostUpgrade : 0f;
+
+	/// <summary>Begin researching the next level (caller pays <see cref="NextResearchCost"/>).</summary>
+	public void StartResearch()
+	{
+		if ( HasNextLevel && !NextResearched && !researching )
+		{
+			researching = true;
+			researchProgress = 0f;
+		}
+	}
+
+	/// <summary>Advance research by <paramref name="researchers"/> researcher-seconds.</summary>
+	public void TickResearch( float dt, int researchers )
+	{
+		if ( !researching || researchers <= 0 )
+			return;
+		researchProgress += dt * researchers;
+		if ( researchProgress >= ResearchDuration )
+		{
+			ResearchedLevel = UpgradeLevel + 1;
+			researching = false;
+			researchProgress = 0f;
+		}
+	}
+
+	/// <summary>Apply the researched next level (caller pays <see cref="NextUpgradeCost"/>); bumps capacity.</summary>
+	public void ApplyUpgrade()
+	{
+		if ( NextResearched )
+			UpgradeLevel++;
+	}
 
 	/// <summary>The ride's duration band (<c>Info.DurationUnit</c>, 0–3 — indexes a seconds table in TP.EXE).</summary>
 	public int DurationUnit { get; private set; }
@@ -92,8 +148,19 @@ public class Ride : Entity
 			// Sub-tile positions within the entrance/exit cells (where peeps stand / appear), default centre.
 			EntryStandPos = (ReadFloat( settings, "UsageInfo.EntryCellStandPosX", 0.5f ), ReadFloat( settings, "UsageInfo.EntryCellStandPosY", 0.5f ));
 			ExitAppearPos = (ReadFloat( settings, "UsageInfo.ExitCellAppearPosX", 0.5f ), ReadFloat( settings, "UsageInfo.ExitCellAppearPosY", 0.5f ));
-			Capacity = Math.Max( 1, ReadInt( settings, "UsageInfo.MaxCapacity", 8 ) );
+			maxCapacity = Math.Max( 1, ReadInt( settings, "UsageInfo.MaxCapacity", 8 ) );
 			DurationUnit = ReadInt( settings, "Info.DurationUnit", 0 );
+
+			// Upgrade table: Upgrades[0] = as built, [1..] = researchable capacity upgrades (T-044).
+			for ( int i = 0; ; i++ )
+			{
+				int cap = ReadInt( settings, $"Upgrades[{i}].InitCapacity", -1 );
+				if ( cap < 0 )
+					break;
+				upgrades.Add( new UpgradeLevelInfo( cap,
+					ReadInt( settings, $"Upgrades[{i}].CostOfResearch", 0 ),
+					ReadInt( settings, $"Upgrades[{i}].CostOfUpgrade", 0 ) ) );
+			}
 			Excitement = Math.Max( 1, ReadInt( settings, "UsageInfo.ExcitementLevel", 50 ) );
 			Attraction = ReadInt( settings, "Info.AttractionValue", 25 );
 			TicketPrice = MathF.Max( 1f, MathF.Round( Excitement / 10f ) );
@@ -300,5 +367,8 @@ public class Ride : Entity
 
 		// Running the ride costs money over time (its upkeep drains the park balance).
 		ParkFinances.Current?.PayUpkeep( UpkeepPerSecond * Time.Delta );
+
+		// Researchers advance any in-progress upgrade research for this ride (T-044).
+		TickResearch( Time.Delta, Staff.ResearcherCount );
 	}
 }

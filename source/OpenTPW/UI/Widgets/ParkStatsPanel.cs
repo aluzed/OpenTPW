@@ -51,7 +51,17 @@ internal sealed class ParkStatsPanel : Panel
 		if ( BuildMode.Current is { } build )
 		{
 			if ( build.SelectedRide is { } sel )
-				lines.Add( $"RIDE {sel.Name} price {sel.TicketPrice:0}  (, . adjust)" );
+			{
+				lines.Add( $"RIDE {sel.Name} L{sel.UpgradeLevel} cap {sel.Capacity}  price {sel.TicketPrice:0} (,.)" );
+				if ( sel.IsResearching )
+					lines.Add( $"  researching... {sel.ResearchFraction * 100f:0}%" );
+				else if ( sel.NextResearched )
+					lines.Add( $"  U: upgrade ${sel.NextUpgradeCost:0} -> cap {sel.Upgrades[sel.UpgradeLevel + 1].Capacity}" );
+				else if ( sel.HasNextLevel )
+					lines.Add( $"  R: research next ${sel.NextResearchCost:0}" );
+				else
+					lines.Add( "  (max upgrade level)" );
+			}
 
 			lines.Add( "" );
 			lines.Add( "BUILD (1-N pick, click place, 0/Esc cancel):" );

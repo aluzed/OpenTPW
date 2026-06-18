@@ -35,6 +35,9 @@ public sealed class Staff : ModelEntity
 	// Active guards, so peeps can cheaply check whether one is nearby (litter deterrence).
 	private static readonly List<Staff> guards = new();
 
+	/// <summary>How many researchers are currently employed (drives ride upgrade research, T-044).</summary>
+	public static int ResearcherCount => Entity.All.Count( e => e is Staff s && s.Role == StaffRole.Researcher );
+
 	/// <summary>True if a patrolling guard is within <paramref name="radius"/> of the point.</summary>
 	public static bool GuardNear( Vector3 p, float radius = GuardDeterRadius )
 	{

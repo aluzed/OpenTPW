@@ -98,11 +98,22 @@ public sealed class BuildMode : Entity
 			// Admission fee.
 			if ( Hit( Key.BracketLeft ) ) fin.EntryFee = MathF.Max( 0f, fin.EntryFee - 1f );
 			if ( Hit( Key.BracketRight ) ) fin.EntryFee += 1f;
-			// Selected ride's ticket price.
-			if ( SelectedRide != null )
+			// Selected ride: ticket price (, .), research next upgrade (R), apply it (U) — T-042 / T-044.
+			if ( SelectedRide is { } sel )
 			{
-				if ( Hit( Key.Comma ) ) SelectedRide.TicketPrice = MathF.Max( 1f, SelectedRide.TicketPrice - 1f );
-				if ( Hit( Key.Period ) ) SelectedRide.TicketPrice += 1f;
+				if ( Hit( Key.Comma ) ) sel.TicketPrice = MathF.Max( 1f, sel.TicketPrice - 1f );
+				if ( Hit( Key.Period ) ) sel.TicketPrice += 1f;
+				if ( Hit( Key.R ) && sel.HasNextLevel && !sel.NextResearched && !sel.IsResearching
+					&& fin.CanAfford( sel.NextResearchCost ) )
+				{
+					fin.PayBuild( sel.NextResearchCost );
+					sel.StartResearch();
+				}
+				if ( Hit( Key.U ) && sel.NextResearched && fin.CanAfford( sel.NextUpgradeCost ) )
+				{
+					fin.PayBuild( sel.NextUpgradeCost );
+					sel.ApplyUpgrade();
+				}
 			}
 			// Loans: take / repay the small loan.
 			if ( Hit( Key.L ) ) fin.TakeLoan( 0 );

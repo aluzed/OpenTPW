@@ -81,6 +81,18 @@ public class Level
 				+ $"ent={CommitPlacement( catalog[4], grid, terrain, cx, cy + 2 )} "
 				+ $"hand={CommitPlacement( catalog[5], grid, terrain, cx + 2, cy + 2 )} "
 				+ $"rsch={CommitPlacement( catalog[7], grid, terrain, cx + 4, cy + 2 )}" );
+
+			// Exercise the research → upgrade pipeline (T-044) on the first placed ride.
+			var ride = Entity.All.OfType<Ride>().FirstOrDefault();
+			if ( ride != null )
+			{
+				int before = ride.Capacity;
+				ride.StartResearch();
+				ride.TickResearch( 100f, 1 ); // force-complete the research
+				bool researched = ride.NextResearched;
+				ride.ApplyUpgrade();
+				Log.Info( $"[build] upgrade-test {ride.Name}: L0 cap {before} -> researched={researched} L{ride.UpgradeLevel} cap {ride.Capacity} (levels={ride.Upgrades.Count})" );
+			}
 		}
 
 		// Spawn a crowd; with no rides yet they wander until the player builds one (then they queue).
@@ -179,7 +191,7 @@ public class Level
 					? grid.PointToWorld( tx + x.X + ride.ExitAppearPos.X, ty + x.Y + ride.ExitAppearPos.Y )
 					: waypoints[^1];
 				exit = exit.WithZ( terrain.SampleHeight( exit.X, exit.Y ) );
-				parkQueues.Add( new RideQueue( ride, waypoints, exit, ride.RideDuration, ride.Capacity ) );
+				parkQueues.Add( new RideQueue( ride, waypoints, exit, ride.RideDuration ) );
 			}
 			return true;
 		}
