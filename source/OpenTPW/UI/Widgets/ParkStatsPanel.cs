@@ -27,7 +27,7 @@ internal sealed class ParkStatsPanel : Panel
 		int visitors = Entity.All.Count( e => e is Peep );
 
 		// One line per stat, stepping down from the top-left.
-		string[] lines =
+		var lines = new List<string>
 		{
 			$"MONEY {fin.Money:0}",
 			$"TICKETS {fin.RideRevenue:0}",
@@ -39,7 +39,20 @@ internal sealed class ParkStatsPanel : Panel
 			$"LITTER {Litter.Active.Count}",
 		};
 
-		for ( int i = 0; i < lines.Length; i++ )
+		// Build palette (T-041): number keys pick an item to place, left-click places it.
+		if ( BuildMode.Current is { } build )
+		{
+			lines.Add( "" );
+			lines.Add( "BUILD (1-N pick, click place, 0/Esc cancel):" );
+			for ( int i = 0; i < build.Catalog.Count; i++ )
+			{
+				var it = build.Catalog[i];
+				string mark = build.Selected == i ? ">" : " ";
+				lines.Add( $"{mark}[{i + 1}] {it.Name} ${it.Cost:0}" );
+			}
+		}
+
+		for ( int i = 0; i < lines.Count; i++ )
 			Graphics.DrawText( Font, lines[i], Left, Top - i * LineStep, TextAlign.Left, Scale );
 	}
 }

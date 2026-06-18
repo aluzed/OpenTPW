@@ -20,11 +20,22 @@ public sealed class ParkFinances
 	public float FoodRevenue { get; private set; }
 	public float UpkeepPaid { get; private set; }
 	public float WagesPaid { get; private set; }
+	public float BuildSpent { get; private set; }
 
 	public ParkFinances( float starting, float entryFee )
 	{
 		Money = starting;
 		EntryFee = entryFee;
+	}
+
+	/// <summary>Can the park currently afford a build/upgrade of <paramref name="cost"/>?</summary>
+	public bool CanAfford( float cost ) => Money >= cost;
+
+	/// <summary>Pay a one-off build/placement cost (caller checks <see cref="CanAfford"/> first).</summary>
+	public void PayBuild( float amount )
+	{
+		Money -= amount;
+		BuildSpent += amount;
 	}
 
 	/// <summary>A peep pays to board a ride.</summary>

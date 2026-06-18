@@ -54,67 +54,41 @@ public class Level
 		var terrain = new ParkTerrain( "levels/jungle/terrain" );
 
 		// The park starts with a budget; peeps pay a gate fee + ride tickets, rides cost upkeep (see Ride / Peep).
-		ParkFinances.Current = new ParkFinances( starting: 10000f, entryFee: 10f );
+		ParkFinances.Current = new ParkFinances( starting: 30000f, entryFee: 10f );
 
 		// Centre the placement grid on the terrain's dense centroid (robust to stray distant meshes).
 		var standard = new SettingsFile( "/levels/jungle/Standard.sam" );
 		var centre = terrain.Centroid;
 		var grid = PlacementGrid.FromLevelSettings( standard, tileSize: 16f, worldCenter: new Vector3( centre.X, centre.Y, 0 ) );
 
-		// Player-controlled build/manage camera focused on the park centroid (T-040), plus the build-mode
-		// foundation (cursor→tile picking + highlight + click dispatch).
+		// Player-controlled build/manage camera focused on the park centroid (T-040).
 		BuildCameraMode.Focus = new Vector3( centre.X, centre.Y, centre.Z );
 		Camera.SetCameraMode<BuildCameraMode>();
-		_ = new BuildMode( grid, terrain );
 
-		// Lay a few rides out in a row near the centre, each reserving its real tile footprint (from the
-		// ride's Info.Shape) on the grid and dropped onto the terrain surface.
-		LoadProgress.Report( "Placing rides...", 0.9f );
-		var paths = new[] { "levels/jungle/rides/totem", "levels/jungle/rides/monkey", "levels/jungle/rides/wateride" };
-		var queues = new List<RideQueue>(); // each ride's queue (waypoints + exit + capacity)
-		int tx = grid.Width / 2 - 7, ty = grid.Height / 2 - 2;
-		foreach ( var path in paths )
+		// Build mode (T-041): an empty park the player fills via the catalog (number keys pick an item,
+		// left-click places it, charging its cost). Rides register their queue so peeps can use them.
+		parkQueues = new List<RideQueue>();
+		var catalog = BuildCatalog();
+		_ = new BuildMode( grid, terrain, catalog, ( item, tx, ty ) => CommitPlacement( item, grid, terrain, tx, ty ) );
+
+		// Diagnostic: deterministically exercise the placement pipeline (the same path a click commits).
+		if ( Environment.GetEnvironmentVariable( "OPENTPW_AUTOPLACE" ) != null )
 		{
-			var shape = RideShape.Load( path, Path.GetFileName( path ) );
-			if ( !grid.TryPlace( tx, ty, shape.Width, shape.Height ) )
-			{
-				tx += shape.Width + 1;
-				continue;
-			}
-
-			var w = grid.TileToWorld( tx, ty, shape.Width, shape.Height );
-			var wz = w.WithZ( terrain.SampleHeight( w.X, w.Y ) );
-			Log.Info( $"[park] {Path.GetFileName( path )} footprint {shape.Width}x{shape.Height} at tile({tx},{ty})" );
-			try
-			{
-				var ride = new Ride( path, wz );
-				ride.SetActive( false ); // idle until a peep boards (occupancy drives the animation)
-				PlaceEntranceExitMarkers( ride, grid, terrain, tx, ty );
-				var waypoints = SpawnQueuePath( ride, grid, terrain, tx, ty );
-				if ( waypoints != null )
-				{
-					// Where riders reappear: the exit cell stand point (fall back to the entrance).
-					var exit = ride.Shape.Exit is { } x
-						? grid.PointToWorld( tx + x.X + ride.ExitAppearPos.X, ty + x.Y + ride.ExitAppearPos.Y )
-						: waypoints[^1];
-					exit = exit.WithZ( terrain.SampleHeight( exit.X, exit.Y ) );
-					queues.Add( new RideQueue( ride, waypoints, exit, rideDuration: ride.RideDuration, capacity: ride.Capacity ) );
-				}
-			}
-			catch ( Exception e ) { Log.Warning( $"[park] ride '{path}' failed: {e.Message}" ); }
-
-			tx += shape.Width + 1; // 1-tile gap before the next ride
+			int cx = grid.Width / 2, cy = grid.Height / 2;
+			Log.Info( $"[build] autoplace totem={CommitPlacement( catalog[0], grid, terrain, cx - 6, cy - 2 )} "
+				+ $"monkey={CommitPlacement( catalog[1], grid, terrain, cx + 1, cy - 2 )} "
+				+ $"shop={CommitPlacement( catalog[3], grid, terrain, cx - 6, cy + 4 )}" );
 		}
 
-		// Spawn a crowd of visitors that follow the queue paths to the rides (see Peep).
+		// Spawn a crowd; with no rides yet they wander until the player builds one (then they queue).
 		LoadProgress.Report( "Spawning visitors...", 0.95f );
-		for ( int i = 0; i < 40; i++ )
+		for ( int i = 0; i < 30; i++ )
 		{
-			var a = i / 40f * MathF.PI * 2f;
+			var a = i / 30f * MathF.PI * 2f;
 			var spawn = new Vector3( centre.X + MathF.Cos( a ) * 120f, centre.Y + MathF.Sin( a ) * 120f, 0 );
-			_ = new Peep( terrain, queues, spawn, i );
+			_ = new Peep( terrain, parkQueues, spawn, i );
 		}
-		Log.Info( $"[park] spawned 40 visitors following {queues.Count} queues" );
+		Log.Info( $"[park] build mode ready ({catalog.Count} catalog items), {parkQueues.Count} queues" );
 
 		// Staff roam the park, drawing wages: entertainers cheer nearby visitors, handymen pick up the
 		// litter visitors drop (which otherwise sours the crowd). See Staff / Litter.
@@ -124,10 +98,87 @@ public class Level
 		_ = new Staff( StaffRole.Handyman, terrain, staffHome, roam: 90f );
 		_ = new Staff( StaffRole.Handyman, terrain, staffHome, roam: 90f );
 		_ = new Staff( StaffRole.Guard, terrain, staffHome, roam: 90f );
+	}
 
-		// A couple of food stalls flanking the rides; hungry visitors detour to the nearest (see Shop / Peep).
-		_ = new Shop( terrain, new Vector3( centre.X - 70f, centre.Y + 40f, 0 ) );
-		_ = new Shop( terrain, new Vector3( centre.X + 70f, centre.Y - 40f, 0 ) );
+	// The park's ride queues — placed rides register here so peeps (which hold this list) can use them.
+	private static List<RideQueue> parkQueues = new();
+
+	// Build catalog: the jungle rides (footprint from RideShape, cost from the ride's .sam) + a food shop.
+	private static List<BuildCatalogItem> BuildCatalog()
+	{
+		var list = new List<BuildCatalogItem>();
+		foreach ( var path in new[] { "levels/jungle/rides/totem", "levels/jungle/rides/monkey", "levels/jungle/rides/wateride" } )
+		{
+			var name = Path.GetFileName( path );
+			var shape = RideShape.Load( path, name );
+			list.Add( new BuildCatalogItem( name, path, shape.Width, shape.Height, ReadRideCost( path, name ) ) );
+		}
+		list.Add( new BuildCatalogItem( "shop", null, 2, 2, 500f ) );
+		return list;
+	}
+
+	private static float ReadRideCost( string path, string name )
+	{
+		try
+		{
+			var s = new SettingsFile( FileSystem.OpenRead( $"{path}/{name}.sam" ) );
+			return int.TryParse( s["Upgrades[0].CostOfUpgrade"], out var v ) ? v : 2000f;
+		}
+		catch { return 2000f; }
+	}
+
+	// Commit a placement at tile (tx,ty): validate + reserve the grid, spawn the ride/shop, charge the cost.
+	private static bool CommitPlacement( BuildCatalogItem item, PlacementGrid grid, ParkTerrain terrain, int tx, int ty )
+	{
+		var fin = ParkFinances.Current;
+		if ( !grid.CanPlace( tx, ty, item.Width, item.Height ) || (fin != null && !fin.CanAfford( item.Cost )) )
+			return false;
+		if ( !grid.TryPlace( tx, ty, item.Width, item.Height ) )
+			return false;
+
+		bool ok = item.RidePath == null
+			? SpawnShopAt( terrain, grid, tx, ty )
+			: SpawnRideAt( item.RidePath, grid, terrain, tx, ty );
+
+		if ( !ok )
+		{
+			grid.Clear( tx, ty, item.Width, item.Height );
+			return false;
+		}
+		fin?.PayBuild( item.Cost );
+		return true;
+	}
+
+	// Spawns a ride on its (already reserved) footprint: model, entrance/exit markers, queue path, and
+	// registers its RideQueue so peeps can ride it. Starts idle (occupancy drives the animation).
+	private static bool SpawnRideAt( string path, PlacementGrid grid, ParkTerrain terrain, int tx, int ty )
+	{
+		try
+		{
+			var w = grid.TileToWorld( tx, ty, RideShape.Load( path, Path.GetFileName( path ) ).Width,
+				RideShape.Load( path, Path.GetFileName( path ) ).Height );
+			var ride = new Ride( path, w.WithZ( terrain.SampleHeight( w.X, w.Y ) ) );
+			ride.SetActive( false );
+			PlaceEntranceExitMarkers( ride, grid, terrain, tx, ty );
+			var waypoints = SpawnQueuePath( ride, grid, terrain, tx, ty );
+			if ( waypoints != null )
+			{
+				var exit = ride.Shape.Exit is { } x
+					? grid.PointToWorld( tx + x.X + ride.ExitAppearPos.X, ty + x.Y + ride.ExitAppearPos.Y )
+					: waypoints[^1];
+				exit = exit.WithZ( terrain.SampleHeight( exit.X, exit.Y ) );
+				parkQueues.Add( new RideQueue( ride, waypoints, exit, ride.RideDuration, ride.Capacity ) );
+			}
+			return true;
+		}
+		catch ( Exception e ) { Log.Warning( $"[build] ride '{path}' failed: {e.Message}" ); return false; }
+	}
+
+	private static bool SpawnShopAt( ParkTerrain terrain, PlacementGrid grid, int tx, int ty )
+	{
+		var c = grid.TileToWorld( tx, ty, 2, 2 );
+		_ = new Shop( terrain, c );
+		return true;
 	}
 
 	// Visualises a ride's entrance/exit cells (from its Info.Shape) as small markers on the terrain —

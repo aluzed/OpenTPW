@@ -2,9 +2,31 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine / UI
-- **Status**: ☐ To do
+- **Status**: ⚠️ Core done — catalog + footprint preview (green/red) + place-on-click with cost
+  charging + queue registration are in; `SetupDevPark` is now an empty park the player fills. Rotation
+  and sell/demolish remain (deferred — see below).
 - **Parent**: [T-038](T-038-park-management-ui.md). **Needs**: [T-040](T-040-build-mode-foundation.md).
   **Couples with**: [T-036](T-036-peep-pathfinding.md) (paths/queues).
+
+## Done
+
+- **Catalog** (`BuildCatalogItem`): the jungle rides (footprint from `RideShape`, **cost read from the
+  `.sam`** `Upgrades[0].CostOfUpgrade`) + a food shop; shown in the HUD palette (number keys pick).
+- **Footprint preview**: the selected item's `Width×Height` quad follows the cursor, **green** when
+  `grid.CanPlace` & affordable, **red** otherwise.
+- **Commit** (`CommitPlacement` → `SpawnRideAt`/`SpawnShopAt`): validates + `TryPlace`, spawns the
+  `Ride`/`Shop`, **charges the cost** (`ParkFinances.PayBuild`, refused if unaffordable), and registers
+  the ride's `RideQueue` into the shared list so peeps use it. Replaces the hardcoded dev layout.
+- **Verified in-game** (deterministic `OPENTPW_AUTOPLACE` exercising the exact commit path): totem +
+  monkey + shop placed, money debited by exactly their costs (3250+2000+500), 2 queues registered,
+  peeps queue/ride/eat. Interactive select+preview+click dispatch verified via T-040.
+
+## Remaining (follow-up)
+
+- **Rotation** (`ACTION_SET_RIDE_ROTATION`): needs rotating the ride's mesh parts about the placement
+  centre + rotating the footprint/entrance — deferred.
+- **Sell / demolish**: needs ride teardown (despawn parts, remove queue, clear cells, refund) — a
+  tile→object map + `Ride` teardown, deferred.
 
 ## Context
 
