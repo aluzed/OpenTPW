@@ -12,8 +12,9 @@ public interface IRideEngine
 	/// <summary>ADDOBJ — register an object (sound / particle / …) under the script's handle + slot.</summary>
 	void SpawnObject( int type, int parameter, int id, int slot );
 
-	/// <summary>SPAWNSOUND — play a sound identified by the script.</summary>
-	void PlaySound( int sound );
+	/// <summary>SPAWNSOUND — play (or set up) a sound named by the script. The operand is a string: a
+	/// sound file name, or a sound-event-map script (e.g. <c>EventMap.rse</c>).</summary>
+	void PlaySound( string name );
 
 	/// <summary>KILLOBJ — remove a previously-spawned object by its handle id (and despawn its model).</summary>
 	void KillObject( int id );

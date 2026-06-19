@@ -113,21 +113,54 @@ public sealed class RideEngine : IRideEngine
 		var obj = new RideObject { Id = id, Slot = slot, Type = type };
 		objects[id] = obj;
 
-		if ( IsSoundType( type ) )
-		{
-			Log.Info( $"[ride] ADDOBJ sound type={type} param={parameter} id={id} slot={slot}" );
-			obj.SoundKey = PlayRideSound( parameter );
-		}
-		else
-		{
-			Log.Trace( $"[ride] ADDOBJ type={type} param={parameter} id={id} slot={slot} (kind deferred)" );
-		}
+		// An ADDOBJ sound object's `parameter` is NOT a direct RideHD index — e.g. param -1 is a sentinel,
+		// and the real code→asset binding is the ride's EventMap / .MAP catalog (deferred — T-032/T-016).
+		// Playing RideHD[param%N] here produced wrong clips spammed every cycle (param -1 → Crunch.mp2,
+		// the "explosions"), so we register the object (for KILLOBJ) but don't play the approximate clip.
+		// Real rider screams still play correctly via the scream opcodes (KidsHD).
+		Log.Trace( $"[ride] ADDOBJ type={type} param={parameter} id={id} slot={slot}"
+			+ ( IsSoundType( type ) ? " (sound binding deferred)" : " (kind deferred)" ) );
 	}
 
-	public void PlaySound( int sound )
+	public void PlaySound( string name )
 	{
-		Log.Info( $"[ride] SPAWNSOUND {sound}" );
-		PlayRideSound( sound );
+		// A ".rse" name is a sound-event-map script (e.g. EventMap.rse) — a child script that sets up the
+		// ride's EVENT→sound bindings. The EVENT effects engine that consumes those bindings is deferred
+		// (T-032), so we recognise it without playing a clip (playing RideHD[offset] here was the old
+		// wrong-sound bug). A plain sound name plays from the ride's banks by name.
+		if ( name.EndsWith( ".rse", StringComparison.OrdinalIgnoreCase ) )
+		{
+			Log.Info( $"[ride] SPAWNSOUND sound-event map '{name}' (EVENT bindings deferred — T-032)" );
+			return;
+		}
+		PlayNamedSound( name );
+	}
+
+	// Play a sound by file name from the ride's sound bank (RideHD). Best-effort: the catalog (T-016)
+	// lists the category's banks; for now we resolve names against the ride bank.
+	private void PlayNamedSound( string name )
+	{
+		try
+		{
+			var path = Path.Join( GameDir.GamePath, "data", "global", "sound", "RideHD.sdt" );
+			if ( !File.Exists( path ) )
+				return;
+			rideSounds ??= new SdtArchive( path );
+			var stem = Path.GetFileNameWithoutExtension( name );
+			var track = rideSounds.soundFiles.FirstOrDefault( f =>
+				f.Name.StartsWith( stem, StringComparison.OrdinalIgnoreCase ) );
+			if ( track == null )
+			{
+				Log.Warning( $"[ride] SPAWNSOUND '{name}' not found in RideHD" );
+				return;
+			}
+			Audio.PlaySfx( $"ride_{track.Name}", track.SoundData );
+			Log.Info( $"[ride] SPAWNSOUND '{name}' -> {track.Name}" );
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( $"[ride] SPAWNSOUND '{name}' failed: {e.Message}" );
+		}
 	}
 
 	public void KillObject( int id )
@@ -615,34 +648,4 @@ public sealed class RideEngine : IRideEngine
 		or (int)ScriptDefs.Effects.OBJ_SOUND_GLO_AMB
 		or (int)ScriptDefs.Effects.OBJ_SOUND_GLO_UI
 		or (int)ScriptDefs.Effects.OBJ_SOUND_GLO_BMP;
-
-	/// <summary>
-	/// Best-effort: play a ride sound for the script's sound code. The exact code→asset mapping is
-	/// the `.MAP` audio catalog (T-016) — not decoded yet — so for now this indexes the global
-	/// ride-sound archive to give an audible, logged proof. Returns the audio cache key, or null.
-	/// </summary>
-	private string? PlayRideSound( int code, float gain = -1f )
-	{
-		try
-		{
-			var path = Path.Join( GameDir.GamePath, "data", "global", "sound", "RideHD.sdt" );
-			if ( !File.Exists( path ) )
-				return null;
-
-			rideSounds ??= new SdtArchive( path );
-			if ( rideSounds.soundFiles.Count == 0 )
-				return null;
-
-			var track = rideSounds.soundFiles[Math.Abs( code ) % rideSounds.soundFiles.Count];
-			var key = $"ride_{track.Name}";
-			Audio.PlaySfx( key, track.SoundData, gain );
-			Log.Info( $"[ride] sound code={code} -> {track.Name} (approx mapping, see T-016)" );
-			return key;
-		}
-		catch ( Exception e )
-		{
-			Log.Warning( $"[ride] sound code={code} failed: {e.Message}" );
-			return null;
-		}
-	}
 }

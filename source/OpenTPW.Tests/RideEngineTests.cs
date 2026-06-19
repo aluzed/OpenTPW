@@ -13,7 +13,7 @@ public class RideEngineTests
 	private sealed class FakeEngine : IRideEngine
 	{
 		public List<(int type, int param, int id, int slot)> Spawns = new();
-		public List<int> Sounds = new();
+		public List<string> Sounds = new();
 		public List<int> Kills = new();
 		public List<(int id, int param, int value)> Params = new();
 		public List<(int id, int anim, bool loop)> Anims = new();
@@ -21,7 +21,7 @@ public class RideEngineTests
 		public bool Animating; // controls IsAnimating / AnyAnimating
 
 		public void SpawnObject( int type, int parameter, int id, int slot ) => Spawns.Add( (type, parameter, id, slot) );
-		public void PlaySound( int sound ) => Sounds.Add( sound );
+		public void PlaySound( string name ) => Sounds.Add( name );
 		public void KillObject( int id ) => Kills.Add( id );
 		public void SetObjectParam( int id, int param, int value ) => Params.Add( (id, param, value) );
 		public void TriggerAnim( int id, int anim, bool loop ) => Anims.Add( (id, anim, loop) );
@@ -58,12 +58,14 @@ public class RideEngineTests
 		vm.Engine = fake;
 
 		vm.CallOpcodeHandler( Opcode.ADDOBJ, Lit( vm, 3 ), Lit( vm, 42 ), Lit( vm, 7 ), Lit( vm, 1 ) );
-		vm.CallOpcodeHandler( Opcode.SPAWNSOUND, Lit( vm, 9 ) );
+		// SPAWNSOUND takes a string operand (sound name); the handler resolves it via vm.Strings.
+		vm.Strings[5] = "EventMap.rse";
+		vm.CallOpcodeHandler( Opcode.SPAWNSOUND, new Operand( vm, Operand.Type.String, 5 ) );
 		vm.CallOpcodeHandler( Opcode.KILLOBJ, Lit( vm, 7 ) );
 
 		Assert.AreEqual( 1, fake.Spawns.Count );
 		Assert.AreEqual( (3, 42, 7, 1), fake.Spawns[0] );
-		CollectionAssert.AreEqual( new[] { 9 }, fake.Sounds );
+		CollectionAssert.AreEqual( new[] { "EventMap.rse" }, fake.Sounds );
 		CollectionAssert.AreEqual( new[] { 7 }, fake.Kills );
 	}
 

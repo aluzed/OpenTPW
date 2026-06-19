@@ -17,9 +17,15 @@ partial class OpcodeHandlers
 		public static void AddObj( ref RideVM vm, Operand type, Operand parameter, Operand id, Operand slot )
 			=> vm.Engine?.SpawnObject( type.Value, parameter.Value, id.Value, slot.Value );
 
-		[OpcodeHandler( Opcode.SPAWNSOUND, "Play a sound." )]
+		[OpcodeHandler( Opcode.SPAWNSOUND, "Play (or set up) a sound named by a string operand." )]
 		public static void SpawnSound( ref RideVM vm, Operand sound )
-			=> vm.Engine?.PlaySound( sound.Value );
+		{
+			// The operand is a string (sound name / sound-event-map script) — RE'd: the handler requires
+			// the string type tag (FUN_005551ab). Resolve it; a non-string operand is a no-op (as in the
+			// original). Passing the raw offset to the engine was the old "wrong clip" bug (T-037).
+			if ( vm.Strings.TryGetValue( sound.Value, out var name ) )
+				vm.Engine?.PlaySound( name );
+		}
 
 		[OpcodeHandler( Opcode.KILLOBJ, "Remove a spawned object by its handle." )]
 		public static void KillObj( ref RideVM vm, Operand id )
