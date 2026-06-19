@@ -2,9 +2,11 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Reverse engineering
-- **Status**: ⚠️ **Partial.** Variant detection + the SFX category header are decoded and
-  verified across all `Data/global/sound/cat_*` samples; the per-record *mixing* fields
-  (opaque) still need the engine. See "Done" / "Remaining" below.
+- **Status**: ✅ **Decoded.** Variant detection, the BANK name table, the SFX category header, **and
+  the SFX per-sound record table** all decode and validate across every `Data/global/sound/cat_*`
+  sample. The BANK 11-byte records were RE'd (Ghidra) to be **serialized object pointers, not catalog
+  data**. The only thing still raw is the SFX trailing **mixing-curve blob** (a serialized object graph),
+  which isn't needed to use the catalog. See "Done".
 - **Split from**: [T-012](T-012-partial-formats.md).
 
 ## Context
@@ -29,23 +31,32 @@ variant (`…a0c993f203`), the trailing table of `count` length-prefixed entry n
   `Data/global/sound/cat_*` files. Covered by `MapFileTests` (synthetic BANK + SFX, real
   samples of both variants via `TPW_MAP_SAMPLE`).
 
-## Remaining work
+## Done (this pass)
 
-1. **BANK 11-byte record fields**: `A` is opaque — it is *not* a name hash (the "Ride" and
-   "xKids" entries share the same `A`), so the meaning (sound id? bank handle?) needs the
-   engine. The constant + `0x9A`/`0x99` markers suggest a fixed packed struct.
-2. **SFX per-sound list**: a variable/nested record list follows the category header (sound
-   index + sub-records; the values 3200/2300 seen are not a reliable per-entry delimiter).
-   Decode it into `{ soundId, volume, pitch, … }`.
+- **BANK 11-byte records resolved (Ghidra)**: `A` is *not* a name hash or sound id — it's a stale
+  **`.text` code pointer** baked in when the catalog was serialized (the `A` values `0x00494A4C`,
+  `0x00478A74`, … and the recurring constant `0x0066F22C` all land in the executable's code section,
+  verified by a memory peek; "Ride" and "xKids" share the same `A` because they're the same serialized
+  object). So the records carry **no catalog data** — the trailing name list is the real content. Doc
+  in `MapFile` updated to say so.
+- **SFX per-sound record table decoded**: after the category header come exactly `SoundEntryCount`
+  fixed **20-byte** records (count == `SoundEntryCount` verified on rides/staff/lobby samples). Layout:
+  `uint32 soundId` · `uint32 variationCount` · `uint32` reserved(0) · `uint32 param` · `uint32 flags`.
+  Exposed as `MapFile.SoundEntries` (`MapSoundEntry`). E.g. `cat_ridesSFX`: 25 entries, ids
+  18/14/17/12/24/184/…, mostly 1 variation, param 3200/2300. `MapFileTests` assert the decode on a
+  synthetic file and on real BANK + SFX samples (`TPW_MAP_SAMPLE`).
 
-Both need **Ghidra** on the DirectMusic-style catalog loader in `TP.EXE`
-(see [05-ghidra-reverse.md](../05-ghidra-reverse.md)) — black-box analysis of one set of
-samples isn't enough to assign the fields confidently.
+## Remaining (optional)
+
+- **SFX trailing mixing-curve blob**: a serialized DirectMusic object graph (embedded `.text`/data
+  pointers + `0x6464`/`0x3232`/`0xFFFF` markers, like the BANK records) follows the 20-byte table. It
+  holds per-sound mixing curves/envelopes. Kept raw; decoding it needs the engine and isn't required to
+  *use* the catalog (the sound ids + variation counts + category defaults are the actionable data).
 
 ## Acceptance criteria
 
 - ✅ Variant + SFX category header decode and validate against real samples.
-- ☐ BANK record fields and the SFX per-sound list decode to typed fields (needs Ghidra).
+- ✅ BANK records explained (serialized pointers, not data); SFX per-sound list decodes to typed fields.
 
 ## Affected files
 

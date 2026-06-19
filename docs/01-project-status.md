@@ -88,7 +88,9 @@ All targets are **`net8.0`**.
 - **`.LIP` lip-sync**: keyframe timestamps decoded; **unit confirmed = microseconds**. Mouth-shape
   semantics remain. [T-020](tickets/T-020-lip-mouth-shapes.md).
 - **`.MAP`**: audio category catalog (not terrain). Variant (BANK/SFX) + BANK entry names + SFX
-  category header decoded; per-record mixing fields remain. [T-016](tickets/T-016-map-entry-records.md).
+  category header + SFX per-sound 20-byte records (sound id + variation count + params) decoded; BANK
+  records are serialized object pointers (not data); only the SFX mixing-curve blob stays raw.
+  [T-016](tickets/T-016-map-entry-records.md).
 - **`.PLB`**: names + colour ramp decoded; the other parameter fields remain. [T-019](tickets/T-019-plb-parameter-fields.md).
 - **`.TPWS` saves**: partial reader; no sample on the install disc to verify. [T-017](tickets/T-017-tpws-saves.md).
 

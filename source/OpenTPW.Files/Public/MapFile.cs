@@ -3,6 +3,15 @@ using System.Text;
 
 namespace OpenTPW;
 
+/// <summary>
+/// One per-sound record from an SFX <c>.MAP</c> catalog (a fixed 20-byte entry). <see cref="SoundId"/>
+/// is the sound's index within the category's banks (see the matching BANK catalog's name list);
+/// <see cref="VariationCount"/> is how many alternate samples that sound has (usually 1). <c>Param</c>
+/// and <c>Flags</c> are per-sound mixing values (e.g. 3200/2300/700 across categories) whose exact
+/// units await the engine. See docs/tickets/T-016.
+/// </summary>
+public readonly record struct MapSoundEntry( int SoundId, int VariationCount, int Param, int Flags );
+
 /// <summary>The audio-catalog variant of a <c>.MAP</c> file (from its GUID).</summary>
 public enum MapVariant
 {
@@ -28,13 +37,18 @@ public enum MapVariant
 ///   <item><b>BANK</b> (<c>…00<u>a0</u>c993f203</c>): after the 16-byte GUID and 8 reserved
 ///   bytes, a <c>uint32</c> entry count, then one fixed 11-byte record per entry, then a
 ///   trailing table of <c>count</c> length-prefixed ASCII names (e.g. "Sound\Kids"). The names
-///   are decoded into <see cref="Entries"/>; each 11-byte record is an opaque field block
-///   (<c>uint32</c> + a constant + 3 bytes — semantics undetermined, see T-016).</item>
+///   (the real catalog data) are decoded into <see cref="Entries"/>. The 11-byte records are
+///   <b>serialized object state</b>, not catalog data: each is a <c>uint32</c> + the constant
+///   <c>0x0066F22C</c> + 3 marker bytes, and those <c>uint32</c>s are stale <c>.text</c> code
+///   pointers (verified in Ghidra) baked in when the catalog was saved — so they carry no
+///   meaning at load. See T-016.</item>
 ///   <item><b>SFX</b> (<c>…00<u>b0</u>c993f203</c>): a single category header — a
 ///   <c>uint32</c> sound-entry count (<see cref="SoundEntryCount"/>) and three category
 ///   default parameters (<see cref="CategoryParameters"/>, observed (1.0, 2.0, 0.5) = unity
-///   volume + a ±octave pitch range) — followed by a variable per-sound record list that is
-///   kept raw (its layout is nested/variable, undetermined without the engine; see T-016).</item>
+///   volume + a ±octave pitch range) — followed by <see cref="SoundEntryCount"/> fixed 20-byte
+///   per-sound records, decoded into <see cref="SoundEntries"/> (<see cref="MapSoundEntry"/>:
+///   sound id + variation count + mixing params). A trailing serialized blob (the mixing-curve
+///   objects, with embedded pointers like the BANK records) follows and is kept raw. See T-016.</item>
 /// </list>
 /// See docs/tickets/T-016.
 /// </summary>
@@ -49,6 +63,12 @@ public sealed class MapFile : BaseFormat
 	private const int SoundEntryCountOffset = 28;
 	private const int CategoryParamsOffset = 40;
 	private const int CategoryParamCount = 3;
+
+	// After the category header comes a table of `soundEntryCount` fixed 20-byte per-sound records
+	// (verified: record count == soundEntryCount across every cat_*SFX sample). A trailing serialized
+	// blob (mixing-curve objects with embedded pointers) follows it and is kept raw — see T-016.
+	private const int SfxRecordsOffset = CategoryParamsOffset + CategoryParamCount * 4; // 52
+	private const int SfxRecordStride = 20;
 
 	// The GUID byte that distinguishes the variants (0xA0 = BANK, 0xB0 = SFX).
 	private const int VariantByteOffset = 11;
@@ -74,6 +94,10 @@ public sealed class MapFile : BaseFormat
 
 	/// <summary>The number of per-sound records in the SFX variant (0 for BANK).</summary>
 	public int SoundEntryCount { get; private set; }
+
+	/// <summary>The decoded SFX per-sound records (<see cref="SoundEntryCount"/> of them); empty for
+	/// BANK or a malformed file. See <see cref="MapSoundEntry"/>.</summary>
+	public IReadOnlyList<MapSoundEntry> SoundEntries { get; private set; } = Array.Empty<MapSoundEntry>();
 
 	/// <summary>
 	/// The SFX category-level default parameters (observed (1.0, 2.0, 0.5) — unity volume and a
@@ -131,6 +155,25 @@ public sealed class MapFile : BaseFormat
 			for ( var i = 0; i < CategoryParamCount; i++ )
 				parameters[i] = BinaryPrimitives.ReadSingleLittleEndian( bytes.AsSpan( CategoryParamsOffset + i * 4, 4 ) );
 			CategoryParameters = parameters;
+		}
+
+		// The per-sound record table: SoundEntryCount fixed 20-byte records. Only parse the full table
+		// if it fits (otherwise leave SoundEntries empty rather than read a partial/garbage record).
+		if ( SoundEntryCount > 0 && SoundEntryCount <= MaxEntries
+			&& bytes.Length >= SfxRecordsOffset + SoundEntryCount * SfxRecordStride )
+		{
+			var entries = new MapSoundEntry[SoundEntryCount];
+			for ( var i = 0; i < SoundEntryCount; i++ )
+			{
+				var r = bytes.AsSpan( SfxRecordsOffset + i * SfxRecordStride, SfxRecordStride );
+				entries[i] = new MapSoundEntry(
+					SoundId: (int)BinaryPrimitives.ReadUInt32LittleEndian( r[..4] ),
+					VariationCount: (int)BinaryPrimitives.ReadUInt32LittleEndian( r[4..8] ),
+					// r[8..12] is always 0 (reserved).
+					Param: (int)BinaryPrimitives.ReadUInt32LittleEndian( r[12..16] ),
+					Flags: (int)BinaryPrimitives.ReadUInt32LittleEndian( r[16..20] ) );
+			}
+			SoundEntries = entries;
 		}
 	}
 

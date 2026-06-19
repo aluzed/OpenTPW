@@ -67,21 +67,35 @@ public class MapFileTests
 		ms.Write( guid.ToByteArray() );                  // 16
 		ms.Write( new byte[8] );                         // reserved @0x10
 		ms.Write( BitConverter.GetBytes( 1 ) );          // categoryCount @0x18 = 1
-		ms.Write( BitConverter.GetBytes( 25 ) );         // soundEntryCount @0x1c = 25
+		ms.Write( BitConverter.GetBytes( 2 ) );          // soundEntryCount @0x1c = 2
 		ms.Write( BitConverter.GetBytes( 0 ) );          // pad @0x20
 		ms.Write( BitConverter.GetBytes( 0x10009 ) );    // flags @0x24
 		ms.Write( BitConverter.GetBytes( 1.0f ) );       // params @0x28
 		ms.Write( BitConverter.GetBytes( 2.0f ) );
 		ms.Write( BitConverter.GetBytes( 0.5f ) );
-		ms.Write( new byte[] { 0xAA, 0xBB } );           // start of the (raw) per-sound list
+		// Two 20-byte per-sound records @0x34: (soundId, variations, reserved, param, flags).
+		void Record( int id, int vars, int param, int flags )
+		{
+			ms.Write( BitConverter.GetBytes( id ) );
+			ms.Write( BitConverter.GetBytes( vars ) );
+			ms.Write( BitConverter.GetBytes( 0 ) );
+			ms.Write( BitConverter.GetBytes( param ) );
+			ms.Write( BitConverter.GetBytes( flags ) );
+		}
+		Record( 18, 1, 3200, 0 );
+		Record( 14, 3, 3200, 6 );
+		ms.Write( new byte[] { 0xAA, 0xBB } );           // start of the (raw) trailing blob
 
 		ms.Position = 0;
 		var map = new MapFile( ms );
 
 		Assert.AreEqual( MapVariant.Sfx, map.Variant );
-		Assert.AreEqual( 25, map.SoundEntryCount );
+		Assert.AreEqual( 2, map.SoundEntryCount );
 		Assert.AreEqual( 0, map.Entries.Count, "SFX has no name table" );
 		CollectionAssert.AreEqual( new[] { 1.0f, 2.0f, 0.5f }, map.CategoryParameters.ToArray() );
+		Assert.AreEqual( 2, map.SoundEntries.Count );
+		Assert.AreEqual( new MapSoundEntry( 18, 1, 3200, 0 ), map.SoundEntries[0] );
+		Assert.AreEqual( new MapSoundEntry( 14, 3, 3200, 6 ), map.SoundEntries[1] );
 	}
 
 	// Optional validation against a real .MAP (CAT_*) file. Set TPW_MAP_SAMPLE.
@@ -111,6 +125,9 @@ public class MapFileTests
 		{
 			Assert.IsTrue( map.SoundEntryCount > 0, "SFX should have sound entries" );
 			Assert.AreEqual( 3, map.CategoryParameters.Count );
+			// The 20-byte per-sound record table decodes exactly soundEntryCount entries.
+			Assert.AreEqual( map.SoundEntryCount, map.SoundEntries.Count );
+			Assert.IsTrue( map.SoundEntries.All( e => e.VariationCount >= 1 ), "each sound has >= 1 sample" );
 		}
 	}
 }
