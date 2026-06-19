@@ -23,6 +23,8 @@ public sealed class RideEngine : IRideEngine
 
 	private readonly Dictionary<int, RideObject> objects = new();
 	private SdtArchive? rideSounds;
+	private SdtArchive? peepSounds;      // KidsHD.sdt — peep voices (screams live here, not RideHD)
+	private int[]? screamIndices;        // indices of the scream/yell samples in peepSounds
 
 	// Rider scream (STARTSCREAM/STOPSCREAM/SINGLESCREAM/SCREAMLEVEL — used by e.g. monkey). A sustained
 	// scream re-plays the scream sound every ScreamPeriod while active; level (0..100) scales volume.
@@ -243,12 +245,38 @@ public sealed class RideEngine : IRideEngine
 
 	public void DipMusic( int amount ) => Log.Trace( $"[ride] DIPMUSIC {amount}" );
 
-	// Play the scream sound (approx asset mapping — T-016) at the given volume, and stamp the time so
-	// a sustained scream paces its re-triggers.
+	// Play an actual peep scream at the given volume, and stamp the time so a sustained scream paces its
+	// re-triggers. Screams are peep voices in KidsHD.sdt (sceem*/screem*/yell*/whoop*), NOT RideHD — the
+	// script's scream code (0) is not an index into a sound bank, so we pick a scream sample by name.
+	// (Playing RideHD[code] before gave Backfire/Crunch — the "explosions/gunshots" bug.)
 	private void PlayScream( int code, float gain )
 	{
 		lastScreamAt = Time.Now;
-		PlayRideSound( code, gain );
+		try
+		{
+			var path = Path.Join( GameDir.GamePath, "data", "global", "sound", "KidsHD.sdt" );
+			if ( !File.Exists( path ) )
+				return;
+			peepSounds ??= new SdtArchive( path );
+			screamIndices ??= peepSounds.soundFiles
+				.Select( ( f, i ) => (f.Name, i) )
+				.Where( x => x.Name.Contains( "sceem", StringComparison.OrdinalIgnoreCase )
+					|| x.Name.Contains( "screem", StringComparison.OrdinalIgnoreCase )
+					|| x.Name.Contains( "yell", StringComparison.OrdinalIgnoreCase )
+					|| x.Name.Contains( "whoop", StringComparison.OrdinalIgnoreCase ) )
+				.Select( x => x.i )
+				.ToArray();
+			if ( screamIndices.Length == 0 )
+				return;
+
+			var track = peepSounds.soundFiles[screamIndices[Random.Shared.Next( screamIndices.Length )]];
+			Audio.PlaySfx( $"scream_{track.Name}", track.SoundData, gain );
+			Log.Info( $"[ride] scream -> {track.Name}" );
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( $"[ride] scream failed: {e.Message}" );
+		}
 	}
 
 	/// <summary>

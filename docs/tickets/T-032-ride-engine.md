@@ -72,9 +72,11 @@ is what makes a ride *do* anything, and it backs the remaining VM opcodes (T-007
    jungle rides). No longer the scream blocker (the queue→`VAR_LETMEON` bridge replaced that path), but
    needed for VM-driven peep movement onto rides — peep system started ([T-034](T-034-peeps.md)).
 5. ⚠️ **Scream / coaster** — the **scream family** (`STARTSCREAM`/`STOPSCREAM`/`SINGLESCREAM`/
-   `SCREAMLEVEL`) is **done and audible in-game**: routed through `IRideEngine`, `RideEngine` plays the
-   scream sound (approx asset mapping, T-016) at the script's level (`Audio.PlaySfx` gained a per-effect
-   volume), and a sustained scream re-triggers each ~1.8 s until `STOPSCREAM`. Operands RE'd from
+   `SCREAMLEVEL`) is **done and audible in-game**: routed through `IRideEngine`, `RideEngine` plays a
+   real peep scream at the script's level (`Audio.PlaySfx` gained a per-effect volume), and a sustained
+   scream re-triggers each ~1.8 s until `STOPSCREAM`. **Screams are peep voices in `KidsHD.sdt`**
+   (`sceem*`/`screem*`/`yell*`/`whoop*`), picked by name at random — not `RideHD` indexed by the script
+   code (code 0 → `RideHD[0]` = `Backfire.mp2`, which sounded like gunshots/explosions; fixed). Operands RE'd from
    `monkey.rse`: `(soundCode, level 0..100)`, `-1` = default. Two more fixes made it actually fire:
    - **Boarding bridge.** Rides start CLOSED in the VM (`VAR_RIDECLOSED=1`) and the script's load loop
      polls `VAR_LETMEON` ("a peep wants on") then takes a rider (`VAR_ONRIDE++`), runs, and screams
