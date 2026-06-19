@@ -206,7 +206,27 @@ public class Ride : Entity
 			: 5f;
 		Log.Info( $"[ride] '{Name}' duration {RideDuration:0.0}s (DurationUnit {DurationUnit}), capacity {Capacity}" );
 
+		// Open the ride and tell its script the capacity. A ride starts CLOSED in the VM (VAR_RIDECLOSED
+		// = 1); the engine is what opens it. The script's load loop then polls VAR_LETMEON — the "a peep
+		// wants on" signal the game sets — to take a rider, run, and (for thrill rides) scream. Wiring
+		// our RideQueue → VAR_LETMEON (NotifyBoarding) is what finally drives that authentic run sequence.
+		// RE'd from monkey.rse (TEST VAR_RIDECLOSED → TEST VAR_LETMEON → ADD VAR_ONRIDE → STARTSCREAM).
+		VM.Variables[(int)RideVariables.VAR_RIDECLOSED] = 0;
+		VM.Variables[(int)RideVariables.VAR_CAPACITY] = Capacity;
+
 		VM.IsRunning = true;
+	}
+
+	/// <summary>
+	/// Tell the ride script a peep is boarding by raising <c>VAR_LETMEON</c> — the per-ride "a peep wants
+	/// on" flag its load loop polls (it consumes the flag, increments its on-ride count, and runs the
+	/// ride). This bridges our <see cref="RideQueue"/> occupancy to the VM's own rider model so scripted
+	/// run sequences (animations, scream, …) actually fire. See T-032.
+	/// </summary>
+	public void NotifyBoarding()
+	{
+		if ( VM != null )
+			VM.Variables[(int)RideVariables.VAR_LETMEON] = 1;
 	}
 
 	// Loads the decoded keyframe tracks for each animation channel and hands them to the engine, so a

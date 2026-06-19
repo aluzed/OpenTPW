@@ -47,7 +47,7 @@ public partial class OpcodeHandlers
 		[OpcodeHandler( Opcode.ENDSLICE, "End current slice" )]
 		public static void EndSlice( ref RideVM vm )
 		{
-			Log.Trace( "TODO: End slice" );
+			vm.SliceEnded = true; // yield the rest of this tick's slice (see RideVM.RunSlice)
 		}
 
 		// ADDOBJ now lives in Handlers/Objects.cs (routes to the ride engine). It must exist in

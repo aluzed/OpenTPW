@@ -69,6 +69,7 @@ public sealed class RideQueue
 		line.Remove( peep );
 		bool wasEmpty = riders == 0;
 		riders++;
+		Ride?.NotifyBoarding();      // raise VAR_LETMEON so the ride script loads this rider (T-032)
 		if ( wasEmpty )
 			Ride?.SetActive( true ); // edge 0 -> 1: kick off the load/start/run cycle
 	}

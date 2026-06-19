@@ -126,6 +126,30 @@ public partial class RideVM
 		instruction.Invoke();
 	}
 
+	/// <summary>Set by the ENDSLICE opcode to yield the rest of this tick's slice (see <see cref="RunSlice"/>).</summary>
+	public bool SliceEnded { get; set; }
+
+	/// <summary>
+	/// Runs the script for one game tick: a batch of instructions, stopping early at an <c>ENDSLICE</c>
+	/// (the script's own per-tick yield) or when a blocking opcode (<c>WAIT</c>/<c>WAITANIM</c>) rewinds
+	/// the PC to re-run itself next tick. The instruction cap bounds work and stops a tight loop with no
+	/// yield from spinning forever within a single tick. This replaces stepping one instruction per tick,
+	/// which was far too slow for the ride scripts' real-time load/run loops (see T-032).
+	/// </summary>
+	public void RunSlice( int maxInstructions = 256 )
+	{
+		for ( int n = 0; n < maxInstructions && IsRunning && CurrentPos >= 0 && CurrentPos < Instructions.Count; n++ )
+		{
+			int before = CurrentPos;
+			SliceEnded = false;
+			Step();
+			if ( SliceEnded )
+				break;                       // ENDSLICE: done for this tick
+			if ( CurrentPos == before )
+				break;                       // a WAIT/WAITANIM rewound to re-run: yield until next tick
+		}
+	}
+
 	public MethodInfo? FindOpcodeHandler( Opcode opcodeId )
 	{
 		if ( OpcodeHandlers.TryGetValue( opcodeId, out var handlerAttribute ) )
@@ -183,11 +207,15 @@ public partial class RideVM
 	private TimeSince TimeSinceLastTick;
 	public void Update()
 	{
-		if ( IsRunning && TimeSinceLastTick > 1f / 5f )
-		{
-			Step();
-			TimeSinceLastTick = 0;
-		}
+		if ( !IsRunning || TimeSinceLastTick <= 1f / 5f )
+			return;
+
+		// Advance the ride's millisecond clock by the real elapsed time so WAIT/WAITABS actually wake
+		// (GameTime was never advanced, so every WAIT hung the script at its first wait — T-032), then
+		// run this tick's slice.
+		GameTime += (int)( (float)TimeSinceLastTick * 1000f );
+		TimeSinceLastTick = 0;
+		RunSlice();
 	}
 
 	public void Run()
