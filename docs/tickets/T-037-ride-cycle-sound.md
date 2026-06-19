@@ -31,12 +31,34 @@ wrong mapping.
   remain correct** (KidsHD path, T-032). Verified: 0 `Crunch`/`Backfire`/`arc` clips, screams still fire.
 - **Duration**: already taken from the ride's running-animation length (per Context).
 
+## EVENT / EventMap sound architecture (RE'd — Ghidra)
+
+The full chain that plays a ride's *intended* sound, decoded end to end:
+
+1. **`SPAWNSOUND("EventMap.rse")`** (handler `FUN_005551ab`): builds the ride path + the operand string
+   and calls `FUN_005587f0` to load the ride's **`EventMap.rse`** as its sound-event-map resource.
+2. **`EventMap.rse`** is a tiny per-ride binding table — variables `VAR_EVT0..N` (a **sound id** per
+   event slot) and `VAR_PAR0..N` (a param per slot), set by `COPY` literals. E.g. `coaster1`:
+   `EVT=[200,216,69,203,203]`, `PAR=[0,0,19,0,22]`; `gokarts`: `EVT=[194,195,203,199,203,…]` (id `203`
+   recurs as the "no sound" default).
+3. **`EVENT(type, target, code)`** (handler `FUN_00552615` → dispatch `FUN_005573d0`): `switch(type)`
+   selects a per-type effect pool (`DAT_00803a20..3c`); `FUN_00556b90` computes the **3D position** from
+   the `target` node in the ride's model/node graph; the chosen sound id is spawned through the runtime
+   **sound manager** (`FUN_0051bfc0` → virtual call on `DAT_00802bcc`).
+4. **sound id → file**: the id indexes a **global sound registry** held by that manager, built at load
+   from the banks named in the BANK catalog (`cat_ridesBANK`: `Ride/sfUi/Staff/Kids/xKids`) + the SFX
+   catalogs. Verified the ids are global, not per-catalog: `coaster1`'s `200/69/203` are in
+   `cat_ridesSFX` but `216` is not; `gokarts`'s `199/203` are, `194/195` are not (they live in other
+   banks). The SFX `SoundEntries` (T-016) carry `{soundId, variations, params}` but **no filename**, so
+   id→file needs the manager's registry reconstructed.
+
 ## Remaining work
 
-- **Correct per-cue SFX** (boarding / running / unloading): bind ADDOBJ sound objects + `EVENT` codes to
-  assets via the ride's `EventMap.rse` + the `.MAP` catalog. This is the **EVENT effects engine**
-  (T-032 roadmap) — `EVENT` (`FUN_005573d0`) dispatches positioned sounds/particles from per-type pools,
-  and `EventMap.rse` populates the binding table.
+- **Reconstruct the global sound registry** (banks + SFX catalogs → `id → (bank, index, file)`), then
+  wire `EventMap` (`VAR_EVT`) + `EVENT`/`ADDOBJ` through it to play the **correct** asset. This is the
+  meat of the **EVENT effects engine** (T-032 roadmap). Deliberately **not guessed** here — an
+  approximate id→file mapping reintroduces the wrong-sound bug this ticket just removed. Positioned 3D
+  audio (`FUN_00556b90`) and the particle pools are further stages.
 
 ## Acceptance criteria
 
