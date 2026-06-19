@@ -3,8 +3,9 @@
 - **Priority**: 🟡 Feature (the central unlock — backs Batch B of the VM and real gameplay)
 - **Type**: Engine
 - **Status**: ⚠️ In progress — slice 1 (seam + sound + ride in-scene), stage 1 (lifecycle +
-  procedural animation) and stage 2 (animation system RE'd + channel-aware engine) done; real keyframe
-  playback / lights / peeps / coaster / park remain.
+  procedural animation), stage 2 (animation system RE'd + channel-aware engine), real keyframe playback
+  and the **rider scream family** done; lights / walk-limbo / coaster motion / park remain. (73/106
+  opcodes implemented.)
 - **Related**: [T-007](T-007-vm-opcodes-rse.md) (the VM + opcode RE), [T-033](T-033-ride-animation-keyframes.md) (animation keyframes), [05](../05-ghidra-reverse.md)/[07](../07-ghidra-render.md)/[08](../08-ghidra-animation.md).
 
 ## Problem
@@ -68,7 +69,16 @@ is what makes a ride *do* anything, and it backs the remaining VM opcodes (T-007
 3. ☐ **Lights** — `ENABLELIGHT`/`DISABLELIGHT`/`SETLIGHT`/`COLOURLIGHT` (needs a multi-light render path).
 4. ⚠️ **Walk/limbo** — needs a peep/visitor system, now started ([T-034](T-034-peeps.md): a wandering
    visitor crowd; path/queue following + ride interaction remain).
-5. ☐ **Scream / coaster** — `STARTSCREAM`/`TOUR`/`COAST`/`TURBO`/`BUMP` (depends on peeps + track).
+5. ⚠️ **Scream / coaster** — the **scream family** (`STARTSCREAM`/`STOPSCREAM`/`SINGLESCREAM`/
+   `SCREAMLEVEL`) is done: routed through `IRideEngine`, `RideEngine` plays the scream sound (approx
+   asset mapping, T-016) at the script's level (`Audio.PlaySfx` gained a per-effect volume), and a
+   sustained scream re-triggers each ~1.8 s until `STOPSCREAM`. Operands RE'd from `monkey.rse`:
+   `(soundCode, level 0..100)`, `-1` = default — `monkey` uses all four, `totem` `SINGLESCREAM`.
+   Routing is unit-tested (`ScreamOpcodesRouteToEngine`); the audio path is the same one proven in-game
+   by ride sounds. **In-game audibility is gated upstream**: the script branch that reaches scream
+   depends on the **walk/limbo** opcodes (`WALKON` etc., item 4), still no-ops, so the VM doesn't yet
+   advance there. The coaster **motion** opcodes (`COAST`×12 in coaster1, `BUMP` in bumper/gokarts,
+   `TOUR`/`TURBO`) remain — they drive car objects and need the ride-engine/track tie.
 6. ⚠️ **Real park terrain + placement grid** — `PlacementGrid` (tile↔world, footprint, occupancy;
    jungle's 95×84 dims from `Standard.sam`, unit-tested) + `ParkTerrain` rendering the real jungle
    landscape (`terrain.wad`/`base.MD2`, 272 meshes — textured ground, water, paths) with rides placed

@@ -38,4 +38,17 @@ public interface IRideEngine
 
 	/// <summary>WAIT4ANIM — whether any object is still playing a (non-looping) animation.</summary>
 	bool AnyAnimating();
+
+	/// <summary>STARTSCREAM — begin a sustained rider scream (sound <paramref name="code"/>) at volume
+	/// <paramref name="level"/> (0..100; &lt;0 = keep current).</summary>
+	void StartScream( int code, int level );
+
+	/// <summary>STOPSCREAM — end the sustained scream.</summary>
+	void StopScream();
+
+	/// <summary>SINGLESCREAM — play a one-shot scream (sound <paramref name="code"/>) at <paramref name="level"/>.</summary>
+	void SingleScream( int code, int level );
+
+	/// <summary>SCREAMLEVEL — set the scream volume level (0..100; &lt;0 = unchanged).</summary>
+	void SetScreamLevel( int level );
 }

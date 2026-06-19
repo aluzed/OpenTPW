@@ -24,6 +24,14 @@ public sealed class RideEngine : IRideEngine
 	private readonly Dictionary<int, RideObject> objects = new();
 	private SdtArchive? rideSounds;
 
+	// Rider scream (STARTSCREAM/STOPSCREAM/SINGLESCREAM/SCREAMLEVEL — used by e.g. monkey). A sustained
+	// scream re-plays the scream sound every ScreamPeriod while active; level (0..100) scales volume.
+	private const float ScreamPeriod = 1.8f;
+	private bool screaming;
+	private int screamCode;
+	private float screamGain = 0.8f;        // 0..1, from the script's level
+	private float lastScreamAt = float.NegativeInfinity;
+
 	// The ride's real animation channels, discovered from the WAD: anim id -> keyframe count. Empty
 	// until the owning Ride calls SetAnimChannels. A ScriptDefs.Animations value present here means
 	// the ride actually ships that channel's keyframe files (see docs/08-ghidra-animation.md, T-033).
@@ -191,6 +199,43 @@ public sealed class RideEngine : IRideEngine
 		return false;
 	}
 
+	public void StartScream( int code, int level )
+	{
+		screaming = true;
+		screamCode = code;
+		if ( level >= 0 )
+			screamGain = Math.Clamp( level / 100f, 0f, 1f );
+		PlayScream( code, screamGain ); // begin immediately; Update sustains it
+		Log.Info( $"[ride] STARTSCREAM code={code} level={level}" );
+	}
+
+	public void StopScream()
+	{
+		screaming = false;
+		Log.Info( "[ride] STOPSCREAM" );
+	}
+
+	public void SingleScream( int code, int level )
+	{
+		float gain = level >= 0 ? Math.Clamp( level / 100f, 0f, 1f ) : screamGain;
+		PlayScream( code, gain );
+		Log.Info( $"[ride] SINGLESCREAM code={code} level={level}" );
+	}
+
+	public void SetScreamLevel( int level )
+	{
+		if ( level >= 0 )
+			screamGain = Math.Clamp( level / 100f, 0f, 1f );
+	}
+
+	// Play the scream sound (approx asset mapping — T-016) at the given volume, and stamp the time so
+	// a sustained scream paces its re-triggers.
+	private void PlayScream( int code, float gain )
+	{
+		lastScreamAt = Time.Now;
+		PlayRideSound( code, gain );
+	}
+
 	/// <summary>
 	/// Supplies the decoded keyframe tracks for an animation channel (the ride's <c>&lt;base&gt;&lt;c&gt;[n].md2</c>
 	/// files, parsed by <see cref="RideKeyframeFile"/>). When that channel is the active animation, the
@@ -347,6 +392,11 @@ public sealed class RideEngine : IRideEngine
 	/// <summary>Per-frame animation: drive real keyframe tracks where we have them, else the placeholder bob.</summary>
 	public void Update( float now )
 	{
+		// Sustain an active scream by re-playing it each period (PlaySfx is one-shot; there's no looping
+		// sfx source). STOPSCREAM clears `screaming`.
+		if ( screaming && now - lastScreamAt >= ScreamPeriod )
+			PlayScream( screamCode, screamGain );
+
 		foreach ( var obj in objects.Values )
 		{
 			if ( obj.AnimId == null || obj.Parts.Count == 0 )
@@ -528,7 +578,7 @@ public sealed class RideEngine : IRideEngine
 	/// the `.MAP` audio catalog (T-016) — not decoded yet — so for now this indexes the global
 	/// ride-sound archive to give an audible, logged proof. Returns the audio cache key, or null.
 	/// </summary>
-	private string? PlayRideSound( int code )
+	private string? PlayRideSound( int code, float gain = -1f )
 	{
 		try
 		{
@@ -542,7 +592,7 @@ public sealed class RideEngine : IRideEngine
 
 			var track = rideSounds.soundFiles[Math.Abs( code ) % rideSounds.soundFiles.Count];
 			var key = $"ride_{track.Name}";
-			Audio.PlaySfx( key, track.SoundData );
+			Audio.PlaySfx( key, track.SoundData, gain );
 			Log.Info( $"[ride] sound code={code} -> {track.Name} (approx mapping, see T-016)" );
 			return key;
 		}

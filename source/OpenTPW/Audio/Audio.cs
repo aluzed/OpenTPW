@@ -63,9 +63,11 @@ internal static unsafe class Audio
 	/// <summary>
 	/// Plays a one-shot sound effect from an MPEG (.mp2) byte stream. <paramref name="key"/> caches
 	/// the decoded buffer so repeated effects (e.g. UI clicks) decode only once. Uses a round-robin
-	/// source pool so overlapping effects don't cut each other off.
+	/// source pool so overlapping effects don't cut each other off. <paramref name="gain"/> sets the
+	/// per-effect volume (0..1); negative uses the global <see cref="SfxVolume"/> (e.g. ride screams
+	/// scale gain by their script level — see RideEngine).
 	/// </summary>
-	public static void PlaySfx( string key, byte[] mpegData )
+	public static void PlaySfx( string key, byte[] mpegData, float gain = -1f )
 	{
 		if ( !EnsureInitialized() )
 			return;
@@ -89,7 +91,7 @@ internal static unsafe class Audio
 
 			al.SourceStop( src );
 			al.SetSourceProperty( src, SourceInteger.Buffer, (int)buffer );
-			al.SetSourceProperty( src, SourceFloat.Gain, sfxVolume );
+			al.SetSourceProperty( src, SourceFloat.Gain, gain < 0f ? sfxVolume : Math.Clamp( gain, 0f, 1f ) * sfxVolume );
 			al.SourcePlay( src );
 		}
 		catch ( Exception e )

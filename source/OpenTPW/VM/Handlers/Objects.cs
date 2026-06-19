@@ -82,6 +82,27 @@ partial class OpcodeHandlers
 		}
 
 		//
+		// Rider scream (e.g. monkey, totem): operand 1 = scream sound code, operand 2 = volume level
+		// (0..100, -1 = default). See docs/06-rse-vm-opcodes.md / T-032.
+		//
+
+		[OpcodeHandler( Opcode.STARTSCREAM, "Begin a sustained rider scream (code, level)." )]
+		public static void StartScream( ref RideVM vm, Operand code, Operand level )
+			=> vm.Engine?.StartScream( code.Value, level.Value );
+
+		[OpcodeHandler( Opcode.STOPSCREAM, "End the sustained rider scream." )]
+		public static void StopScream( ref RideVM vm )
+			=> vm.Engine?.StopScream();
+
+		[OpcodeHandler( Opcode.SINGLESCREAM, "Play a one-shot rider scream (code, level)." )]
+		public static void SingleScream( ref RideVM vm, Operand code, Operand level )
+			=> vm.Engine?.SingleScream( code.Value, level.Value );
+
+		[OpcodeHandler( Opcode.SCREAMLEVEL, "Set the rider scream volume level." )]
+		public static void ScreamLevel( ref RideVM vm, Operand level )
+			=> vm.Engine?.SetScreamLevel( level.Value );
+
+		//
 		// _CH variants — same actions, targeting the active child's objects (shared engine for now).
 		// They carry one extra leading operand (the child handle) that we don't distinguish yet.
 		//

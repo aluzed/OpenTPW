@@ -6,9 +6,10 @@ dispatched by the executor `FUN_00551cb0` (opcode word tagged `0x80`, bounds `< 
 table at `0x5567d8`). The **Operands** column is authoritative (the reflection dispatcher must
 match it). **Kind**: `pure` = VM-state only (done); `engine` = needs the ride engine.
 
-Status: **51 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus **SPAWNCHILD**
-(first Batch B opcode: its VM-level child-script linkage; the actual script load is injected by
-the engine). See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md).
+Status: **73 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus a growing set of
+Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sound, the animation +
+`WAIT*` family, and now the **rider scream family** `STARTSCREAM`/`STOPSCREAM`/`SINGLESCREAM`/
+`SCREAMLEVEL`). See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md) / [T-032](tickets/T-032-ride-engine.md).
 
 | # | Opcode | Operands | Implemented | Kind |
 |---|--------|:--------:|:-----------:|------|
@@ -98,10 +99,10 @@ the engine). See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md).
 | 83 | `DISABLELIGHT` | 1 | ☐ | engine |
 | 84 | `SETLIGHT` | 2 | ☐ | engine |
 | 85 | `COLOURLIGHT` | 4 | ☐ | engine |
-| 86 | `STARTSCREAM` | 2 | ☐ | engine |
-| 87 | `STOPSCREAM` | 0 | ☐ | engine |
-| 88 | `SINGLESCREAM` | 2 | ☐ | engine |
-| 89 | `SCREAMLEVEL` | 1 | ☐ | engine |
+| 86 | `STARTSCREAM` | 2 | ✅ | engine | `(soundCode, level 0..100)` — sustained rider scream |
+| 87 | `STOPSCREAM` | 0 | ✅ | engine | end the sustained scream |
+| 88 | `SINGLESCREAM` | 2 | ✅ | engine | `(soundCode, level)` one-shot (`-1` = default level) |
+| 89 | `SCREAMLEVEL` | 1 | ✅ | engine | set scream volume `0..100` |
 | 90 | `FINDSCRIPTRAND` | 2 | ☐ | engine |
 | 91 | `GETREMOTEVAR` | 3 | ☐ | engine |
 | 92 | `SETREMOTEVAR` | 3 | ☐ | engine |

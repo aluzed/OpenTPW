@@ -17,6 +17,7 @@ public class RideEngineTests
 		public List<int> Kills = new();
 		public List<(int id, int param, int value)> Params = new();
 		public List<(int id, int anim, bool loop)> Anims = new();
+		public List<string> Screams = new(); // scream opcode trace
 		public bool Animating; // controls IsAnimating / AnyAnimating
 
 		public void SpawnObject( int type, int parameter, int id, int slot ) => Spawns.Add( (type, parameter, id, slot) );
@@ -29,6 +30,10 @@ public class RideEngineTests
 		public int GetAnim( int id ) => 0;
 		public bool IsAnimating( int id, int anim ) => Animating;
 		public bool AnyAnimating() => Animating;
+		public void StartScream( int code, int level ) => Screams.Add( $"start({code},{level})" );
+		public void StopScream() => Screams.Add( "stop" );
+		public void SingleScream( int code, int level ) => Screams.Add( $"single({code},{level})" );
+		public void SetScreamLevel( int level ) => Screams.Add( $"level({level})" );
 	}
 
 	private static RideVM NewVm()
@@ -108,6 +113,22 @@ public class RideEngineTests
 	}
 
 	[TestMethod]
+	public void ScreamOpcodesRouteToEngine()
+	{
+		var vm = NewVm();
+		var fake = new FakeEngine();
+		vm.Engine = fake;
+
+		// Mirrors monkey.rse: STARTSCREAM(code,level), SCREAMLEVEL(level), SINGLESCREAM(code,level), STOPSCREAM().
+		vm.CallOpcodeHandler( Opcode.STARTSCREAM, Lit( vm, 0 ), Lit( vm, 20 ) );
+		vm.CallOpcodeHandler( Opcode.SCREAMLEVEL, Lit( vm, 50 ) );
+		vm.CallOpcodeHandler( Opcode.SINGLESCREAM, Lit( vm, 0 ), Lit( vm, 90 ) );
+		vm.CallOpcodeHandler( Opcode.STOPSCREAM );
+
+		CollectionAssert.AreEqual( new[] { "start(0,20)", "level(50)", "single(0,90)", "stop" }, fake.Screams );
+	}
+
+	[TestMethod]
 	public void EngineOpcodesAreNoOpWithoutEngine()
 	{
 		var vm = NewVm(); // Engine is null
@@ -116,5 +137,7 @@ public class RideEngineTests
 		vm.CallOpcodeHandler( Opcode.ADDOBJ, Lit( vm, 3 ), Lit( vm, 42 ), Lit( vm, 7 ), Lit( vm, 1 ) );
 		vm.CallOpcodeHandler( Opcode.SPAWNSOUND, Lit( vm, 9 ) );
 		vm.CallOpcodeHandler( Opcode.KILLOBJ, Lit( vm, 7 ) );
+		vm.CallOpcodeHandler( Opcode.STARTSCREAM, Lit( vm, 0 ), Lit( vm, 20 ) );
+		vm.CallOpcodeHandler( Opcode.STOPSCREAM );
 	}
 }
