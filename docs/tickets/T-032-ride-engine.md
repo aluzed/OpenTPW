@@ -93,13 +93,23 @@ is what makes a ride *do* anything, and it backs the remaining VM opcodes (T-007
    - **Engine-opcode routing + log cleanup.** Now that scripts actually run, the live-firing engine
      opcodes were spamming "No handler" (`COAST` ~20k/min from coaster1's load loop, plus `EVENT`,
      `SETREVERB`). Routed `COAST`/`EVENT`/`EVENT_EXT`/`SETREVERB`/`DIPMUSIC` through `IRideEngine`
-     (78/106 opcodes now). **`COAST`** is RE'd as a multiplexed coaster-control opcode (subcommand map
-     above); its query subcommands (2 can-load?, 3 wants-off?) set the Zero flag so the load/unload
-     loops branch out, and `CRIT_LOCK`/`CRIT_UNLOCK` are now proper no-ops (single-threaded VM). Also
+     (78/106 opcodes now). `CRIT_LOCK`/`CRIT_UNLOCK` are now proper no-ops (single-threaded VM). Also
      dropped the per-instruction `Step`/branch trace logging — with `RunSlice` running many instructions
-     per tick it flooded the log (a 48 s run went 35,880 → 149 lines). Real coaster car loading + motion
-     (and `BUMP`/`TOUR`/`TURBO`) still need the ride-engine/track tie — deferred; coaster1's load loop
-     idles rather than fully terminating until then.
+     per tick it flooded the log (a 48 s run went 35,880 → 149 lines).
+   - **EVENT / COAST RE (Ghidra).** Both turned out to be fronts for whole subsystems (decompiled, so
+     the future work is scoped):
+     - **`EVENT`** (handler `FUN_00552615` → dispatch `FUN_005573d0`) is a `switch(type)` that spawns
+       **positioned sounds / particle effects** from per-type effect pools (`DAT_00803a20..3c`), e.g.
+       type 1/2 = 3D-positioned sound (the `__ftol` coord conversions), 3–9 = effect-pool spawns. It's
+       the particle/effects engine (overlaps `.PLB` + the `.MAP` audio catalog, T-016) — routed for now,
+       not dispatched, to avoid spurious sounds.
+     - **`COAST`** (handler `FUN_00554a5a`) switches the subcommand onto a coaster-object class
+       (`FUN_0043b0e0/1f0/220/270/2f0/330/050/2b0`): 1 load · 2 can-load? · 3 wants-off? · 4–6 set state ·
+       8 create/init. Queries 2/3 return a value the next `BRANCH_Z` reads via the flag, so as a stopgap
+       **sub 2 clears Zero** (a car is free → the load loop falls through to its `VAR_LETMEON` gate, and
+       the queue→`VAR_LETMEON` bridge loads coaster riders like any ride) and **sub 3 sets Zero** (no
+       scripted unload yet). Real car loading + motion (and `BUMP`/`TOUR`/`TURBO`) need the coaster-object
+       + car/track engine — deferred; coaster1's load loop idles rather than fully terminating until then.
 6. ⚠️ **Real park terrain + placement grid** — `PlacementGrid` (tile↔world, footprint, occupancy;
    jungle's 95×84 dims from `Standard.sam`, unit-tested) + `ParkTerrain` rendering the real jungle
    landscape (`terrain.wad`/`base.MD2`, 272 meshes — textured ground, water, paths) with rides placed

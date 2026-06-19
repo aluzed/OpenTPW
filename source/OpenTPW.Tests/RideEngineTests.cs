@@ -146,10 +146,13 @@ public class RideEngineTests
 		vm.CallOpcodeHandler( Opcode.DIPMUSIC, Lit( vm, 50 ) );
 		CollectionAssert.AreEqual( new[] { "coast(6,8)", "event(3,-1,62)", "reverb(2)", "dip(50)" }, fake.Effects );
 
-		// A COAST query subcommand sets the Zero flag so the coaster load/unload loop can branch out.
-		vm.Flags = RideVM.VMFlags.None;
+		// COAST query subcommands set the Zero flag to steer the coaster load/unload loops: sub 2
+		// "can-load?" clears Zero (fall through to the VAR_LETMEON gate), sub 3 "wants-off?" sets it.
+		vm.Flags = RideVM.VMFlags.Zero;
 		vm.CallOpcodeHandler( Opcode.COAST, Lit( vm, 2 ), Lit( vm, 0 ) );
-		Assert.IsTrue( vm.Flags.HasFlag( RideVM.VMFlags.Zero ), "COAST query should set the Zero flag" );
+		Assert.IsFalse( vm.Flags.HasFlag( RideVM.VMFlags.Zero ), "COAST can-load? should clear Zero" );
+		vm.CallOpcodeHandler( Opcode.COAST, Lit( vm, 3 ), Lit( vm, 0 ) );
+		Assert.IsTrue( vm.Flags.HasFlag( RideVM.VMFlags.Zero ), "COAST wants-off? should set Zero" );
 	}
 
 	[TestMethod]

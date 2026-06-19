@@ -13,11 +13,17 @@ partial class OpcodeHandlers
 		[OpcodeHandler( Opcode.COAST, "Coaster control, multiplexed by subcommand." )]
 		public static void Coast( ref RideVM vm, Operand sub, Operand arg )
 		{
-			// Subcommands 2 (can-load?) and 3 (peep-wants-off?) are queries whose result the following
-			// BRANCH_Z reads via the Zero flag. With no coaster car/track engine yet (T-045's coaster is
-			// build-mode and separate), report "nothing to do" (Zero set) so coaster scripts' load/unload
-			// loops take their idle/yield branch instead of spinning every tick. Map RE'd from coaster1.rse.
-			if ( sub.Value is 2 or 3 )
+			// COAST is a coaster-object interface (RE'd: handler FUN_00554a5a switches on the subcommand
+			// and calls into a coaster class FUN_0043bXXX). Subcommands 2 (can-load?) and 3 (peep-wants-
+			// off?) are queries whose result the following BRANCH_Z reads via the Zero flag. We have no
+			// coaster-object engine yet (T-045's coaster is build-mode + separate), so:
+			//   2 → clear Zero ("a car is free"): the script's load loop then falls through to its
+			//       TEST(VAR_LETMEON) gate, so the queue→VAR_LETMEON bridge (Ride.NotifyBoarding) drives
+			//       loading exactly as for the other rides — one rider per boarding signal.
+			//   3 → set Zero ("nobody wants off"): no scripted unload until the car/timing engine exists.
+			if ( sub.Value == 2 )
+				vm.Flags = RideVM.VMFlags.None;
+			else if ( sub.Value == 3 )
 				vm.Flags = RideVM.VMFlags.Zero;
 			vm.Engine?.Coast( sub.Value, arg.Value );
 		}
