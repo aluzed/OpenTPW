@@ -79,6 +79,10 @@
   coaster train carries **visible riders** — bright seat markers (2 per car) shown for as many seats as
   the coaster's live occupancy fills. Verified in-frame (forced full occupancy): the markers sit on the
   CrocCar, which renders clearly (red body, green croc head). Scream SFX still awaits the ride engine.
+- **CrocCar animation**: the car now loads its `CrocCarM1..3` animation frames alongside the base mesh
+  (4 frames) and ping-pongs through them at 8 fps (all cars in sync), so the croc chomps as it runs.
+  Frames share the base frame's scale (they animate, don't pulse); a single procedural box frame is the
+  fallback. Verified: `CrocCar loaded (4 frame(s))`, cycling with no exceptions.
 - Verified via `OPENTPW_AUTOPLACE`: `CrocCar loaded (134 verts, 76 tris)`; an auto-laid ring around the
   station logs `autotrack segments=9 closed=True`, the looping train runs with no exceptions, and the
   smooth textured track ribbon + riders render (confirmed in-frame).
@@ -87,7 +91,7 @@
 
 3b. **Rideable CrocCar + authentic pieces** — wire real peep boarding (peeps leave the queue *onto* the
     train rather than the current marker stand-ins) + scream (ties into the ride engine, T-032/T-033),
-    `CrocCarM1..3` animation frames, and (polish) authoring the ribbon profile from the
+    and (polish) authoring the ribbon profile from the
     `.hmp` templates (rails + cross-ties geometry) rather than a flat textured strip. Rotation /
     `STACKUP/DOWN` elevation editing of segments also lands here.
 
