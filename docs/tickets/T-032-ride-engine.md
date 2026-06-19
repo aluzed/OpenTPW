@@ -88,8 +88,16 @@ is what makes a ride *do* anything, and it backs the remaining VM opcodes (T-007
      `ENDSLICE` or when a `WAIT`/`WAITANIM` rewinds the PC). `ENDSLICE` sets the yield flag (was a
      no-op). Verified in-game: a peep boards `totem` → its script loads, runs, and `SINGLESCREAM` fires
      (audible, repeating each ride cycle), no exceptions.
-   The coaster **motion** opcodes (`COAST`×12 in coaster1, `BUMP` in bumper/gokarts, `TOUR`/`TURBO`)
-   remain — they drive car objects and need the ride-engine/track tie.
+   - **Engine-opcode routing + log cleanup.** Now that scripts actually run, the live-firing engine
+     opcodes were spamming "No handler" (`COAST` ~20k/min from coaster1's load loop, plus `EVENT`,
+     `SETREVERB`). Routed `COAST`/`EVENT`/`EVENT_EXT`/`SETREVERB`/`DIPMUSIC` through `IRideEngine`
+     (78/106 opcodes now). **`COAST`** is RE'd as a multiplexed coaster-control opcode (subcommand map
+     above); its query subcommands (2 can-load?, 3 wants-off?) set the Zero flag so the load/unload
+     loops branch out, and `CRIT_LOCK`/`CRIT_UNLOCK` are now proper no-ops (single-threaded VM). Also
+     dropped the per-instruction `Step`/branch trace logging — with `RunSlice` running many instructions
+     per tick it flooded the log (a 48 s run went 35,880 → 149 lines). Real coaster car loading + motion
+     (and `BUMP`/`TOUR`/`TURBO`) still need the ride-engine/track tie — deferred; coaster1's load loop
+     idles rather than fully terminating until then.
 6. ⚠️ **Real park terrain + placement grid** — `PlacementGrid` (tile↔world, footprint, occupancy;
    jungle's 95×84 dims from `Standard.sam`, unit-tested) + `ParkTerrain` rendering the real jungle
    landscape (`terrain.wad`/`base.MD2`, 272 meshes — textured ground, water, paths) with rides placed

@@ -120,10 +120,9 @@ public partial class RideVM
 
 	public void Step()
 	{
-		var instruction = Instructions[CurrentPos++];
-		Log.Trace( $"Invoking {instruction.opcode} at position {CurrentPos}" );
-
-		instruction.Invoke();
+		// No per-instruction trace here: RunSlice runs many instructions per tick, so logging each one
+		// floods the log (tight ride loops fire thousands per second). Trace specific opcodes if needed.
+		Instructions[CurrentPos++].Invoke();
 	}
 
 	/// <summary>Set by the ENDSLICE opcode to yield the rest of this tick's slice (see <see cref="RunSlice"/>).</summary>
@@ -200,8 +199,6 @@ public partial class RideVM
 		}
 
 		CurrentPos = index + 1; // Ignore the leading NO-OP, as before.
-
-		Log.Trace( $"Branching to .label_{value} / {fileOffset} (location: {CurrentPos})" );
 	}
 
 	private TimeSince TimeSinceLastTick;

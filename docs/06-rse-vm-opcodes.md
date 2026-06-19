@@ -6,7 +6,7 @@ dispatched by the executor `FUN_00551cb0` (opcode word tagged `0x80`, bounds `< 
 table at `0x5567d8`). The **Operands** column is authoritative (the reflection dispatcher must
 match it). **Kind**: `pure` = VM-state only (done); `engine` = needs the ride engine.
 
-Status: **73 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus a growing set of
+Status: **78 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus a growing set of
 Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sound, the animation +
 `WAIT*` family, and now the **rider scream family** `STARTSCREAM`/`STOPSCREAM`/`SINGLESCREAM`/
 `SCREAMLEVEL`). See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md) / [T-032](tickets/T-032-ride-engine.md).
@@ -26,8 +26,8 @@ Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sou
 | 10 | `KILLOBJ` | 1 | ☐ | engine |
 | 11 | `FADEOBJ` | 1 | ☐ | engine |
 | 12 | `SETOBJPARAM` | 3 | ☐ | engine |
-| 13 | `EVENT` | 3 | ☐ | engine |
-| 14 | `EVENT_EXT` | 4 | ☐ | engine |
+| 13 | `EVENT` | 3 | ✅ | engine | ride event dispatch (routed; full sound/effect map is a follow-up) |
+| 14 | `EVENT_EXT` | 4 | ✅ | engine | as EVENT with an extra parameter |
 | 15 | `FLUSHANIM` | 0 | ☐ | engine |
 | 16 | `TRIGANIM` | 3 | ☐ | engine |
 | 17 | `WAITANIM` | 2 | ☐ | engine |
@@ -68,7 +68,7 @@ Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sou
 | 52 | `END` | 0 | ✅ | pure |
 | 53 | `TOUR` | 2 | ☐ | engine |
 | 54 | `BUMP` | 2 | ☐ | engine |
-| 55 | `COAST` | 2 | ☐ | engine |
+| 55 | `COAST` | 2 | ✅ | engine | coaster control, multiplexed by subcommand (1 load·2 can-load?·3 wants-off?·4 state·5 mode·6 capacity·7 worn·8 init); queries set the Zero flag |
 | 56 | `ADDHEAD` | 1 | ☐ | engine |
 | 57 | `DELHEAD` | 1 | ☐ | engine |
 | 58 | `LIMBO` | 2 | ☐ | engine |
@@ -116,7 +116,7 @@ Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sou
 | 100 | `HOUR` | 1 | ✅ | pure |
 | 101 | `MIN` | 1 | ✅ | pure |
 | 102 | `SEC` | 1 | ✅ | pure |
-| 103 | `SETREVERB` | 1 | ☐ | engine |
-| 104 | `DIPMUSIC` | 1 | ☐ | engine |
+| 103 | `SETREVERB` | 1 | ✅ | engine | audio reverb (routed) |
+| 104 | `DIPMUSIC` | 1 | ✅ | engine | duck background music (routed) |
 | 105 | `SPARK` | 4 | ☐ | engine |
 _Generated from the binary opcode table; method in docs/05-ghidra-reverse.md._

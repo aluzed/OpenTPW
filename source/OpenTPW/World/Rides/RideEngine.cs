@@ -228,6 +228,21 @@ public sealed class RideEngine : IRideEngine
 			screamGain = Math.Clamp( level / 100f, 0f, 1f );
 	}
 
+	// Coaster control, multiplexed by subcommand (RE'd from coaster1.rse): 1 load rider · 2 can-load? ·
+	// 3 peep-wants-off? · 4 set running/broken · 5 mode/closed · 6 capacity · 7 worn · 8 init. The query
+	// subcommands' Zero-flag result is set in the opcode handler so the script's load/unload loops yield
+	// rather than spin; real car loading + motion needs the coaster car/track engine (T-045) — deferred.
+	// Silent: coaster1's loops call this thousands of times per second, so it must not log.
+	public void Coast( int sub, int arg ) { }
+
+	// Ride event dispatch (sounds / effects / messages / music) — captured; full dispatch is a follow-up
+	// (it overlaps the .MAP audio catalog, T-016). Silent (called frequently in ride run loops).
+	public void Event( int type, int p1, int p2 ) { }
+
+	public void SetReverb( int level ) => Log.Trace( $"[ride] SETREVERB {level}" );
+
+	public void DipMusic( int amount ) => Log.Trace( $"[ride] DIPMUSIC {amount}" );
+
 	// Play the scream sound (approx asset mapping — T-016) at the given volume, and stamp the time so
 	// a sustained scream paces its re-triggers.
 	private void PlayScream( int code, float gain )

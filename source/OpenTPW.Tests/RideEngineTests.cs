@@ -34,6 +34,11 @@ public class RideEngineTests
 		public void StopScream() => Screams.Add( "stop" );
 		public void SingleScream( int code, int level ) => Screams.Add( $"single({code},{level})" );
 		public void SetScreamLevel( int level ) => Screams.Add( $"level({level})" );
+		public List<string> Effects = new(); // COAST / EVENT / SETREVERB / DIPMUSIC trace
+		public void Coast( int sub, int arg ) => Effects.Add( $"coast({sub},{arg})" );
+		public void Event( int type, int p1, int p2 ) => Effects.Add( $"event({type},{p1},{p2})" );
+		public void SetReverb( int level ) => Effects.Add( $"reverb({level})" );
+		public void DipMusic( int amount ) => Effects.Add( $"dip({amount})" );
 	}
 
 	private static RideVM NewVm()
@@ -126,6 +131,25 @@ public class RideEngineTests
 		vm.CallOpcodeHandler( Opcode.STOPSCREAM );
 
 		CollectionAssert.AreEqual( new[] { "start(0,20)", "level(50)", "single(0,90)", "stop" }, fake.Screams );
+	}
+
+	[TestMethod]
+	public void EffectOpcodesRouteToEngine()
+	{
+		var vm = NewVm();
+		var fake = new FakeEngine();
+		vm.Engine = fake;
+
+		vm.CallOpcodeHandler( Opcode.COAST, Lit( vm, 6 ), Lit( vm, 8 ) );   // set capacity
+		vm.CallOpcodeHandler( Opcode.EVENT, Lit( vm, 3 ), Lit( vm, -1 ), Lit( vm, 62 ) );
+		vm.CallOpcodeHandler( Opcode.SETREVERB, Lit( vm, 2 ) );
+		vm.CallOpcodeHandler( Opcode.DIPMUSIC, Lit( vm, 50 ) );
+		CollectionAssert.AreEqual( new[] { "coast(6,8)", "event(3,-1,62)", "reverb(2)", "dip(50)" }, fake.Effects );
+
+		// A COAST query subcommand sets the Zero flag so the coaster load/unload loop can branch out.
+		vm.Flags = RideVM.VMFlags.None;
+		vm.CallOpcodeHandler( Opcode.COAST, Lit( vm, 2 ), Lit( vm, 0 ) );
+		Assert.IsTrue( vm.Flags.HasFlag( RideVM.VMFlags.Zero ), "COAST query should set the Zero flag" );
 	}
 
 	[TestMethod]

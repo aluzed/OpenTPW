@@ -51,4 +51,18 @@ public interface IRideEngine
 
 	/// <summary>SCREAMLEVEL — set the scream volume level (0..100; &lt;0 = unchanged).</summary>
 	void SetScreamLevel( int level );
+
+	/// <summary>COAST — multiplexed coaster control (subcommand + arg). Subcommand map RE'd from
+	/// coaster1.rse: 1 load rider · 2 can-load? · 3 peep-wants-off? · 4 state · 5 mode · 6 capacity ·
+	/// 7 worn · 8 init. Query subcommands' Zero-flag result is set by the opcode handler.</summary>
+	void Coast( int sub, int arg );
+
+	/// <summary>EVENT / EVENT_EXT — fire a ride event (type + params): sounds, effects, messages, …</summary>
+	void Event( int type, int p1, int p2 );
+
+	/// <summary>SETREVERB — set the audio reverb preset/level.</summary>
+	void SetReverb( int level );
+
+	/// <summary>DIPMUSIC — briefly duck the background music.</summary>
+	void DipMusic( int amount );
 }

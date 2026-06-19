@@ -10,18 +10,14 @@ public partial class OpcodeHandlers
 			// Do nothing
 		}
 
-		[OpcodeHandler( Opcode.CRIT_LOCK, "Crit lock" )]
-		public static void CritLock( ref RideVM vm )
-		{
-			Log.Trace( "TODO: Crit lock" );
-		}
+		// CRIT_LOCK/CRIT_UNLOCK guard the script's critical section (e.g. the coaster load loop). With a
+		// single-threaded VM there's no contention, so they're no-ops. Not logged — ride loops fire them
+		// thousands of times per second.
+		[OpcodeHandler( Opcode.CRIT_LOCK, "Crit lock (no-op: single-threaded VM)." )]
+		public static void CritLock( ref RideVM vm ) { }
 
-		[OpcodeHandler( Opcode.CRIT_UNLOCK, "Crit unlock" )]
-		public static void CritUnlock( ref RideVM vm )
-		{
-			// Pairs with CRIT_LOCK; no critical-section machinery yet.
-			Log.Trace( "TODO: Crit unlock" );
-		}
+		[OpcodeHandler( Opcode.CRIT_UNLOCK, "Crit unlock (no-op: single-threaded VM)." )]
+		public static void CritUnlock( ref RideVM vm ) { }
 
 		[OpcodeHandler( Opcode.COPY, "Copy a value" )]
 		public static void Copy( ref RideVM vm, Operand dest, Operand source )
