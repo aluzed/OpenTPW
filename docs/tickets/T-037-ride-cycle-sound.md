@@ -52,13 +52,28 @@ The full chain that plays a ride's *intended* sound, decoded end to end:
    banks). The SFX `SoundEntries` (T-016) carry `{soundId, variations, params}` but **no filename**, so
    id→file needs the manager's registry reconstructed.
 
+## Done (global sound registry + correct EVENT sounds)
+
+- **Global sound registry decoded + implemented.** A ride sound id (`VAR_EVT*` / `EVENT` operands) is a
+  **global index across the category's banks concatenated** in BANK-catalog order — `cat_ridesBANK` →
+  `RideHD (0-69) · sfUiHD (70-89) · StaffHD (90-185) · KidsHD (186-992) · xKidsHD (993-1176)`. Verified:
+  id 14 → `RideHD:nl_creak_2`, 69 → `mortar_3`, 104 → `StaffHD:hamer002`, 200 → `KidsHD:fscE001` — all
+  plausible ride/peep/staff sounds. New `RideSoundBank` (lazy per-bank load) resolves id → sample;
+  `RideSoundBankTests` lock in the mapping against the real banks.
+- **`EVENT` plays the ride's real sounds.** Types **1 & 2** are dedicated positioned sounds (RE'd:
+  dispatch `FUN_005573d0` → `FUN_00521e60` / `FUN_00521930`); the engine resolves their `code` through
+  the registry and plays it (e.g. a coaster's `nl_creak` track creak), debounced so a looped event
+  doesn't restart the clip every tick. **Types 3-9** use the generic effect spawn (sound *or* particle)
+  and resolve unreliably (type-3 codes 76-78 are `sfUi`/build clips, not ride sounds), so they're
+  deferred rather than risk wrong sounds. Verified in-game: only correct sounds (creaks), 0
+  `Backfire`/`Crunch`/`bomb`/`goldticket`.
+
 ## Remaining work
 
-- **Reconstruct the global sound registry** (banks + SFX catalogs → `id → (bank, index, file)`), then
-  wire `EventMap` (`VAR_EVT`) + `EVENT`/`ADDOBJ` through it to play the **correct** asset. This is the
-  meat of the **EVENT effects engine** (T-032 roadmap). Deliberately **not guessed** here — an
-  approximate id→file mapping reintroduces the wrong-sound bug this ticket just removed. Positioned 3D
-  audio (`FUN_00556b90`) and the particle pools are further stages.
+- **`EVENT` types 3-9 + `EventMap`/`COAST`/`BUMP` + `ADDOBJ` sounds**: wire these through the registry
+  once each opcode's sound semantics are RE'd (the type-3+ pools, and which `COAST`/`BUMP` subcommand
+  plays which `VAR_EVT` slot). The id→file half is now solved; this is the per-trigger half.
+- **3D positioning** (`FUN_00556b90`) and the particle pools are further stages of the effects engine.
 
 ## Acceptance criteria
 

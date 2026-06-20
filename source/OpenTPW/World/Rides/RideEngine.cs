@@ -270,9 +270,45 @@ public sealed class RideEngine : IRideEngine
 	// Silent: coaster1's loops call this thousands of times per second, so it must not log.
 	public void Coast( int sub, int arg ) { }
 
-	// Ride event dispatch (sounds / effects / messages / music) — captured; full dispatch is a follow-up
-	// (it overlaps the .MAP audio catalog, T-016). Silent (called frequently in ride run loops).
-	public void Event( int type, int p1, int p2 ) { }
+	private readonly Dictionary<int, float> lastEventAt = new();
+	private const float EventDebounce = 0.5f; // ride loops re-fire EVENT each tick — don't restart too fast
+
+	// Ride event dispatch. EVENT(type, target, code): types 1 & 2 are **dedicated positioned sounds**
+	// (RE'd: dispatch FUN_005573d0 routes them to the sound funcs FUN_00521e60 / FUN_00521930), so we
+	// play sound `code` — a global sound id resolved through the verified RideSoundBank (real ride
+	// sounds, no more approximate clips). Types 3-9 use the generic effect spawn (sound OR particle) and
+	// can't be safely played as sound yet (e.g. type-3 codes 76-78 are sfUi/build clips, not ride
+	// sounds), so they're deferred. 3D positioning is also a follow-up. See T-037.
+	public void Event( int type, int p1, int p2 )
+	{
+		if ( type is not (1 or 2) )
+			return;
+		var track = SoundRegistry?.Resolve( p2 );
+		if ( track == null )
+			return;
+		if ( Time.Now - lastEventAt.GetValueOrDefault( p2, float.NegativeInfinity ) < EventDebounce )
+			return;
+		lastEventAt[p2] = Time.Now;
+		Audio.PlaySfx( $"ev_{track.Name}", track.SoundData );
+		Log.Trace( $"[ride] EVENT t{type} code={p2} -> {track.Name}" );
+	}
+
+	// The ride sound registry (global sound ids → samples), built once from the rides BANK catalog.
+	private static RideSoundBank? soundRegistry;
+	private static bool soundRegistryTried;
+	private static RideSoundBank? SoundRegistry
+	{
+		get
+		{
+			if ( !soundRegistryTried )
+			{
+				soundRegistryTried = true;
+				soundRegistry = RideSoundBank.FromBankCatalog(
+					Path.Join( GameDir.GamePath, "data", "global", "sound", "cat_ridesBANK.map" ) );
+			}
+			return soundRegistry;
+		}
+	}
 
 	public void SetReverb( int level ) => Log.Trace( $"[ride] SETREVERB {level}" );
 
