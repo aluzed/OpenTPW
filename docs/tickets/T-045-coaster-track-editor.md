@@ -2,13 +2,15 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine / UI / reverse engineering
-- **Status**: ⚠️ Slices 1–3b (boarding+scream) done — the coaster **station** is placeable via the build
-  catalog and renders/queues like any ride, a **track-laying tool** extends elevated track segments from
-  the station's `>` connector and **closes into a circuit** at the `<` entry connector, a **train of
-  real `CrocCar.MD2` cars** runs the track (shuttling when open, a continuous loop when closed), **real
-  peeps board the train** (they ride it in view from their queue, replacing the seat-marker stand-ins)
-  and the **rider scream** plays while anyone is aboard. Remaining (slice 3b polish): authentic curved
-  track-piece geometry / rail profile from `.hmp`, and segment rotation / `STACKUP/DOWN` elevation editing.
+- **Status**: ⚠️ Slices 1–3b done — the coaster **station** is placeable via the build catalog and
+  renders/queues like any ride, a **track-laying tool** extends elevated track segments from the
+  station's `>` connector and **closes into a circuit** at the `<` entry connector, a **train of real
+  `CrocCar.MD2` cars** runs the track (shuttling when open, a continuous loop when closed), **real peeps
+  board the train** (they ride it in view from their queue, replacing the seat-marker stand-ins) with the
+  **rider scream** while occupied, the track is rendered as a **rail+sleeper profile** (a continuous bed
+  carrying two raised running rails + cross-ties) on height-aware pylons, and **`STACKUP/DOWN` elevation
+  editing** (`PageUp`/`PageDown`) raises/lowers the head segment to build hills. Only nice-to-haves remain
+  (see below): exact rail spacing from the decoded `.hmp`, and per-segment rotation.
 - **Parent**: [T-038](T-038-park-management-ui.md). **Needs**: [T-041](T-041-ride-shop-placement.md).
   **Related**: [T-032](T-032-ride-engine.md), [T-033](T-033-ride-animation-keyframes.md).
 
@@ -104,11 +106,27 @@
   board the train (logged `peep boarded train (n/6 seats)`, seats filling), and `STARTSCREAM`/`STOPSCREAM`
   bracket the occupancy. Build clean (0 errors), 65/0 tests.
 
-## Remaining slices
+## Done (slice 3b — rail profile + elevation)
 
-3b (polish). **Authentic pieces** — authoring the track profile from the `.hmp` templates (rails +
-    cross-ties geometry) rather than a flat textured ribbon strip, and 3D *curved* piece meshes.
-    Rotation / `STACKUP/DOWN` elevation editing of segments also lands here.
+- **Rail+sleeper track profile**: `CoasterTrack.RebuildRibbon` now generates a continuous track bed with
+  two raised running rails offset ±gauge from the centre-line and periodic cross-ties (sleepers) along
+  it, via an `AddStrip(offset, halfWidth, lift)` helper, replacing the old single flat textured ribbon —
+  so a built track reads as a real coaster track. Still the `Trak_sec` texture on the `unlit` shader.
+- **Per-segment elevation (`STACKUP`/`STACKDOWN`)**: a per-tile `rise` offset (parallel to the tile list)
+  feeds `WorldPath`, so the ridden spline + rendered rails + train all follow the raised profile. New
+  segments inherit the head's height (raise once, then keep laying to extend a slope); the loop-closing
+  tile snaps back to the station height. `CoasterTrack.StackHead(±1)` steps the head up/down (clamped to
+  stay above ground), repositions that segment's height-aware pylon and rebuilds the ribbon; `BuildMode`
+  binds it to `PageUp`/`PageDown`. Verified via `OPENTPW_AUTOPLACE` (raises a mid-track hill while laying
+  the auto ring): `autotrack segments=9 closed=True`, no exceptions, 71/0 tests.
+
+## Remaining (nice-to-have)
+
+- Exact rail gauge / cross-tie spacing + curved-piece meshes authored from the decoded `.hmp` templates
+  (the profile is currently a sensible procedural approximation, not `.hmp`-driven — the `.hmp` format is
+  only recon'd, see above).
+- Per-segment **rotation** (`ACTION_COASTER_ROTATE`) — limited value for a grid-aligned tile track, so
+  deferred.
 
 ## Context
 

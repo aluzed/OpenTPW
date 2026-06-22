@@ -154,8 +154,12 @@ public sealed class BuildMode : Entity
 			else if ( SelectedRide is { } cr && cr.Shape.HasTrack )
 				track = new CoasterTrack( cr, grid, terrain );
 		}
-		if ( track != null && Hit( Key.B ) )
-			track.Backtrack();
+		if ( track != null )
+		{
+			if ( Hit( Key.B ) ) track.Backtrack();
+			if ( Hit( Key.PageUp ) ) track.StackHead( +1 );   // raise the head segment (build a hill)
+			if ( Hit( Key.PageDown ) ) track.StackHead( -1 ); // lower it (build a dip)
+		}
 
 		prevDown.Clear();
 		foreach ( var k in down )

@@ -17,6 +17,7 @@ public sealed class CoasterTrack
 	private readonly Texture trackTex;
 	private readonly Material<ObjectUniformBuffer> ribbonMat;
 	private readonly List<(int X, int Y)> tiles = new();
+	private readonly List<float> rise = new();          // per-tile height offset above the base track height (STACKUP/DOWN)
 	private readonly List<ModelEntity> pylons = new(); // one support per laid segment
 	private readonly CoasterTrain train;
 	private readonly (int X, int Y)? trackInTile; // the station's '<' entry connector, where the loop closes
@@ -51,6 +52,7 @@ public sealed class CoasterTrack
 		// Anchor at the station's track-out connector (fall back to track-in / centre).
 		var c = coaster.Shape.TrackOut ?? coaster.Shape.TrackIn ?? (coaster.TileW / 2, coaster.TileH / 2);
 		tiles.Add( (coaster.TileX + c.X, coaster.TileY + c.Y) );
+		rise.Add( 0f ); // the station connector stays at the base track height
 
 		// The entry connector (if any, and distinct from the anchor) is where laying back closes the loop.
 		if ( coaster.Shape.TrackIn is { } ti )
@@ -69,10 +71,11 @@ public sealed class CoasterTrack
 	public List<Vector3> WorldPath()
 	{
 		var pts = new List<Vector3>( tiles.Count );
-		foreach ( var (tx, ty) in tiles )
+		for ( int i = 0; i < tiles.Count; i++ )
 		{
+			var (tx, ty) = tiles[i];
 			var c = grid.TileToWorld( tx, ty );
-			pts.Add( c.WithZ( terrain.SampleHeight( c.X, c.Y ) + TrackHeight ) );
+			pts.Add( c.WithZ( terrain.SampleHeight( c.X, c.Y ) + TrackHeight + rise[i] ) );
 		}
 		return pts;
 	}
@@ -106,9 +109,31 @@ public sealed class CoasterTrack
 		if ( !CanExtend( tx, ty ) )
 			return false;
 		tiles.Add( (tx, ty) );
-		SpawnPylon( tx, ty );
+		rise.Add( rise[^1] ); // a new segment continues at the current head's height (build a slope by raising first)
 		if ( (tx, ty) == trackInTile )
-			IsClosed = true; // laid back to the station entry — the circuit is complete
+		{
+			IsClosed = true;  // laid back to the station entry — the circuit is complete
+			rise[^1] = 0f;     // the entry connector meets the station at the base height
+		}
+		SpawnPylon( tx, ty, rise[^1] );
+		RebuildRibbon();
+		return true;
+	}
+
+	/// <summary>Raise (<paramref name="dir"/> &gt; 0) or lower the head segment a step (T-045 3b
+	/// STACKUP/STACKDOWN), so the player can build hills. Clamped so the track stays above ground; a closed
+	/// circuit's closing tile is fixed at the station height and can't be moved.</summary>
+	public bool StackHead( int dir )
+	{
+		if ( tiles.Count <= 1 || IsClosed )
+			return false;
+		float step = TrackHeight * 0.5f;
+		float next = Math.Clamp( rise[^1] + dir * step, -TrackHeight * 0.6f, TrackHeight * 4f );
+		if ( MathF.Abs( next - rise[^1] ) < 1e-3f )
+			return false;
+		rise[^1] = next;
+		if ( pylons.Count > 0 )
+			PositionPylon( pylons[^1], Head.X, Head.Y, rise[^1] );
 		RebuildRibbon();
 		return true;
 	}
@@ -120,6 +145,7 @@ public sealed class CoasterTrack
 			return;
 		IsClosed = false; // removing the head reopens a closed circuit (the head was the closing tile)
 		tiles.RemoveAt( tiles.Count - 1 );
+		rise.RemoveAt( rise.Count - 1 );
 		if ( pylons.Count > 0 )
 		{
 			Entity.All.Remove( pylons[^1] );
@@ -142,22 +168,35 @@ public sealed class CoasterTrack
 			coaster.Train = null;
 	}
 
-	// A slim grey pillar from the ground up to the track, under the laid tile's centre.
-	private void SpawnPylon( int tx, int ty )
+	// A slim grey pillar from the ground up to the (possibly raised) track, under the laid tile's centre.
+	private void SpawnPylon( int tx, int ty, float riseVal )
+	{
+		var pylonMat = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader" );
+		pylonMat.Set( "Color", new Texture( [90, 90, 105, 255], 1, 1 ) );
+		var e = new ModelEntity { Model = Primitives.Cube.GenerateModel( pylonMat ) };
+		PositionPylon( e, tx, ty, riseVal );
+		pylons.Add( e );
+	}
+
+	// Size + place a pylon so it spans the ground up to the track top at this tile's height.
+	private void PositionPylon( ModelEntity e, int tx, int ty, float riseVal )
 	{
 		var c = grid.TileToWorld( tx, ty );
 		float gz = terrain.SampleHeight( c.X, c.Y );
-		var pylonMat = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader" );
-		pylonMat.Set( "Color", new Texture( [90, 90, 105, 255], 1, 1 ) );
-		pylons.Add( new ModelEntity
-		{
-			Model = Primitives.Cube.GenerateModel( pylonMat ),
-			Position = c.WithZ( gz + TrackHeight / 2f ),
-			Scale = new Vector3( 1.5f, 1.5f, TrackHeight / 2f ),
-		} );
+		float h = MathF.Max( 2f, TrackHeight + riseVal );
+		e.Position = c.WithZ( gz + h / 2f );
+		e.Scale = new Vector3( 1.5f, 1.5f, h / 2f );
 	}
 
-	// Generate the smooth track surface as a textured ribbon following the ridden centre-line.
+	// Authentic-ish track profile (T-045 slice 3b): a continuous track bed carrying two raised running rails
+	// along the ridden centre-line with periodic cross-ties (sleepers), replacing the old flat textured
+	// strip — so a built track reads as a real coaster track. The train still runs the centre-line.
+	private const float RailGauge = 0.16f;   // ×TileSize: half-distance between the two rails
+	private const float RailHalfWidth = 0.03f; // ×TileSize: half-width of a rail strip
+	private const float RailRise = 0.05f;      // ×TileSize: rails sit a little above the tie deck
+	private const float TieHalfLength = 0.22f; // ×TileSize: cross-tie reach along travel
+	private const int TieEvery = 4;            // a cross-tie every N spline points (~2 ties / tile at sub=8)
+
 	private void RebuildRibbon()
 	{
 		var pts = SmoothedPath();
@@ -167,27 +206,66 @@ public sealed class CoasterTrack
 			return;
 		}
 
-		float halfW = grid.TileSize * 0.25f;
-		var verts = new List<Vertex>( pts.Count * 2 );
-		float cum = 0f;
+		float ts = grid.TileSize;
+		float gauge = ts * RailGauge, railHalf = ts * RailHalfWidth, rise = ts * RailRise, tieLen = ts * TieHalfLength;
+
+		// A horizontal frame (position + perpendicular-to-travel) at each centre-line point.
+		var pos = new Vector3[pts.Count];
+		var perp = new Vector3[pts.Count];
+		var tan = new Vector3[pts.Count];
 		for ( int i = 0; i < pts.Count; i++ )
 		{
 			var prev = pts[Math.Max( i - 1, 0 )];
 			var next = pts[Math.Min( i + 1, pts.Count - 1 )];
-			var dir = next - prev;
-			var perp = new Vector3( -dir.Y, dir.X, 0f ).Normal; // horizontal, perpendicular to travel
-			if ( i > 0 ) cum += pts[i].Distance( pts[i - 1] );
-			float v = cum / grid.TileSize; // repeat the texture roughly once per tile of length
-			verts.Add( new Vertex { Position = pts[i] + perp * halfW, Normal = Vector3.Up, TexCoords = new Vector2( 0f, v ) } );
-			verts.Add( new Vertex { Position = pts[i] - perp * halfW, Normal = Vector3.Up, TexCoords = new Vector2( 1f, v ) } );
+			var dir = (next - prev).Normal;
+			pos[i] = pts[i];
+			perp[i] = new Vector3( -dir.Y, dir.X, 0f ).Normal;
+			tan[i] = dir;
 		}
 
-		var idx = new List<uint>( (pts.Count - 1) * 6 );
-		for ( int i = 0; i < pts.Count - 1; i++ )
+		var verts = new List<Vertex>( pts.Count * 6 + pts.Count / TieEvery * 4 );
+		var idx = new List<uint>();
+
+		// A strip centred `offset` from the centre-line, `halfWidth` wide, raised `lift` — used for the
+		// continuous track bed (offset 0) and for the two running rails (offset ±gauge, lifted onto the bed).
+		void AddStrip( float offset, float halfWidth, float lift )
 		{
-			uint a = (uint)(2 * i), b = a + 1, c = a + 2, d = a + 3;
-			idx.Add( a ); idx.Add( b ); idx.Add( c );
-			idx.Add( b ); idx.Add( d ); idx.Add( c );
+			uint baseIdx = (uint)verts.Count;
+			float cum = 0f;
+			for ( int i = 0; i < pts.Count; i++ )
+			{
+				if ( i > 0 ) cum += pts[i].Distance( pts[i - 1] );
+				float v = cum / ts;
+				var c = pos[i] + perp[i] * offset + Vector3.Up * lift;
+				verts.Add( new Vertex { Position = c + perp[i] * halfWidth, Normal = Vector3.Up, TexCoords = new Vector2( 0f, v ) } );
+				verts.Add( new Vertex { Position = c - perp[i] * halfWidth, Normal = Vector3.Up, TexCoords = new Vector2( 1f, v ) } );
+			}
+			for ( int i = 0; i < pts.Count - 1; i++ )
+			{
+				uint a = baseIdx + (uint)(2 * i), b = a + 1, c = a + 2, d = a + 3;
+				idx.Add( a ); idx.Add( b ); idx.Add( c );
+				idx.Add( b ); idx.Add( d ); idx.Add( c );
+			}
+		}
+		float tieReach = gauge + railHalf * 2f;
+		AddStrip( 0f, tieReach, 0f );      // continuous track bed (reads as solid from a distance)
+		AddStrip( -gauge, railHalf, rise ); // left running rail, lifted onto the bed
+		AddStrip( +gauge, railHalf, rise ); // right running rail
+
+		// Cross-ties: a short quad spanning the bed every few points (the "sleepers"), just above the bed.
+		float tieLift = rise * 0.5f;
+		for ( int i = 0; i < pts.Count; i += TieEvery )
+		{
+			var step = tan[i] * tieLen;
+			var l = pos[i] + perp[i] * (-tieReach) + Vector3.Up * tieLift;
+			var r = pos[i] + perp[i] * tieReach + Vector3.Up * tieLift;
+			uint bi = (uint)verts.Count;
+			verts.Add( new Vertex { Position = l - step, Normal = Vector3.Up, TexCoords = new Vector2( 0f, 0f ) } );
+			verts.Add( new Vertex { Position = r - step, Normal = Vector3.Up, TexCoords = new Vector2( 1f, 0f ) } );
+			verts.Add( new Vertex { Position = l + step, Normal = Vector3.Up, TexCoords = new Vector2( 0f, 1f ) } );
+			verts.Add( new Vertex { Position = r + step, Normal = Vector3.Up, TexCoords = new Vector2( 1f, 1f ) } );
+			idx.Add( bi ); idx.Add( bi + 1 ); idx.Add( bi + 2 );
+			idx.Add( bi + 1 ); idx.Add( bi + 3 ); idx.Add( bi + 2 );
 		}
 
 		var model = new Model( verts.ToArray(), idx.ToArray(), ribbonMat );

@@ -99,9 +99,13 @@ public class Level
 				for ( int x = right - 1; x >= left; x-- ) loop.Add( (x, top) ); // across the top
 				for ( int y = top + 1; y <= ty; y++ ) loop.Add( (left, y) );    // down the left side
 				loop.Add( (tx, ty) );                                           // into the entry connector
+				int laid = 0;
 				foreach ( var (lx, ly) in loop )
+				{
 					if ( !t.Extend( lx, ly ) )
 						break;
+					if ( ++laid == 3 ) { t.StackHead( +1 ); t.StackHead( +1 ); } // raise a mid-track hill (T-045 3b)
+				}
 				Log.Info( $"[build] autotrack segments={t.SegmentCount} closed={t.IsClosed}" );
 			}
 
