@@ -81,9 +81,11 @@ public class Level
 				+ $"monkey={CommitPlacement( Item( "monkey" ), grid, terrain, cx + 1, cy - 2 )} "
 				+ $"coaster={CommitPlacement( Item( "coaster1" ), grid, terrain, cx - 6, cy + 4 )} "
 				+ $"shop={CommitPlacement( Item( "shop" ), grid, terrain, cx + 6, cy + 4 )} "
+				+ $"drink={CommitPlacement( Item( "drink" ), grid, terrain, cx + 6, cy + 1 )} "
 				+ $"ent={CommitPlacement( Item( "entertainer" ), grid, terrain, cx, cy + 2 )} "
 				+ $"hand={CommitPlacement( Item( "handyman" ), grid, terrain, cx + 2, cy + 2 )} "
-				+ $"rsch={CommitPlacement( Item( "researcher" ), grid, terrain, cx + 4, cy + 2 )}" );
+				+ $"rsch={CommitPlacement( Item( "researcher" ), grid, terrain, cx + 4, cy + 2 )} "
+				+ $"guard={CommitPlacement( Item( "guard" ), grid, terrain, cx, cy )}" ); // guard patrols the centre (T-039 vandalism deterrence)
 
 			// Lay a coaster track that loops around the station back to its '<' entry connector, so the
 			// CoasterTrack closes into a circuit and its train (slice 3) runs a continuous loop.
@@ -149,7 +151,8 @@ public class Level
 			var shape = RideShape.Load( path, name );
 			list.Add( new BuildCatalogItem( name, path, null, shape.Width, shape.Height, ReadRideCost( path, name ) ) );
 		}
-		list.Add( new BuildCatalogItem( "shop", null, null, 2, 2, 500f ) );
+		list.Add( new BuildCatalogItem( "shop", null, null, 2, 2, 500f ) );  // food stall (satisfies hunger)
+		list.Add( new BuildCatalogItem( "drink", null, null, 2, 2, 450f ) ); // drink stall (satisfies thirst, T-039)
 		list.Add( new BuildCatalogItem( "entertainer", null, StaffRole.Entertainer, 1, 1, 800f ) );
 		list.Add( new BuildCatalogItem( "handyman", null, StaffRole.Handyman, 1, 1, 600f ) );
 		list.Add( new BuildCatalogItem( "guard", null, StaffRole.Guard, 1, 1, 1000f ) );
@@ -178,7 +181,9 @@ public class Level
 		if ( item.Staff is { } role )
 		{
 			var c = grid.TileToWorld( tx, ty );
-			_ = new Staff( role, terrain, c.WithZ( 0 ), roam: 70f );
+			// A wide patrol radius so staff actually cover the park — guards reach the queue backs where
+			// unhappy peeps vandalise, handymen reach far litter, entertainers cover more of the crowd (T-039).
+			_ = new Staff( role, terrain, c.WithZ( 0 ), roam: 160f );
 			fin?.PayBuild( item.Cost );
 			return true;
 		}
@@ -187,7 +192,7 @@ public class Level
 			return false;
 
 		bool ok = item.RidePath == null
-			? SpawnShopAt( terrain, grid, tx, ty )
+			? SpawnShopAt( terrain, grid, tx, ty, item.Name == "drink" ? ShopKind.Drink : ShopKind.Food )
 			: SpawnRideAt( item.RidePath, grid, terrain, tx, ty );
 
 		if ( !ok )
@@ -225,10 +230,10 @@ public class Level
 		catch ( Exception e ) { Log.Warning( $"[build] ride '{path}' failed: {e.Message}" ); return false; }
 	}
 
-	private static bool SpawnShopAt( ParkTerrain terrain, PlacementGrid grid, int tx, int ty )
+	private static bool SpawnShopAt( ParkTerrain terrain, PlacementGrid grid, int tx, int ty, ShopKind kind )
 	{
 		var c = grid.TileToWorld( tx, ty, 2, 2 );
-		_ = new Shop( terrain, c );
+		_ = new Shop( terrain, c, kind );
 		return true;
 	}
 
@@ -341,7 +346,8 @@ public class Level
 		if ( Environment.GetEnvironmentVariable( "OPENTPW_ECON_DEBUG" ) != null && ParkFinances.Current is { } f && Time.Now > nextEconLog )
 		{
 			nextEconLog = Time.Now + 5f;
-			Log.Info( $"[econ] money={f.Money:0}  ride+={f.RideRevenue:0}  entry+={f.EntryRevenue:0}  food+={f.FoodRevenue:0}  upkeep-={f.UpkeepPaid:0}  wages-={f.WagesPaid:0}" );
+			Log.Info( $"[econ] money={f.Money:0}  ride+={f.RideRevenue:0}  entry+={f.EntryRevenue:0}  shop+={f.FoodRevenue:0}  upkeep-={f.UpkeepPaid:0}  wages-={f.WagesPaid:0}"
+				+ $"  vandalism={Peep.VandalismActs} deterred={Peep.VandalismDeterred}" );
 		}
 	}
 

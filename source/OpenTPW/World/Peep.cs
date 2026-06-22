@@ -21,8 +21,17 @@ public sealed class Peep : ModelEntity
 	private const float LitterRadius = 18f;          // litter within this sours the mood
 	private const float LitterPenaltyPerSec = 1.5f;  // happiness lost per second per nearby litter (capped)
 	private const float HungerPerSec = 2f;           // hunger builds while in the park (0..100)
-	private const float HungerThreshold = 55f;        // detour to a shop for a snack at this point
+	private const float HungerThreshold = 55f;        // detour to a food stall at this point
+	private const float ThirstPerSec = 2.6f;          // thirst builds a little faster than hunger (0..100)
+	private const float ThirstThreshold = 50f;        // detour to a drink stall at this point
+	private const float VandalHappiness = 28f;        // a peep this unhappy may vandalise (well above LeaveHappiness, so there's a window to act before giving up)
+	private const float VandalChancePerSec = 0.14f;   // ~1 act every ~7 s while unhappy and unwatched
 	private const float WalkFps = 8f;                // walk-cycle frames per second
+
+	/// <summary>Park-wide tallies (T-039): vandalism acts committed, and would-be acts a nearby guard
+	/// stopped — so a guard's effect on vandalism is measurable.</summary>
+	public static int VandalismActs { get; private set; }
+	public static int VandalismDeterred { get; private set; }
 
 	// A small palette of clothing colours so the crowd reads as varied people.
 	private static readonly (byte R, byte G, byte B)[] Palette =
@@ -56,6 +65,7 @@ public sealed class Peep : ModelEntity
 	private float happiness = StartHappiness;
 	private float energy = MaxEnergy;
 	private float hunger;
+	private float thirst;
 
 	// Sprite animation state (real sprite path only).
 	private readonly float spriteHeight;
@@ -143,13 +153,17 @@ public sealed class Peep : ModelEntity
 			return;
 		}
 
-		// Detouring to a shop: walk there (routing around rides), buy a snack (park income), then resume.
+		// Detouring to a stall: walk there (routing around rides), buy (park income), satisfy the matching
+		// need (food → hunger, drink → thirst), then resume riding.
 		if ( shopTarget != null )
 		{
 			if ( MoveTo( shopTarget.Position ) )
 			{
 				ParkFinances.Current?.TakeFoodSale( shopTarget.Price );
-				hunger = 0f;
+				if ( shopTarget.Kind == ShopKind.Drink )
+					thirst = 0f;
+				else
+					hunger = 0f;
 				shopTarget = null;
 				ResetPath();
 				PickRoute();
@@ -176,21 +190,48 @@ public sealed class Peep : ModelEntity
 		if ( nearbyLitter > 0 )
 			happiness = Math.Max( 0f, happiness - LitterPenaltyPerSec * nearbyLitter * Time.Delta );
 
+		// A miserable visitor vandalises — scattering litter around it — unless a guard is close enough to
+		// stop it (the guard's deterrence is what makes guards worth hiring; both outcomes are tallied).
+		if ( happiness <= VandalHappiness && Random.Shared.NextDouble() < VandalChancePerSec * Time.Delta )
+		{
+			if ( Staff.GuardNear( Position ) )
+			{
+				VandalismDeterred++;
+			}
+			else
+			{
+				Vandalise();
+				VandalismActs++;
+			}
+		}
+
 		if ( WantsToLeave() )
 		{
 			BeginLeaving();
 			return;
 		}
 
-		// Getting peckish: leave the ride line and head for the nearest shop for a snack.
+		// Getting peckish / parched: leave the ride line and head for the matching stall. Thirst is checked
+		// first when it's the more pressing need, so a hot, thirsty peep buys a drink before a snack.
 		hunger += HungerPerSec * Time.Delta;
-		if ( hunger >= HungerThreshold && Shop.Stalls.Count > 0 )
+		thirst += ThirstPerSec * Time.Delta;
+		bool wantsDrink = thirst >= ThirstThreshold;
+		bool wantsFood = hunger >= HungerThreshold;
+		if ( wantsDrink || wantsFood )
 		{
-			route?.Dequeue( this );
-			route = null;
-			ResetPath();
-			shopTarget = NearestShop();
-			return;
+			// Prefer whichever need is the more urgent (relative to its threshold), if that stall exists.
+			bool drinkFirst = wantsDrink && (!wantsFood || thirst / ThirstThreshold >= hunger / HungerThreshold);
+			var target = drinkFirst
+				? (Shop.Nearest( ShopKind.Drink, Position ) ?? Shop.Nearest( ShopKind.Food, Position ))
+				: (Shop.Nearest( ShopKind.Food, Position ) ?? Shop.Nearest( ShopKind.Drink, Position ));
+			if ( target != null )
+			{
+				route?.Dequeue( this );
+				route = null;
+				ResetPath();
+				shopTarget = target;
+				return;
+			}
 		}
 
 		// Stand at my place in line (front = the entrance, each place back steps one waypoint out), and
@@ -251,6 +292,7 @@ public sealed class Peep : ModelEntity
 		happiness = StartHappiness;
 		energy = MaxEnergy;
 		hunger = 0f;
+		thirst = 0f;
 		lastRoute = null;
 		ParkFinances.Current?.TakeEntryFee(); // a fresh visitor pays the gate
 		PickRoute();
@@ -356,6 +398,10 @@ public sealed class Peep : ModelEntity
 	/// <summary>An entertainer lifts this peep's mood (capped at full); a happier peep stays longer.</summary>
 	public void Cheer( float amount ) => happiness = Math.Min( 100f, happiness + amount );
 
+	/// <summary>True when this peep is unhappy enough to vandalise — guards patrol toward these so their
+	/// deterrence actually lands where the trouble is (T-039). Not while riding (it's off wandering then).</summary>
+	public bool Unhappy => !riding && !leaving && happiness <= VandalHappiness;
+
 	/// <summary>Place this peep on a moving coaster seat (T-045 3b): sit at <paramref name="seat"/> and
 	/// keep facing the camera. Called by the <see cref="CoasterTrain"/> each frame while the peep is aboard;
 	/// the peep's own update skips its walk logic while riding, so the train fully owns its transform.</summary>
@@ -365,22 +411,15 @@ public sealed class Peep : ModelEntity
 		FaceCamera();
 	}
 
-	// The closest shop to head to when hungry (null if the park has none).
-	private Shop? NearestShop()
+	// Act of vandalism: scatter a couple of pieces of litter around the peep (a mess a handyman must then
+	// clean), venting a little of its frustration so it doesn't immediately do it again.
+	private void Vandalise()
 	{
-		Shop? best = null;
-		float bestD2 = float.MaxValue;
-		foreach ( var s in Shop.Stalls )
-		{
-			float dx = s.Position.X - Position.X, dy = s.Position.Y - Position.Y;
-			float d2 = dx * dx + dy * dy;
-			if ( d2 < bestD2 )
-			{
-				bestD2 = d2;
-				best = s;
-			}
-		}
-		return best;
+		_ = new Litter( Position );
+		var off = new Vector3( ((float)Random.Shared.NextDouble() - 0.5f) * LitterRadius,
+			((float)Random.Shared.NextDouble() - 0.5f) * LitterRadius, 0 );
+		_ = new Litter( Position + off );
+		happiness = Math.Min( 100f, happiness + 6f );
 	}
 
 	// Litter within reach, capped so a single filthy spot doesn't drive happiness down instantly.

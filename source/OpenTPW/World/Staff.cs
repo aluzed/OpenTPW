@@ -101,7 +101,7 @@ public sealed class Staff : ModelEntity
 		switch ( role )
 		{
 			case StaffRole.Handyman: DoHandyman(); break;
-			case StaffRole.Guard: WanderStep(); break;     // patrol
+			case StaffRole.Guard: DoGuard(); break;         // patrol toward trouble (unhappy peeps)
 			case StaffRole.Researcher: WanderStep(); break; // research is off-screen (T-044)
 			default: DoEntertainer(); break;
 		}
@@ -158,6 +158,32 @@ public sealed class Staff : ModelEntity
 			if ( dx * dx + dy * dy <= r2 )
 				peep.Cheer( lift );
 		}
+	}
+
+	// Patrol toward the nearest unhappy (would-be vandal) peep so the guard's deterrence lands where the
+	// trouble actually is; wander when the crowd is content. This is what makes guards measurably cut
+	// vandalism (a lone guard standing still almost never coincides with a vandal). See T-039.
+	private const float GuardSeekRange = 600f; // a guard notices trouble most of the way across the park
+	private void DoGuard()
+	{
+		Peep? trouble = null;
+		float bestD2 = GuardSeekRange * GuardSeekRange;
+		foreach ( var e in Entity.All )
+		{
+			if ( e is not Peep { Unhappy: true } p )
+				continue;
+			float dx = p.Position.X - Position.X, dy = p.Position.Y - Position.Y;
+			float d2 = dx * dx + dy * dy;
+			if ( d2 < bestD2 )
+			{
+				bestD2 = d2;
+				trouble = p;
+			}
+		}
+		if ( trouble != null )
+			WalkToward( trouble.Position );
+		else
+			WanderStep();
 	}
 
 	// Head for the nearest litter and pick it up; wander if the park is clean.
