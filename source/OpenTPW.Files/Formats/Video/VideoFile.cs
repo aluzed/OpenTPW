@@ -123,9 +123,9 @@ public sealed class VideoFile : BaseFormat
 	};
 
 	/// <summary>
-	/// Decodes the EA-ADPCM audio track to 16-bit PCM. Reverse-engineered + verified: the
-	/// decoded sample count matches the SCHl header and the waveform is coherent audio.
-	/// Only stereo (the format used by TPW movies) is implemented.
+	/// Decodes the EA-ADPCM audio track to 16-bit PCM. Reverse-engineered + verified: the decoded sample
+	/// count matches the SCHl header and the waveform is coherent audio. Both <b>stereo</b> (verified on a
+	/// real <c>BF.TGQ</c>) and <b>mono</b> (the disc's speech-style single-channel layout) are supported.
 	/// </summary>
 	public DecodedAudio DecodeAudio()
 	{
@@ -134,16 +134,21 @@ public sealed class VideoFile : BaseFormat
 			throw new InvalidDataException( "Video: no SCHl audio header." );
 
 		var (channels, sampleCount) = ParseAudioHeader( GetPayload( header ) );
-		if ( channels != 2 )
-			throw new NotSupportedException( $"EA-ADPCM: only stereo is implemented (channels={channels})." );
+		return channels switch
+		{
+			1 => DecodeMono( sampleCount ),
+			2 => DecodeStereo( sampleCount ),
+			_ => throw new NotSupportedException( $"EA-ADPCM: unsupported channel count {channels}." ),
+		};
+	}
 
+	private DecodedAudio DecodeStereo( int sampleCount )
+	{
 		var left = new List<short>( sampleCount );
 		var right = new List<short>( sampleCount );
 		foreach ( var chunk in Chunks )
-		{
 			if ( chunk.Type == "SCDl" )
 				DecodeScdlStereo( GetPayload( chunk ), left, right );
-		}
 
 		var n = Math.Min( left.Count, right.Count );
 		var samples = new short[n * 2];
@@ -152,9 +157,18 @@ public sealed class VideoFile : BaseFormat
 			samples[i * 2] = left[i];
 			samples[i * 2 + 1] = right[i];
 		}
-
 		// Sample rate isn't reliably in the header; TPW movies are 22.05 kHz.
-		return new DecodedAudio( channels, 22050, n, samples );
+		return new DecodedAudio( 2, 22050, n, samples );
+	}
+
+	private DecodedAudio DecodeMono( int sampleCount )
+	{
+		var mono = new List<short>( sampleCount );
+		foreach ( var chunk in Chunks )
+			if ( chunk.Type == "SCDl" )
+				DecodeScdlMono( GetPayload( chunk ), mono );
+
+		return new DecodedAudio( 1, 22050, mono.Count, mono.ToArray() );
 	}
 
 	// EA SCHl "PT" tag header: "PT\0\0" then tag bytes. 0xFF ends; 0xFC/0xFD/0xFE are
@@ -217,6 +231,42 @@ public sealed class VideoFile : BaseFormat
 				left.Add( (short)nl );
 				right.Add( (short)nr );
 				produced++;
+			}
+		}
+	}
+
+	// Mono EA-ADPCM (the single-channel form of the same codec, per FFmpeg adpcm_ea): an 8-byte block
+	// header (sample count + prev/cur history), then sub-blocks of one (coeff|shift) byte + 28 data bytes,
+	// each data byte packing TWO consecutive samples (high nibble then low) instead of the stereo L/R pair.
+	private static void DecodeScdlMono( ReadOnlySpan<byte> pl, List<short> mono )
+	{
+		if ( pl.Length < 8 )
+			return;
+
+		var count = BinaryPrimitives.ReadInt32LittleEndian( pl );
+		int prev = BinaryPrimitives.ReadInt16LittleEndian( pl.Slice( 4, 2 ) );
+		int cur = BinaryPrimitives.ReadInt16LittleEndian( pl.Slice( 6, 2 ) );
+
+		var pos = 8;
+		var produced = 0;
+		while ( produced < count && pos < pl.Length )
+		{
+			int hb = pl[pos++]; // coeff index in the high nibble, shift in the low nibble
+			int c1 = EaAdpcmTable[hb >> 4], c2 = EaAdpcmTable[(hb >> 4) + 4];
+			int shift = 20 - (hb & 0xF);
+
+			for ( var i = 0; i < 28 && produced < count && pos < pl.Length; i++ )
+			{
+				int nb = pl[pos++];
+				// Two samples per byte: high nibble first, then low.
+				for ( var half = 0; half < 2 && produced < count; half++ )
+				{
+					int nibble = half == 0 ? nb >> 4 : nb & 0xF;
+					var s = Clamp16( ((Sign4( nibble ) << shift) + cur * c1 + prev * c2 + 0x80) >> 8 );
+					prev = cur; cur = s;
+					mono.Add( (short)s );
+					produced++;
+				}
 			}
 		}
 	}

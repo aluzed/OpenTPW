@@ -41,7 +41,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-019](T-019-plb-parameter-fields.md) | 🟡 Feature | ⚠️ Partial | `.PLB`: **layout Ghidra-confirmed & fully decoded** (8-byte header fix + the trailing block is a 2nd 20×104 table + density/total globals, all typed; whole file accounted for). Per-effect param **field labels** still need the consumer traced |
 | [T-020](T-020-lip-mouth-shapes.md) | 🟡 Feature | ⚠️ Partial | `.LIP` semantics resolved (Ghidra): shapes **not in the file** — engine has 5 visemes (`FUN_0044b2e0`), picked per keyframe interval at runtime; `MouthShape`/`ShapeAt` + timing test added. Live advisor-mouth wiring remains |
 | [T-021](T-021-tqi-exact-dequant.md) | ⚪ Polish | ⏸️ Deferred | `.TQI`: float AAN IDCT confirmed (Ghidra); exact port deferred (decoder already renders correctly) |
-| [T-022](T-022-ea-adpcm-mono.md) | 🟡 Feature | ☐ To do | EA-ADPCM mono audio support |
+| [T-022](T-022-ea-adpcm-mono.md) | 🟡 Feature | ⚠️ Implemented | EA-ADPCM **mono** path added (channel dispatch + `DecodeScdlMono`, two samples/byte per FFmpeg adpcm_ea) + synthesised test; waveform verification awaits a real mono sample (none in install) |
 | [T-023](T-023-linux-vulkan-libdl.md) | 🔴 High | ✅ Done | Linux runtime: Vulkan `libdl` load fix — game now boots on Linux |
 | [T-024](T-024-linux-black-screen.md) | 🟠 Medium | ✅ Done | Linux "black screen" was the synchronous load; lobby renders (loading screen + text) |
 | [T-025](T-025-bf4-antialiased-fonts.md) | 🟢 Low | ☐ To do | `.BF4`: decode the antialiased (multi-bit) font variant (`MENU*`/`TITLE*`/`*AA`) |

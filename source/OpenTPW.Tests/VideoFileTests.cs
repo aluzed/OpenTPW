@@ -57,6 +57,52 @@ public class VideoFileTests
 		Assert.AreEqual( 16, payload[15] );
 	}
 
+	private static byte[] ChunkWith( string fourcc, byte[] payload )
+	{
+		var size = 8 + payload.Length;
+		var b = new byte[size];
+		Encoding.ASCII.GetBytes( fourcc ).CopyTo( b, 0 );
+		BinaryPrimitives.WriteInt32LittleEndian( b.AsSpan( 4, 4 ), size );
+		payload.CopyTo( b, 8 );
+		return b;
+	}
+
+	// Mono EA-ADPCM path: a synthesised single-channel SCHl/SCDl decodes to the header's sample count
+	// (two samples per data byte). No real mono movie ships in the install, so this validates the
+	// channel dispatch + block accounting; the codec math is the proven stereo math applied per-nibble.
+	[TestMethod]
+	public void DecodesMonoEaAdpcm()
+	{
+		const int samples = 56; // one full sub-block: 28 data bytes × 2 samples
+
+		var sch = new System.Collections.Generic.List<byte>();
+		sch.AddRange( Encoding.ASCII.GetBytes( "PT\0\0" ) );
+		sch.AddRange( new byte[] { 0x82, 0x01, 0x01 } );       // channels = 1
+		sch.AddRange( new byte[] { 0x85, 0x02, 0x00, 0x38 } ); // sampleCount = 56 (big-endian)
+		sch.Add( 0xFF );
+
+		var scd = new System.Collections.Generic.List<byte>();
+		scd.AddRange( new byte[] { 56, 0, 0, 0 } ); // count = 56 (LE int32)
+		scd.AddRange( new byte[] { 0, 0, 0, 0 } );  // prev, cur history (two int16 = 0)
+		scd.Add( 0x0C );                            // coeff index 0, shift = 20 - 12 = 8
+		for ( var i = 0; i < 28; i++ ) scd.Add( 0x10 ); // 28 data bytes → 56 samples
+
+		var bytes = ChunkWith( "SCHl", sch.ToArray() )
+			.Concat( ChunkWith( "SCDl", scd.ToArray() ) )
+			.Concat( Chunk( "SCEl", 0 ) )
+			.ToArray();
+
+		var video = new VideoFile( new MemoryStream( bytes ) );
+		var audio = video.DecodeAudio();
+
+		Assert.AreEqual( 1, audio.Channels );
+		Assert.AreEqual( samples, audio.SampleCount, "decodes to the header's sample count" );
+		Assert.AreEqual( samples, audio.Samples.Length, "mono output is not interleaved" );
+		// 0x10 → nibbles (1,0): sample 0 = (1<<8 + 0x80)>>8 = 1, sample 1 = (0 + 0x80)>>8 = 0.
+		Assert.AreEqual( 1, audio.Samples[0] );
+		Assert.AreEqual( 0, audio.Samples[1] );
+	}
+
 	// A truncated/garbage tail must not loop forever or overrun — parse stops cleanly.
 	[TestMethod]
 	public void StopsOnMalformedChunk()
