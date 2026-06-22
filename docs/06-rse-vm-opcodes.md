@@ -6,7 +6,7 @@ dispatched by the executor `FUN_00551cb0` (opcode word tagged `0x80`, bounds `< 
 table at `0x5567d8`). The **Operands** column is authoritative (the reflection dispatcher must
 match it). **Kind**: `pure` = VM-state only (done); `engine` = needs the ride engine.
 
-Status: **83 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus a growing set of
+Status: **87 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus a growing set of
 Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sound, the animation +
 `WAIT*` family, and now the **rider scream family** `STARTSCREAM`/`STOPSCREAM`/`SINGLESCREAM`/
 `SCREAMLEVEL`). See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md) / [T-032](tickets/T-032-ride-engine.md).
@@ -78,7 +78,7 @@ Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sou
 | 62 | `LIMBOSPACE` | 1 | ✅ | engine | read the free limbo slots into dest |
 | 63 | `SPAWNCHILD` | 1 | ✅ | engine |
 | 64 | `SPAWNSOUND` | 1 | ☐ | engine |
-| 65 | `REMOVECHILD` | 0 | ☐ | engine |
+| 65 | `REMOVECHILD` | 0 | ✅ | engine | destroy the active child VM + clear the child link (pure VM/registry) |
 | 66 | `SETVARINCHILD` | 2 | ✅ | pure |
 | 67 | `GETVARINCHILD` | 2 | ✅ | pure |
 | 68 | `SETVARINPARENT` | 2 | ✅ | pure |
@@ -103,9 +103,9 @@ Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sou
 | 87 | `STOPSCREAM` | 0 | ✅ | engine | end the sustained scream |
 | 88 | `SINGLESCREAM` | 2 | ✅ | engine | `(soundCode, level)` one-shot (`-1` = default level) |
 | 89 | `SCREAMLEVEL` | 1 | ✅ | engine | set scream volume `0..100` |
-| 90 | `FINDSCRIPTRAND` | 2 | ☐ | engine |
-| 91 | `GETREMOTEVAR` | 3 | ☐ | engine |
-| 92 | `SETREMOTEVAR` | 3 | ☐ | engine |
+| 90 | `FINDSCRIPTRAND` | 2 | ✅ | engine | random live script matching a name string → its handle in dest (pure VM/registry) |
+| 91 | `GETREMOTEVAR` | 3 | ✅ | engine | read var[index] from the VM with the given handle into dest |
+| 92 | `SETREMOTEVAR` | 3 | ✅ | engine | write var[index] in the VM with the given handle |
 | 93 | `REPAIREFFECT` | 1 | ☐ | engine |
 | 94 | `GETCUSTPTCLCODE` | 2 | ☐ | engine |
 | 95 | `SETTIMER` | 1 | ✅ | pure |

@@ -369,6 +369,75 @@ public class RideScriptTests
 		Assert.AreEqual( 0, dest.Value );
 	}
 
+	// Cross-VM opcodes resolve another script by its global handle (GET/SETREMOTEVAR) or find one by name
+	// (FINDSCRIPTRAND). Semantics recovered from the executor (op_90/91/92) + the resolver FUN_0055a070.
+	[TestMethod]
+	public void CrossVmRemoteVarsAndFindScript()
+	{
+		Log = new();
+		var a = LoadTestVm();
+		var b = LoadTestVm();
+		a.ScriptName = "Caller";
+		b.ScriptName = $"TPW_TEST_TARGET_{b.Handle}"; // unique → matches exactly this VM
+		while ( b.Variables.Count < 4 ) b.Variables.Add( 0 );
+
+		var dest = new Operand( a, Operand.Type.Variable, 0, 0 );
+
+		// SETREMOTEVAR(handle, index, value) then GETREMOTEVAR(dest, handle, index) round-trips through b.
+		OpcodeHandlers.Hierarchy.SetRemoteVar( ref a, Lit( a, b.Handle ), Lit( a, 2 ), Lit( a, 55 ) );
+		Assert.AreEqual( 55, b.Variables[2] );
+		OpcodeHandlers.Hierarchy.GetRemoteVar( ref a, dest, Lit( a, b.Handle ), Lit( a, 2 ) );
+		Assert.AreEqual( 55, dest.Value );
+
+		// Unknown handle → GET returns 0 (+ Zero flag); SET / out-of-range index are guarded no-ops.
+		OpcodeHandlers.Hierarchy.GetRemoteVar( ref a, dest, Lit( a, 0 ), Lit( a, 2 ) );
+		Assert.AreEqual( 0, dest.Value );
+		Assert.IsTrue( a.Flags.HasFlag( RideVM.VMFlags.Zero ) );
+		OpcodeHandlers.Hierarchy.SetRemoteVar( ref a, Lit( a, b.Handle ), Lit( a, 9999 ), Lit( a, 7 ) );
+		OpcodeHandlers.Hierarchy.SetRemoteVar( ref a, Lit( a, 0 ), Lit( a, 2 ), Lit( a, 7 ) );
+
+		// FINDSCRIPTRAND(name, dest): find b by its unique name → its handle.
+		var prevRng = RideVM.RandomIndex;
+		try
+		{
+			RideVM.RandomIndex = _ => 0; // deterministic: take the first match
+			a.Strings[2001] = b.ScriptName;
+			OpcodeHandlers.Hierarchy.FindScriptRand( ref a, new Operand( a, Operand.Type.String, 2001 ), dest );
+			Assert.AreEqual( b.Handle, dest.Value );
+
+			// An unmatched name returns 0 (+ Zero flag).
+			a.Strings[2002] = "no_such_script_zzz";
+			OpcodeHandlers.Hierarchy.FindScriptRand( ref a, new Operand( a, Operand.Type.String, 2002 ), dest );
+			Assert.AreEqual( 0, dest.Value );
+			Assert.IsTrue( a.Flags.HasFlag( RideVM.VMFlags.Zero ) );
+		}
+		finally { RideVM.RandomIndex = prevRng; }
+	}
+
+	// REMOVECHILD destroys the active child and clears the child link (op_65), dropping it from the
+	// global registry so cross-VM lookups can no longer resolve it.
+	[TestMethod]
+	public void RemoveChildDetachesAndUnregisters()
+	{
+		Log = new();
+		var parent = LoadTestVm();
+		var child = LoadTestVm();
+		parent.ActiveChild = child;
+		parent.Children.Add( child );
+		child.Parent = parent;
+		var childHandle = child.Handle;
+		Assert.IsNotNull( RideVM.Resolve( childHandle ) );
+
+		OpcodeHandlers.Hierarchy.RemoveChild( ref parent );
+		Assert.IsNull( parent.ActiveChild );
+		Assert.AreEqual( 0, parent.Children.Count );
+		Assert.IsNull( child.Parent );
+		Assert.IsNull( RideVM.Resolve( childHandle ), "child dropped from the global registry" );
+
+		// No active child: REMOVECHILD is a guarded no-op.
+		OpcodeHandlers.Hierarchy.RemoveChild( ref parent );
+	}
+
 	private static RideVM LoadTestVm()
 	{
 		var path = Path.Combine( AppContext.BaseDirectory, "content", "testscripts", "Test.RSE" );

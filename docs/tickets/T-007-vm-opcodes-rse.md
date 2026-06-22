@@ -2,12 +2,12 @@
 
 - **Priority**: 🟡 Feature (core of ride gameplay)
 - **Type**: Feature / reverse engineering
-- **Status**: ⚠️ **Partial — 83 / 106 opcodes.** The `.RSE` loader / disassembler is restored and
+- **Status**: ⚠️ **Partial — 87 / 106 opcodes.** The `.RSE` loader / disassembler is restored and
   working; `RideVM` parses + runs scripts. **Batch A (all 43 `pure`) complete**; Batch B is well
-  underway — object spawn/lifecycle, the animation + `WAIT*` family, sound, the rider-scream family, and
-  now the **limbo family** (`LIMBO`/`UNLIMBO`/`FORCEUNLIMBO`/`INLIMBO`/`LIMBOSPACE` — RE'd as a per-VM
-  timed value queue, pure VM state) are all in and unit-tested. **Remaining: 23 opcodes** — lights,
-  walk-on/off, heads, cross-VM remote vars, and a few effect/particle ops (see docs/06).
+  underway — object spawn/lifecycle, the animation + `WAIT*` family, sound, the rider-scream family, the
+  **limbo family**, and now the **cross-VM family** (`FINDSCRIPTRAND`/`GETREMOTEVAR`/`SETREMOTEVAR`/
+  `REMOVECHILD` — RE'd as a global VM registry keyed by handle, pure VM state) are all in and unit-tested.
+  **Remaining: 19 opcodes** — lights, walk-on/off, heads, and a few effect/particle ops (see docs/06).
 
 ## Findings
 
@@ -98,17 +98,25 @@ runtime). Classification: **43 `pure`** (VM-state only — implementable now) an
     result (the original's `+0x48` register). New `RideVM.Limbo` list + `Handlers/Limbo.cs`. Coverage
     **78 → 83 / 106**. Covered by `RideScriptTests.LimboOpcodes`.
 
-**Remaining: 23 opcodes**, in families:
+14. ✅ **Cross-VM family** (`FINDSCRIPTRAND` 90, `GETREMOTEVAR` 91, `SETREMOTEVAR` 92, `REMOVECHILD` 65) —
+    reversed from the executor cases + the resolver `FUN_0055a070` (walks the global VM list `DAT_008791b0`
+    matching the per-VM handle at struct `+0x08`). Modelled with a **global VM registry** keyed by an
+    incrementing handle (weak refs so finished VMs drop out): `RideVM.Registry.cs` (`Handle`, `Resolve`,
+    `MatchingByName`, `Unregister`, injectable `RandomIndex`); every VM joins on construction.
+    `GETREMOTEVAR(dest, handle, index)` / `SETREMOTEVAR(handle, index, value)` resolve a VM by handle and
+    read/write its `Variables` (bounds-checked); `FINDSCRIPTRAND(name, dest)` returns a random live VM
+    whose `ScriptName` matches the string operand (0 if none); `REMOVECHILD` destroys + unregisters the
+    active child and clears the link. Pure VM/registry state — no engine needed. Coverage **83 → 87 /
+    106**. Covered by `RideScriptTests.CrossVmRemoteVarsAndFindScript` / `RemoveChildDetachesAndUnregisters`.
+
+**Remaining: 19 opcodes**, all needing engine subsystems:
 - **Lights** (`ENABLELIGHT`/`DISABLELIGHT`/`SETLIGHT`/`COLOURLIGHT`) — need a light subsystem on the engine.
 - **Walk** (`WALKON`/`WALKOFF`/`WALKGET`/`WALKST_FLOAT`/`WALKFLOATSTAT`/`WALKFLOATSTOP`) — peeps walking on/off a ride; ties into the peep system.
-- **Heads** (`ADDHEAD`/`DELHEAD`), **effects** (`ADDOBJ_EXT`/`SPARK`/`REPAIREFFECT`/`GETCUSTPTCLCODE`).
-- **Cross-VM** (`GETREMOTEVAR`/`SETREMOTEVAR`/`FINDSCRIPTRAND`/`REMOVECHILD`) + `TURBO`/`TOUR`/`BUMP` —
-  several of these are likely **pure VM** (like the limbo + child/parent-var families turned out to be);
-  worth reversing their executor cases next, as they're headless-testable.
+- **Heads** (`ADDHEAD`/`DELHEAD`), **effects** (`ADDOBJ_EXT`/`SPARK`/`REPAIREFFECT`/`GETCUSTPTCLCODE`), and the motion ops `TURBO`/`TOUR`/`BUMP`.
 
-Most have clear names + known operand counts; reverse each from its executor case (`op_<n>` in
-`FUN_00551cb0`) before implementing, as the limbo family showed (the "engine" tag is often wrong — limbo
-was pure VM state). The light/walk/head families do need engine subsystems to build + verify.
+These create/drive world entities, so (unlike limbo + cross-VM, which turned out pure VM) they need the
+ride-engine subsystems to build + verify. Reverse each from its executor case (`op_<n>` in `FUN_00551cb0`)
+when its subsystem comes online.
 
 > Note: the instruction doc describes `CMP` as a *bitwise-AND* comparison, but the current
 > `Math.Compare` does equality/less-than. Left as-is for now (changing it could shift branch

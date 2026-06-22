@@ -91,6 +91,10 @@ public partial class RideVM
 
 	public RideVM( Stream stream )
 	{
+		// Every VM joins the global registry with a unique handle, mirroring the original (a global linked
+		// list keyed by the +0x08 handle) — this is what the cross-VM opcodes resolve. See RideVM.Registry.cs.
+		Handle = Register();
+
 		// Parse the .RSE script: populates Variables, Strings, Instructions, Branches.
 		rsseqFile = new RideScriptFile( this, stream );
 
