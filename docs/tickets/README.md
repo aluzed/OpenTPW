@@ -38,7 +38,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-016](T-016-map-entry-records.md) | 🟡 Feature | ✅ Decoded | `.MAP`: variant + BANK names + SFX category header + **SFX per-sound 20-byte records** decoded; BANK records RE'd as serialized pointers (not data); only the SFX mixing-curve blob stays raw |
 | [T-017](T-017-tpws-saves.md) | 🟡 Feature | ☐ To do | `.TPWS` save files: complete read + implement write |
 | [T-018](T-018-mtr-material-semantics.md) | 🟡 Feature | ✅ Done | `.MTR` not runtime-used (Ghidra); `.MD2` carries texture binding (decoded + tested) |
-| [T-019](T-019-plb-parameter-fields.md) | 🟡 Feature | ☐ To do | `.PLB` particle parameter fields (beyond the colour ramp) |
+| [T-019](T-019-plb-parameter-fields.md) | 🟡 Feature | ⚠️ Partial | `.PLB`: **layout Ghidra-confirmed & fully decoded** (8-byte header fix + the trailing block is a 2nd 20×104 table + density/total globals, all typed; whole file accounted for). Per-effect param **field labels** still need the consumer traced |
 | [T-020](T-020-lip-mouth-shapes.md) | 🟡 Feature | ☐ To do | `.LIP` mouth-shape semantics + lip-sync wiring |
 | [T-021](T-021-tqi-exact-dequant.md) | ⚪ Polish | ⏸️ Deferred | `.TQI`: float AAN IDCT confirmed (Ghidra); exact port deferred (decoder already renders correctly) |
 | [T-022](T-022-ea-adpcm-mono.md) | 🟡 Feature | ☐ To do | EA-ADPCM mono audio support |

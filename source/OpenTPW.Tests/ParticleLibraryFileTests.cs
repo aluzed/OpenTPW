@@ -10,35 +10,47 @@ namespace OpenTPW.Tests;
 [TestClass]
 public class ParticleLibraryFileTests
 {
-	// Mirrors the real layout: 16-byte header (count, recordSize) then fixed records,
-	// each = param block + a 48-byte null-padded name, then a trailing block.
-	// recordSize must exceed the 48-byte name + 64-byte colour ramp.
-	private const int RecordSize = 64 + 48; // 64-byte param block (= the colour ramp) + name
-	private const int ParamLen = RecordSize - 48;
+	// Mirrors the real layout (Ghidra-confirmed): 8-byte header (count, recordSize), then fixed effect
+	// records = [param | 64-byte ramp | 40-byte name], then a shared table (count2, size2, records) and
+	// two globals (density, totalParticles).
+	private const int RampBytes = 64;
+	private const int NameBytes = 40;
+	private const int ParamLen = 8;
+	private const int RecordSize = ParamLen + RampBytes + NameBytes; // 112
 
 	private static byte[] BuildPlb()
 	{
 		const int count = 2;
-		var trailing = new byte[] { 0xAA, 0xBB, 0xCC };
+		const int count2 = 2, size2 = 4;
 
-		var buf = new byte[16 + count * RecordSize + trailing.Length];
+		int recordsEnd = 8 + count * RecordSize;
+		int sharedEnd = recordsEnd + 8 + count2 * size2;
+		var buf = new byte[sharedEnd + 8]; // + two globals
+
 		BinaryPrimitives.WriteUInt32LittleEndian( buf.AsSpan( 0, 4 ), count );
 		BinaryPrimitives.WriteUInt32LittleEndian( buf.AsSpan( 4, 4 ), RecordSize );
 
-		// Record 0: a recognisable colour ramp (param block is exactly the 64 ramp bytes),
-		// name "NULL". Stop k = D3DCOLOR 0xAARRGGBB with R=k, G=2k, B=3k, A=4k.
-		var rampStart = 16; // paramLen == 64 == ramp, so the ramp is the whole param block
+		// Record 0: a recognisable colour ramp + name "NULL". Stop k = D3DCOLOR with R=k,G=2k,B=3k,A=4k.
+		int rec0 = 8, ramp0 = rec0 + ParamLen, name0 = ramp0 + RampBytes;
 		for ( var k = 0; k < 16; k++ )
 		{
 			uint argb = (uint)((4 * k) << 24 | (k) << 16 | (2 * k) << 8 | (3 * k));
-			BinaryPrimitives.WriteUInt32LittleEndian( buf.AsSpan( rampStart + k * 4, 4 ), argb );
+			BinaryPrimitives.WriteUInt32LittleEndian( buf.AsSpan( ramp0 + k * 4, 4 ), argb );
 		}
-		Encoding.ASCII.GetBytes( "NULL" ).CopyTo( buf, 16 + ParamLen );
+		Encoding.ASCII.GetBytes( "NULL" ).CopyTo( buf, name0 );
 
 		// Record 1: name "Sparks".
-		Encoding.ASCII.GetBytes( "Sparks" ).CopyTo( buf, 16 + RecordSize + ParamLen );
+		int rec1 = 8 + RecordSize;
+		Encoding.ASCII.GetBytes( "Sparks" ).CopyTo( buf, rec1 + ParamLen + RampBytes );
 
-		trailing.CopyTo( buf, 16 + count * RecordSize );
+		// Shared table: count2 records of size2 bytes.
+		BinaryPrimitives.WriteUInt32LittleEndian( buf.AsSpan( recordsEnd, 4 ), count2 );
+		BinaryPrimitives.WriteUInt32LittleEndian( buf.AsSpan( recordsEnd + 4, 4 ), size2 );
+		buf[recordsEnd + 8] = 0xDE; // a marker byte in shared record 0
+
+		// Globals.
+		BinaryPrimitives.WriteUInt32LittleEndian( buf.AsSpan( sharedEnd, 4 ), 33 );
+		BinaryPrimitives.WriteUInt32LittleEndian( buf.AsSpan( sharedEnd + 4, 4 ), 1024 );
 		return buf;
 	}
 
@@ -62,14 +74,27 @@ public class ParticleLibraryFileTests
 		Assert.AreEqual( new ParticleColor( 5, 10, 15, 20 ), ramp[5] );
 
 		Assert.AreEqual( "Sparks", plb.Effects[1].Name );
-		Assert.AreEqual( 3, plb.TrailingData.Length );
+	}
+
+	[TestMethod]
+	public void ParsesSharedTableAndGlobals()
+	{
+		using var stream = new MemoryStream( BuildPlb() );
+		var plb = new ParticleLibraryFile( stream );
+
+		Assert.AreEqual( 4, plb.SharedRecordSize );
+		Assert.AreEqual( 2, plb.SharedRecords.Count );
+		Assert.AreEqual( 0xDE, plb.SharedRecords[0][0] );
+		Assert.AreEqual( 33, plb.ParticleDensity );
+		Assert.AreEqual( 1024, plb.TotalParticles );
+		Assert.AreEqual( 0, plb.TrailingData.Length );
 	}
 
 	[TestMethod]
 	public void RejectsTruncatedRecords()
 	{
 		// Header claims 10 records of 320 bytes, but the file is far too small.
-		var buf = new byte[16];
+		var buf = new byte[8];
 		BinaryPrimitives.WriteUInt32LittleEndian( buf.AsSpan( 0, 4 ), 10 );
 		BinaryPrimitives.WriteUInt32LittleEndian( buf.AsSpan( 4, 4 ), 320 );
 
@@ -106,5 +131,12 @@ public class ParticleLibraryFileTests
 		Assert.AreEqual( new ParticleColor( 255, 255, 255, 0 ), smoke[0] );
 		Assert.IsTrue( smoke[8].A > smoke[0].A, "smoke alpha should ramp up from 0" );
 		Assert.IsTrue( smoke.All( c => c is { R: 255, G: 255, B: 255 } ), "smoke ramp is white" );
+
+		// The shared table + globals after the records (Ghidra: 20 records of 104 bytes, then density+total).
+		Assert.AreEqual( 104, plb.SharedRecordSize, "observed shared record size on Tp2.plb" );
+		Assert.AreEqual( 20, plb.SharedRecords.Count, "observed shared record count on Tp2.plb" );
+		Assert.IsTrue( plb.ParticleDensity is >= 10 and <= 500, "density is clamped to 10..500 by the engine" );
+		Assert.AreEqual( 1024, plb.TotalParticles, "observed total-particle budget on Tp2.plb" );
+		Assert.AreEqual( 0, plb.TrailingData.Length, "the whole file is now accounted for" );
 	}
 }

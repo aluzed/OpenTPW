@@ -112,7 +112,7 @@ confirmation** below is what Ghidra would add (on a GOG/decrypted build).
 |--------|:------:|---------------------------------|--------|
 | `.TQI`/`.TGQ` video | ✅ pixel-accurate | exact AAN dequant tables (`IDCT_DAT`/`UVA_DATA`) | [T-021](tickets/T-021-tqi-exact-dequant.md) |
 | `.BF4` fonts | ✅ done | — | — |
-| `.PLB` particles | ⚠️ names + colour ramp | the non-colour parameter fields | [T-019](tickets/T-019-plb-parameter-fields.md) |
+| `.PLB` particles | ⚠️ names + ramp + **full layout** (loader `FUN_0051f370`) | per-effect param **field labels** (need the consumer traced) | [T-019](tickets/T-019-plb-parameter-fields.md) |
 | `.MTR` materials | ✅ resolved | *no runtime loader* — texture binding is in the `.MD2` | [T-018](tickets/T-018-mtr-material-semantics.md) |
 | `.LIP` lip-sync | ⚠️ timestamps (µs) | mouth-shape encoding | [T-020](tickets/T-020-lip-mouth-shapes.md) |
 | `.MD2` models | ⚠️ animated done | the static (frameCount-0) header | [T-015](tickets/T-015-md2-static-variant.md) |
