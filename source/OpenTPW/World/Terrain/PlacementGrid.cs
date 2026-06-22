@@ -21,6 +21,7 @@ public sealed class PlacementGrid
 	public Vector3 Origin { get; }
 
 	private readonly bool[,] occupied;
+	private readonly bool[,] path; // tiles laid as walkable path (occupied for placement, but peeps may cross)
 
 	public PlacementGrid( int width, int height, float tileSize, Vector3 origin )
 	{
@@ -29,6 +30,7 @@ public sealed class PlacementGrid
 		TileSize = tileSize;
 		Origin = origin;
 		occupied = new bool[width, height];
+		path = new bool[width, height];
 	}
 
 	/// <summary>A grid whose centre maps to <paramref name="worldCenter"/> (handy until real park siting exists).</summary>
@@ -85,8 +87,23 @@ public sealed class PlacementGrid
 		for ( int y = ty; y < ty + fh; y++ )
 			for ( int x = tx; x < tx + fw; x++ )
 				if ( InBounds( x, y ) )
+				{
 					occupied[x, y] = false;
+					path[x, y] = false;
+				}
 	}
+
+	/// <summary>Marks a reserved tile as a walkable path (e.g. a queue path): it still blocks placement,
+	/// but peeps may route across it (see <see cref="IsWalkable"/> / T-036 pathfinding).</summary>
+	public void MarkPath( int tx, int ty )
+	{
+		if ( InBounds( tx, ty ) )
+			path[tx, ty] = true;
+	}
+
+	/// <summary>Whether a peep may stand on tile (tx,ty): in bounds and either free ground or a laid path
+	/// (a ride/shop footprint blocks, a queue path does not). Used by the peep pathfinder (T-036).</summary>
+	public bool IsWalkable( int tx, int ty ) => InBounds( tx, ty ) && (!occupied[tx, ty] || path[tx, ty]);
 
 	/// <summary>
 	/// Builds a grid from a level's <c>Standard.sam</c> (<c>MapInfo.HeightfieldWidth</c>/<c>Height</c>),

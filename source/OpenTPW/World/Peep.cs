@@ -40,6 +40,7 @@ public sealed class Peep : ModelEntity
 
 	private readonly ParkTerrain terrain;
 	private readonly IReadOnlyList<RideQueue> queues;
+	private readonly PathGraph? paths;
 	private readonly float speed;
 	private readonly Model billboard;
 
@@ -62,12 +63,19 @@ public sealed class Peep : ModelEntity
 	private float walkPhase;     // advances while moving; indexes the walk cycle
 	private bool movedThisFrame;
 
+	// Pathfinding state (T-036): the active route's waypoints + the goal it was planned for, so a path is
+	// reused until the goal moves to another tile rather than re-planned every frame.
+	private List<Vector3>? pathPts;
+	private int pathIdx;
+	private (int X, int Y)? pathGoalTile;
+
 	private static int recycles; // park-wide count of visitors that left and were replaced (diagnostics)
 
-	public Peep( ParkTerrain terrain, IReadOnlyList<RideQueue> queues, Vector3 spawn, int colorIndex )
+	public Peep( ParkTerrain terrain, IReadOnlyList<RideQueue> queues, Vector3 spawn, int colorIndex, PathGraph? paths = null )
 	{
 		this.terrain = terrain;
 		this.queues = queues;
+		this.paths = paths;
 		home = spawn;
 
 		// Prefer a real decoded peep sprite (per-frame models, directional walk cycles), a random kid for
@@ -109,6 +117,7 @@ public sealed class Peep : ModelEntity
 				mount = null;
 				Model = billboard;
 				Position = route.ExitPoint;
+				ResetPath(); // teleported to the exit — replan from here
 				if ( WantsToLeave() )
 					BeginLeaving();
 				else
@@ -117,24 +126,25 @@ public sealed class Peep : ModelEntity
 			return;
 		}
 
-		// Heading for the exit: walk home, then recycle into a fresh visitor.
+		// Heading for the exit: walk home (routing around rides), then recycle into a fresh visitor.
 		if ( leaving )
 		{
-			if ( WalkToward( home ) )
+			if ( MoveTo( home ) )
 				Recycle();
 			FaceCamera();
 			ApplySprite();
 			return;
 		}
 
-		// Detouring to a shop: walk there, buy a snack (park income), then resume riding.
+		// Detouring to a shop: walk there (routing around rides), buy a snack (park income), then resume.
 		if ( shopTarget != null )
 		{
-			if ( WalkToward( shopTarget.Position ) )
+			if ( MoveTo( shopTarget.Position ) )
 			{
 				ParkFinances.Current?.TakeFoodSale( shopTarget.Price );
 				hunger = 0f;
 				shopTarget = null;
+				ResetPath();
 				PickRoute();
 			}
 			FaceCamera();
@@ -171,6 +181,7 @@ public sealed class Peep : ModelEntity
 		{
 			route?.Dequeue( this );
 			route = null;
+			ResetPath();
 			shopTarget = NearestShop();
 			return;
 		}
@@ -184,7 +195,7 @@ public sealed class Peep : ModelEntity
 			pos = route.PositionOf( this );
 		}
 
-		bool atSpot = WalkToward( route.StandPoint( pos ) );
+		bool atSpot = MoveTo( route.StandPoint( pos ) );
 
 		// Only the front peep boards, and only once it has reached the entrance and a slot is free.
 		if ( pos == 0 && atSpot && route.HasFreeSlot )
@@ -219,6 +230,7 @@ public sealed class Peep : ModelEntity
 	{
 		route?.Dequeue( this );
 		route = null;
+		ResetPath();
 		leaving = true;
 	}
 
@@ -228,6 +240,7 @@ public sealed class Peep : ModelEntity
 		recycles++;
 		leaving = false;
 		shopTarget = null;
+		ResetPath();
 		happiness = StartHappiness;
 		energy = MaxEnergy;
 		hunger = 0f;
@@ -252,6 +265,39 @@ public sealed class Peep : ModelEntity
 		}
 		DropToGround();
 		return arrived;
+	}
+
+	// Walk toward a goal along a path that routes around rides/shops (T-036), falling back to a straight
+	// line when there's no pathfinder or no route. The path is re-planned only when the goal lands in a new
+	// tile (so a peep shuffling up a queue or chasing a fixed target doesn't re-run A* every frame).
+	// Returns true once the peep reaches the goal.
+	private bool MoveTo( Vector3 goal )
+	{
+		if ( paths == null )
+			return WalkToward( goal );
+
+		var goalTile = paths.TileOf( goal );
+		if ( pathPts == null || pathGoalTile != goalTile )
+		{
+			pathPts = paths.FindPath( Position, goal );
+			pathGoalTile = goalTile;
+			pathIdx = 0;
+		}
+
+		if ( pathPts == null || pathPts.Count == 0 )
+			return WalkToward( goal ); // unreachable / off-grid — head straight there
+
+		bool reachedWaypoint = WalkToward( pathPts[pathIdx] );
+		if ( reachedWaypoint && pathIdx < pathPts.Count - 1 )
+			pathIdx++;
+		return reachedWaypoint && pathIdx >= pathPts.Count - 1;
+	}
+
+	// Drop the cached path so the next MoveTo re-plans (called when the peep switches goal/mode).
+	private void ResetPath()
+	{
+		pathPts = null;
+		pathGoalTile = null;
 	}
 
 	// World movement angle → one of 8 compass sectors (0 = +X, counter-clockwise).

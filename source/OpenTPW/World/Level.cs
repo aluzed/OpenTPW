@@ -60,6 +60,7 @@ public class Level
 		var standard = new SettingsFile( "/levels/jungle/Standard.sam" );
 		var centre = terrain.Centroid;
 		var grid = PlacementGrid.FromLevelSettings( standard, tileSize: 16f, worldCenter: new Vector3( centre.X, centre.Y, 0 ) );
+		var pathGraph = new PathGraph( grid ); // peeps route around ride/shop footprints (T-036)
 
 		// Player-controlled build/manage camera focused on the park centroid (T-040).
 		BuildCameraMode.Focus = new Vector3( centre.X, centre.Y, centre.Z );
@@ -123,7 +124,7 @@ public class Level
 		{
 			var a = i / 30f * MathF.PI * 2f;
 			var spawn = new Vector3( centre.X + MathF.Cos( a ) * 120f, centre.Y + MathF.Sin( a ) * 120f, 0 );
-			_ = new Peep( terrain, parkQueues, spawn, i );
+			_ = new Peep( terrain, parkQueues, spawn, i, pathGraph );
 		}
 		Log.Info( $"[park] build mode ready ({catalog.Count} catalog items), {parkQueues.Count} queues" );
 		// Staff start empty too — the player hires entertainers/handymen/guards/researchers from the
@@ -274,6 +275,7 @@ public class Level
 			int cx = tx + e.X + dx * i, cy = ty + e.Y + dy * i;
 			if ( !grid.TryPlace( cx, cy, 1, 1 ) )
 				break; // ran off the grid or hit another object
+			grid.MarkPath( cx, cy ); // reserved against placement, but peeps may walk it (T-036)
 
 			var w = OnGround( grid.TileToWorld( cx, cy ) );
 			laid.Add( w );
