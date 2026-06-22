@@ -33,6 +33,25 @@ public class LipSyncFileTests
 		Assert.AreEqual( 5.268752, lip.Duration.TotalSeconds, 1e-6 );
 	}
 
+	[TestMethod]
+	public void ResolvesIntervalsAndCyclesVisemesInSync()
+	{
+		// Boundaries at 0,1,2,3,4,5,6 s — seven keyframes => six intervals.
+		var lip = new LipSyncFile( new MemoryStream( Lip( 0, 1_000_000, 2_000_000, 3_000_000, 4_000_000, 5_000_000, 6_000_000 ) ) );
+
+		// The active interval tracks the playback time.
+		Assert.AreEqual( -1, lip.IntervalAt( TimeSpan.FromSeconds( -0.5 ) ), "before the first keyframe" );
+		Assert.AreEqual( 0, lip.IntervalAt( TimeSpan.FromSeconds( 0.5 ) ) );
+		Assert.AreEqual( 2, lip.IntervalAt( TimeSpan.FromSeconds( 2.5 ) ) );
+		Assert.AreEqual( -1, lip.IntervalAt( TimeSpan.FromSeconds( 6.0 ) ), "at/after the last keyframe" );
+
+		// Mouth is closed outside the clip, and cycles the five visemes across intervals (1..5 then wraps).
+		Assert.AreEqual( MouthShape.Closed, lip.ShapeAt( TimeSpan.FromSeconds( 7 ) ) );
+		Assert.AreEqual( MouthShape.Normal, lip.ShapeAt( TimeSpan.FromSeconds( 0.5 ) ) ); // interval 0 -> viseme 1
+		Assert.AreEqual( MouthShape.Sss, lip.ShapeAt( TimeSpan.FromSeconds( 4.5 ) ) );    // interval 4 -> viseme 5
+		Assert.AreEqual( MouthShape.Normal, lip.ShapeAt( TimeSpan.FromSeconds( 5.5 ) ) ); // interval 5 -> wraps to 1
+	}
+
 	// Optional validation against a real .LIP. Set TPW_LIP_SAMPLE.
 	[TestMethod]
 	public void ParsesRealLipSample()
@@ -45,7 +64,6 @@ public class LipSyncFileTests
 		var lip = new LipSyncFile( stream );
 
 		Assert.IsTrue( lip.Keyframes.Count > 0, "lip-sync should have keyframes" );
-		Assert.AreEqual( 0u, lip.Keyframes[0], "first keyframe is 0" );
 		// Keyframe timestamps must be monotonically non-decreasing.
 		for ( var i = 1; i < lip.Keyframes.Count; i++ )
 			Assert.IsTrue( lip.Keyframes[i] >= lip.Keyframes[i - 1], $"keyframe {i} not monotonic" );

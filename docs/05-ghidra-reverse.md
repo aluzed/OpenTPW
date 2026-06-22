@@ -114,7 +114,7 @@ confirmation** below is what Ghidra would add (on a GOG/decrypted build).
 | `.BF4` fonts | ✅ done | — | — |
 | `.PLB` particles | ⚠️ names + ramp + **full layout** (loader `FUN_0051f370`) | per-effect param **field labels** (need the consumer traced) | [T-019](tickets/T-019-plb-parameter-fields.md) |
 | `.MTR` materials | ✅ resolved | *no runtime loader* — texture binding is in the `.MD2` | [T-018](tickets/T-018-mtr-material-semantics.md) |
-| `.LIP` lip-sync | ⚠️ timestamps (µs) | mouth-shape encoding | [T-020](tickets/T-020-lip-mouth-shapes.md) |
+| `.LIP` lip-sync | ⚠️ timestamps (µs) + **shapes resolved** (not in file; engine has 5 visemes) | live advisor-mouth wiring | [T-020](tickets/T-020-lip-mouth-shapes.md) |
 | `.MD2` models | ⚠️ animated done | the static (frameCount-0) header | [T-015](tickets/T-015-md2-static-variant.md) |
 | `.MAP` catalogs | ⚠️ names + SFX header | BANK record fields + SFX per-sound list | [T-016](tickets/T-016-map-entry-records.md) |
 | `.RSE` VM opcodes | ⚠️ 34/106 | per-opcode semantics (table + arities recovered) | [T-007](tickets/T-007-vm-opcodes-rse.md) |
