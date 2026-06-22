@@ -15,6 +15,7 @@ public class BF4FileTests
 	{
 		var block = new byte[24 + bitmap.Length];
 		BinaryPrimitives.WriteUInt32LittleEndian( block.AsSpan( 0, 4 ), (uint)charCode );
+			BinaryPrimitives.WriteUInt32LittleEndian( block.AsSpan( 12, 4 ), 2 ); // encoding: 1bpp (OneBpp)
 		BinaryPrimitives.WriteUInt16LittleEndian( block.AsSpan( 16, 2 ), (ushort)width );
 		BinaryPrimitives.WriteUInt16LittleEndian( block.AsSpan( 18, 2 ), (ushort)height );
 		bitmap.CopyTo( block, 24 );
@@ -83,6 +84,28 @@ public class BF4FileTests
 		Assert.AreEqual( "#...", Row( 0 ) );
 		Assert.AreEqual( "#...", Row( 3 ) );
 		Assert.AreEqual( "####", Row( 4 ) );
+	}
+
+	[TestMethod]
+	public void DecodesRaw4BppAntialiasedGlyph()
+	{
+		// A 2×2 raw-4bpp glyph: nibbles F,8 / 4,0 (high nibble first) = bytes 0xF8, 0x40.
+		// Coverage = nibble×17 → 255,136 / 68,0.
+		var block = new byte[24 + 2];
+		BinaryPrimitives.WriteUInt32LittleEndian( block.AsSpan( 0, 4 ), 'A' );
+		BinaryPrimitives.WriteUInt32LittleEndian( block.AsSpan( 12, 4 ), 0 ); // encoding: Raw4Bpp
+		BinaryPrimitives.WriteUInt16LittleEndian( block.AsSpan( 16, 2 ), 2 ); // width
+		BinaryPrimitives.WriteUInt16LittleEndian( block.AsSpan( 18, 2 ), 2 ); // height
+		block[24] = 0xF8;
+		block[25] = 0x40;
+
+		var font = new BF4File( new MemoryStream( BuildFont( block ) ) );
+		var g = font.Glyphs.Single();
+
+		Assert.AreEqual( BF4File.GlyphEncoding.Raw4Bpp, g.Encoding );
+		CollectionAssert.AreEqual( new byte[] { 255, 136, 68, 0 }, g.Coverage );
+		// Pixels mark any non-zero coverage.
+		CollectionAssert.AreEqual( new[] { true, true, true, false }, g.Pixels );
 	}
 
 	[TestMethod]

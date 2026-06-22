@@ -17,6 +17,7 @@ public class FontAtlasTests
 	{
 		var block = new byte[24 + bitmap.Length];
 		BinaryPrimitives.WriteUInt32LittleEndian( block.AsSpan( 0, 4 ), (uint)charCode );
+			BinaryPrimitives.WriteUInt32LittleEndian( block.AsSpan( 12, 4 ), 2 ); // encoding: 1bpp (OneBpp)
 		BinaryPrimitives.WriteUInt16LittleEndian( block.AsSpan( 16, 2 ), (ushort)width );
 		BinaryPrimitives.WriteUInt16LittleEndian( block.AsSpan( 18, 2 ), (ushort)height );
 		block[20] = (byte)xBearing;

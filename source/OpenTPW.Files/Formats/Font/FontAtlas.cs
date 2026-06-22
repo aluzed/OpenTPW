@@ -92,18 +92,23 @@ public sealed class FontAtlas
 		// Second pass: blit each glyph's mask and record its UVs.
 		foreach ( var (src, x, y) in placements )
 		{
+			var coverage = src.Coverage;
+			var hasCoverage = coverage is { Length: > 0 };
 			for ( var row = 0; row < src.Height; row++ )
 			{
 				for ( var col = 0; col < src.Width; col++ )
 				{
-					if ( !src.Pixels[row * src.Width + col] )
+					var idx = row * src.Width + col;
+					// White with alpha = the glyph's coverage (antialiased), or 0/255 from the 1bpp mask.
+					var alpha = hasCoverage ? coverage[idx] : (src.Pixels[idx] ? (byte)255 : (byte)0);
+					if ( alpha == 0 )
 						continue;
 
 					var p = ((y + row) * Width + (x + col)) * 4;
 					Pixels[p + 0] = 255;
 					Pixels[p + 1] = 255;
 					Pixels[p + 2] = 255;
-					Pixels[p + 3] = 255;
+					Pixels[p + 3] = alpha;
 				}
 			}
 

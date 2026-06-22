@@ -111,7 +111,7 @@ confirmation** below is what Ghidra would add (on a GOG/decrypted build).
 | Target | Status | What Ghidra would still confirm | Ticket |
 |--------|:------:|---------------------------------|--------|
 | `.TQI`/`.TGQ` video | ✅ pixel-accurate | exact AAN dequant tables (`IDCT_DAT`/`UVA_DATA`) | [T-021](tickets/T-021-tqi-exact-dequant.md) |
-| `.BF4` fonts | ✅ done | — | — |
+| `.BF4` fonts | ✅ 1bpp + **raw-4bpp AA** | the compressed-4bpp menu/title variant | [T-025](tickets/T-025-bf4-antialiased-fonts.md) |
 | `.PLB` particles | ⚠️ names + ramp + **full layout** (loader `FUN_0051f370`) | per-effect param **field labels** (need the consumer traced) | [T-019](tickets/T-019-plb-parameter-fields.md) |
 | `.MTR` materials | ✅ resolved | *no runtime loader* — texture binding is in the `.MD2` | [T-018](tickets/T-018-mtr-material-semantics.md) |
 | `.LIP` lip-sync | ⚠️ timestamps (µs) + **shapes resolved** (not in file; engine has 5 visemes) | live advisor-mouth wiring | [T-020](tickets/T-020-lip-mouth-shapes.md) |

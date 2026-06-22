@@ -2,7 +2,26 @@
 
 - **Priority**: 🟢 Low (1bpp fonts work; AA fonts are a visual upgrade)
 - **Type**: File format / reverse engineering
+- **Status**: ⚠️ Partial — the **raw-4bpp antialiased** variant is decoded (all the `*AA` faces + several
+  others); the **compressed-4bpp** variant (menu/title big faces) remains.
 - **Blocks**: nicer UI typography (menu/title fonts).
+
+## Solved: the encoding is in the glyph block (offset 12)
+
+The glyph block's **offset-12 field is the encoding tag** (not a constant): `2` = 1bpp, `0` = **raw 4bpp**
+(antialiased), `1` = **compressed 4bpp**. (Offset 8 is `width*height/2`, the 4bpp *uncompressed* size, not
+the stored byte count — which is why the byte-ratio heuristic below was noisy.)
+
+- **Raw 4bpp (tag 0) — done.** Continuous 4-bit coverage nibbles, high nibble first, scaled 0..15→0..255.
+  Verified by rendering: `GAME6AA`/`GAME9AA`/`TITLESMALL`/… 'A','B','H' come out as clean antialiased
+  glyphs. `BF4File` now exposes `GlyphEncoding` + per-pixel `Coverage`, and `FontAtlas` blits coverage as
+  the alpha channel (1bpp glyphs stay 0/255). Covers the `*AA` faces, the `DATE*`/`SESHSMALL`/`TITLESMALL`
+  /`GAMEBOLD9/10` faces. Unit-tested (`DecodesRaw4BppAntialiasedGlyph`).
+- **Compressed 4bpp (tag 1) — remaining.** The big menu/title faces (`MENU*`, `TITLE*BIG/MED`, `CASH*`,
+  `SESH*`, `MATISSE*`, `GAME12AA`) store fewer bytes than `width*height/2`, so they're a compressed 4bpp
+  stream. The decompression scheme isn't cracked yet; these still fall back to a rough 1bpp read. Needs the
+  BF4 blit/decompressor traced in Ghidra (no `.bf4`/`F4FB` string xref — search the `F4FB` magic constant
+  `0x42464634`), or more sample analysis of the byte stream.
 
 ## Problem
 

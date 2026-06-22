@@ -19,24 +19,36 @@ namespace OpenTPW;
 ///   ...: glyph blocks. Each block is:
 ///          0  : 4   character code (confirmed, e.g. 42 = '*')
 ///          4  : 4   line height (constant 8)
-///          8  : 4   bitmap byte count (= width*height/2; redundant)
-///          12 : 4   constant 2
+///          8  : 4   4bpp uncompressed size (= width*height/2; nominal, not the stored size)
+///          12 : 4   encoding tag: 2 = 1bpp, 0 = raw 4bpp (antialiased), 1 = compressed 4bpp
 ///          16 : 2   glyph width  (little-endian uint16)
 ///          18 : 2   glyph height (little-endian uint16)
 ///          20 : 1   x bearing
 ///          21 : 1   y bearing
 ///          22 : 2   x advance (cursor step)
-///          24 : ... 1bpp bitmap, MSB-first, width bits per row, height rows
+///          24 : ... pixel data (see <see cref="GlyphEncoding"/>)
 /// </code>
 ///
-/// All of the above were confirmed by rendering: a real font's glyph atlas is legible,
-/// and laying glyphs out by their advance produces correctly-spaced text ("GAME OVER").
-/// See docs/tickets/T-008. No published spec exists; reverse-engineered from sample fonts.
+/// All of the above were confirmed by rendering: a real font's glyph atlas is legible, and laying glyphs
+/// out by their advance produces correctly-spaced text ("GAME OVER"). The 1bpp + raw-4bpp paths render
+/// clean masks / antialiased coverage; the compressed-4bpp variant (menu/title faces) is not yet decoded.
+/// See docs/tickets/T-025. No published spec exists; reverse-engineered from sample fonts.
 /// </summary>
 public sealed class BF4File : BaseFormat
 {
 	private const string Magic = "F4FB";
 	private const int HeaderSize = 8;
+
+	/// <summary>How a glyph's pixel data (at block offset 24) is encoded — the block's offset-12 tag.</summary>
+	public enum GlyphEncoding
+	{
+		/// <summary>Raw 4-bit-per-pixel coverage (antialiased): continuous nibbles, high nibble first.</summary>
+		Raw4Bpp = 0,
+		/// <summary>Compressed 4bpp (menu/title faces) — not yet decoded; falls back to a 1bpp read.</summary>
+		Compressed4Bpp = 1,
+		/// <summary>1-bit-per-pixel mask: a continuous MSB-first bitstream, width bits per row.</summary>
+		OneBpp = 2,
+	}
 
 	public readonly struct Glyph
 	{
@@ -59,12 +71,21 @@ public sealed class BF4File : BaseFormat
 		public int Advance { get; init; }
 
 		/// <summary>
-		/// Row-major 1bpp pixel mask, <see cref="Width"/> × <see cref="Height"/>
-		/// (<c>true</c> = set). Empty for zero-size glyphs (e.g. space).
+		/// Row-major pixel mask, <see cref="Width"/> × <see cref="Height"/> (<c>true</c> = any coverage).
+		/// Empty for zero-size glyphs (e.g. space).
 		/// </summary>
 		public bool[] Pixels { get; init; }
 
-		/// <summary>The raw glyph block (for fields not yet decoded). See T-008.</summary>
+		/// <summary>
+		/// Row-major per-pixel coverage 0..255 (the antialiased alpha). For a 1bpp glyph this is 0/255; for
+		/// a raw-4bpp glyph the 0..15 nibble scaled to 0..255. Same length as <see cref="Pixels"/>.
+		/// </summary>
+		public byte[] Coverage { get; init; }
+
+		/// <summary>How this glyph's pixel data was encoded (the block's offset-12 tag).</summary>
+		public GlyphEncoding Encoding { get; init; }
+
+		/// <summary>The raw glyph block (for fields not yet decoded). See T-025.</summary>
 		public byte[] Data { get; init; }
 	}
 
@@ -123,7 +144,13 @@ public sealed class BF4File : BaseFormat
 			var xBearing = hasMetrics ? block[20] : 0;
 			var yBearing = hasMetrics ? block[21] : 0;
 			var advance = hasMetrics ? BinaryPrimitives.ReadUInt16LittleEndian( block.AsSpan( 22, 2 ) ) : 0;
-			var pixels = DecodeBitmap( block, width, height );
+			var encoding = hasMetrics
+				? (GlyphEncoding)BinaryPrimitives.ReadUInt32LittleEndian( block.AsSpan( 12, 4 ) )
+				: GlyphEncoding.OneBpp;
+			var coverage = DecodeCoverage( block, width, height, encoding );
+			var pixels = new bool[coverage.Length];
+			for ( var p = 0; p < coverage.Length; p++ )
+				pixels[p] = coverage[p] != 0;
 
 			Glyphs.Add( new Glyph
 			{
@@ -133,33 +160,53 @@ public sealed class BF4File : BaseFormat
 				XBearing = xBearing,
 				YBearing = yBearing,
 				Advance = advance,
+				Encoding = encoding,
 				Pixels = pixels,
+				Coverage = coverage,
 				Data = block,
 			} );
 		}
 	}
 
 	/// <summary>
-	/// Decodes the 1bpp glyph bitmap that starts at block offset 24: a continuous
-	/// MSB-first bitstream, <paramref name="width"/> bits per row, <paramref name="height"/>
-	/// rows. Missing bits (short block) read as 0.
+	/// Decodes a glyph's pixel data (block offset 24) to row-major coverage 0..255, per its
+	/// <see cref="GlyphEncoding"/>. Missing bytes (short block) read as 0.
+	/// <list type="bullet">
+	/// <item><see cref="GlyphEncoding.Raw4Bpp"/>: continuous 4-bit coverage nibbles (high nibble first),
+	///   scaled 0..15 → 0..255 — verified to render clean antialiased glyphs.</item>
+	/// <item>otherwise (1bpp, or the not-yet-decoded compressed variant): a continuous MSB-first 1bpp
+	///   bitstream → 0/255. The compressed variant therefore renders as a rough 1bpp mask for now.</item>
+	/// </list>
 	/// </summary>
-	private static bool[] DecodeBitmap( byte[] block, int width, int height )
+	private static byte[] DecodeCoverage( byte[] block, int width, int height, GlyphEncoding encoding )
 	{
 		const int bitmapOffset = 24;
 		var count = width * height;
-		var pixels = new bool[count < 0 ? 0 : count];
+		var coverage = new byte[count < 0 ? 0 : count];
 
-		for ( var i = 0; i < pixels.Length; i++ )
+		if ( encoding == GlyphEncoding.Raw4Bpp )
 		{
-			var bit = i;
-			var byteIndex = bitmapOffset + (bit >> 3);
-			if ( byteIndex >= block.Length )
-				break;
-
-			pixels[i] = ( (block[byteIndex] >> (7 - (bit & 7))) & 1 ) != 0;
+			for ( var i = 0; i < coverage.Length; i++ )
+			{
+				var byteIndex = bitmapOffset + (i >> 1);
+				if ( byteIndex >= block.Length )
+					break;
+				var nibble = (i & 1) == 0 ? block[byteIndex] >> 4 : block[byteIndex] & 0xF;
+				coverage[i] = (byte)(nibble * 17); // 0..15 → 0..255
+			}
+		}
+		else
+		{
+			for ( var i = 0; i < coverage.Length; i++ )
+			{
+				var byteIndex = bitmapOffset + (i >> 3);
+				if ( byteIndex >= block.Length )
+					break;
+				if ( ( (block[byteIndex] >> (7 - (i & 7))) & 1 ) != 0 )
+					coverage[i] = 255;
+			}
 		}
 
-		return pixels;
+		return coverage;
 	}
 }
