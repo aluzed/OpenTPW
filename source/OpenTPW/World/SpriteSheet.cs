@@ -13,20 +13,22 @@ internal sealed class SpriteSheet
 	public readonly record struct Anim( int Start, int Count );
 
 	private readonly Model[] frames;
-	private readonly float[] aspects;
 	private readonly Anim[] anims;
 
-	private SpriteSheet( Model[] frames, float[] aspects, Anim[] anims )
+	/// <summary>The tallest frame's pixel height — the reference a caller scales by (one pixels-to-world
+	/// factor for the whole sheet), so different-sized frames keep correct relative size with no jitter.</summary>
+	public float RefHeight { get; }
+
+	private SpriteSheet( Model[] frames, Anim[] anims, float refHeight )
 	{
 		this.frames = frames;
-		this.aspects = aspects;
 		this.anims = anims;
+		RefHeight = refHeight;
 	}
 
 	public int FrameCount => frames.Length;
 	public IReadOnlyList<Anim> Anims => anims;
 	public Model FrameModel( int i ) => frames[Math.Clamp( i, 0, frames.Length - 1 )];
-	public float FrameAspect( int i ) => aspects[Math.Clamp( i, 0, aspects.Length - 1 )];
 
 	private static readonly Dictionary<string, SpriteSheet?> cache = new();
 
@@ -52,23 +54,26 @@ internal sealed class SpriteSheet
 
 			var tpc = new TpcFile( s );
 			var frames = new Model[tpc.FrameCount];
-			var aspects = new float[tpc.FrameCount];
+			float refHeight = 1f;
+			for ( int i = 0; i < tpc.FrameCount; i++ )
+				refHeight = MathF.Max( refHeight, tpc.Frames[i].Height );
+
 			for ( int i = 0; i < tpc.FrameCount; i++ )
 			{
 				var f = tpc.Frames[i];
 				if ( f.Width == 0 || f.Height == 0 || f.Rgba.Length == 0 )
 				{
 					frames[i] = Billboard.Make( 0, 0, 0 );
-					aspects[i] = 1f;
 					continue;
 				}
-				frames[i] = Billboard.Make( new Texture( f.Rgba, f.Width, f.Height, TextureFlags.PointFilter ) );
-				aspects[i] = (float)f.Width / f.Height;
+				// Hotspot-anchored, pixel-unit quad: feet planted + no per-frame width jitter (T-035).
+				var tex = new Texture( f.Rgba, f.Width, f.Height, TextureFlags.PointFilter );
+				frames[i] = Billboard.MakeSprite( tex, f.Width, f.Height, f.HotspotX, f.HotspotY );
 			}
 
 			var anims = LoadAnims( dir, name, frames.Length );
-			Log.Info( $"[sprite] {key}: {frames.Length} frames, {anims.Length} directional anims" );
-			return new SpriteSheet( frames, aspects, anims );
+			Log.Info( $"[sprite] {key}: {frames.Length} frames, {anims.Length} directional anims, refH {refHeight:0}" );
+			return new SpriteSheet( frames, anims, refHeight );
 		}
 		catch ( Exception e )
 		{

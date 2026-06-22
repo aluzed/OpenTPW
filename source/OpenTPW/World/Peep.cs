@@ -59,9 +59,13 @@ public sealed class Peep : ModelEntity
 
 	// Sprite animation state (real sprite path only).
 	private readonly float spriteHeight;
-	private int facing;          // 0..7 movement direction sector → directional walk cycle
+	private int facing;          // 0..7 camera-relative direction sector → directional walk cycle
 	private float walkPhase;     // advances while moving; indexes the walk cycle
 	private bool movedThisFrame;
+	private Vector3 moveDir = new( 0, -1, 0 ); // last world travel direction (drives the facing each frame)
+
+	private static readonly Vector3 Offscreen = new( 0, 0, -100000f );
+	private readonly ModelEntity? shadow; // soft ground shadow under the peep (hidden while riding)
 
 	// Pathfinding state (T-036): the active route's waypoints + the goal it was planned for, so a path is
 	// reused until the goal moves to another tile rather than re-planned every frame.
@@ -96,6 +100,7 @@ public sealed class Peep : ModelEntity
 		}
 		speed = 8f + (float)Random.Shared.NextDouble() * 7f;
 		Position = spawn;
+		shadow = new ModelEntity { Model = ShadowModel(), Scale = new Vector3( spriteHeight * 0.4f, spriteHeight * 0.4f, 1f ) };
 		ParkFinances.Current?.TakeEntryFee(); // pays the gate on arrival
 		PickRoute();
 		DropToGround();
@@ -103,6 +108,8 @@ public sealed class Peep : ModelEntity
 
 	protected override void OnUpdate()
 	{
+		UpdateShadow();
+
 		// On the ride: hidden, waiting out the ride duration, then reappear at the exit, bank the fun, and
 		// either head home (tired/fed up) or pick another ride.
 		if ( riding )
@@ -261,7 +268,7 @@ public sealed class Peep : ModelEntity
 		if ( !arrived )
 		{
 			Position += to.Normal * speed * Time.Delta;
-			facing = DirSector( to.X, to.Y );
+			moveDir = to.Normal; // world travel direction; the facing is derived from it per frame
 		}
 		DropToGround();
 		return arrived;
@@ -300,34 +307,50 @@ public sealed class Peep : ModelEntity
 		pathGoalTile = null;
 	}
 
-	// World movement angle → one of 8 compass sectors (0 = +X, counter-clockwise).
-	private static int DirSector( float dx, float dy )
-	{
-		int s = (int)MathF.Round( MathF.Atan2( dy, dx ) / (MathF.PI / 4f) );
-		return ((s % 8) + 8) % 8;
-	}
-
-	// Picks the current sprite frame from the facing direction + walk phase and sizes the billboard to
-	// the frame's aspect. No-op on the flat-billboard fallback path.
+	// Picks the current sprite frame from the camera-relative facing + walk phase, holding the cycle's
+	// first (standing) frame when idle, at a uniform scale (the quad is hotspot-anchored so feet stay
+	// planted and frames don't pulse). No-op on the flat-billboard fallback path.
 	private void ApplySprite()
 	{
 		if ( sheet == null )
 			return;
 
+		facing = SpriteFacing.Sector( moveDir ); // matches the on-screen travel direction (T-035)
 		var anims = sheet.Anims;
 		int frame = 0;
 		if ( anims.Count > 0 )
 		{
 			var a = anims[facing % anims.Count];
-			if ( movedThisFrame )
-				walkPhase += WalkFps * Time.Delta;
-			else
-				walkPhase = 0f; // stand on the cycle's first frame when idle
+			walkPhase = movedThisFrame ? walkPhase + WalkFps * Time.Delta : 0f; // idle holds the standing frame
 			frame = a.Start + ( a.Count > 0 ? (int)walkPhase % a.Count : 0 );
 		}
 
 		Model = sheet.FrameModel( frame );
-		Scale = new Vector3( spriteHeight * sheet.FrameAspect( frame ), 1f, spriteHeight );
+		float p2w = spriteHeight / sheet.RefHeight; // one px→world factor for the whole sheet (no jitter)
+		Scale = new Vector3( p2w, 1f, p2w );
+	}
+
+	// Keep the soft ground shadow under the peep (hidden while it's riding / off the ground).
+	private void UpdateShadow()
+	{
+		if ( shadow == null )
+			return;
+		shadow.Position = riding
+			? Offscreen
+			: Position.WithZ( terrain.SampleHeight( Position.X, Position.Y ) + 0.12f );
+	}
+
+	// A shared flat dark translucent ground decal, so adding peeps/staff allocates nothing extra.
+	private static Model? shadowModel;
+	internal static Model ShadowModel()
+	{
+		if ( shadowModel != null )
+			return shadowModel;
+		var material = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader",
+			MaterialFlags.DoubleSided | MaterialFlags.DisableDepthWrite );
+		material.Set( "Color", new Texture( [0, 0, 0, 90], 1, 1 ) );
+		shadowModel = Primitives.Plane.GenerateModel( material );
+		return shadowModel;
 	}
 
 	/// <summary>An entertainer lifts this peep's mood (capped at full); a happier peep stays longer.</summary>

@@ -11,6 +11,10 @@ namespace OpenTPW;
 ///   per frame:  u32 dataLen, u16 w, u16 h, u16, u16, s32 hotspotX, s32 hotspotY
 ///               byte data[dataLen]            // h scanlines of signed-byte RLE
 /// </code>
+/// The hotspot is the frame top-left as a signed pixel offset from the sprite's anchor (feet), image X
+/// right / Y down — so a pixel at frame-local (px,py) sits at anchor-relative (hotspotX+px, hotspotY+py).
+/// <code>
+/// </code>
 /// Each scanline is prefixed by its byte length, then signed control bytes until <c>width</c> pixels:
 /// <c>c &lt; 0</c> → a run of <c>|c|</c> pixels of palette index = the next byte (index 0 = transparent);
 /// <c>c &gt; 0</c> → <c>c</c> literal palette indices. Frames are decoded to straight RGBA.
@@ -60,8 +64,10 @@ public sealed class TpcFile
 			uint dataLen = BinaryPrimitives.ReadUInt32LittleEndian( d.AsSpan( p ) );
 			ushort w = BinaryPrimitives.ReadUInt16LittleEndian( d.AsSpan( p + 4 ) );
 			ushort h = BinaryPrimitives.ReadUInt16LittleEndian( d.AsSpan( p + 6 ) );
-			short hotspotX = (short)BinaryPrimitives.ReadUInt16LittleEndian( d.AsSpan( p + 0x14 ) );
-			short hotspotY = (short)BinaryPrimitives.ReadUInt16LittleEndian( d.AsSpan( p + 0x16 ) );
+			// hotspot = signed top-left offset from the anchor, s32 at frame-header offsets 12/16
+			// (the previous u16 @0x14/0x16 read into the pixel data — those values were never used).
+			int hotspotX = BinaryPrimitives.ReadInt32LittleEndian( d.AsSpan( p + 12 ) );
+			int hotspotY = BinaryPrimitives.ReadInt32LittleEndian( d.AsSpan( p + 16 ) );
 			p += 20;
 			int pixStart = p;
 			p += (int)dataLen;

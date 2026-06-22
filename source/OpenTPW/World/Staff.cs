@@ -66,6 +66,10 @@ public sealed class Staff : ModelEntity
 	private int facing;
 	private float walkPhase;
 	private bool movedThisFrame;
+	private Vector3 moveDir = new( 0, -1, 0 ); // last world travel direction (drives the camera-relative facing)
+
+	private static readonly Vector3 Offscreen = new( 0, 0, -100000f );
+	private readonly ModelEntity shadow; // soft ground shadow under the staff member
 
 	public Staff( StaffRole role, ParkTerrain terrain, Vector3 center, float roam )
 	{
@@ -85,12 +89,14 @@ public sealed class Staff : ModelEntity
 		speed = 10f + (float)Random.Shared.NextDouble() * 4f;
 		target = PickWanderTarget();
 		Position = target;
+		shadow = new ModelEntity { Model = Peep.ShadowModel(), Scale = new Vector3( spriteHeight * 0.45f, spriteHeight * 0.45f, 1f ) };
 		DropToGround();
 	}
 
 	protected override void OnUpdate()
 	{
 		ParkFinances.Current?.PayWages( WagePerSecond * Time.Delta );
+		shadow.Position = Position.WithZ( terrain.SampleHeight( Position.X, Position.Y ) + 0.12f );
 
 		switch ( role )
 		{
@@ -116,12 +122,14 @@ public sealed class Staff : ModelEntity
 		_ => SpriteSheet.Load( "esprites/Fantasy/Entertainers", EntertainerSprites[Random.Shared.Next( EntertainerSprites.Length )] ),
 	};
 
-	// Picks the current sprite frame from the facing direction + walk phase, sizing the billboard.
+	// Picks the current sprite frame from the camera-relative facing + walk phase, at a uniform scale
+	// (hotspot-anchored quad — feet planted, no per-frame pulsing).
 	private void ApplySprite()
 	{
 		if ( sheet == null )
 			return;
 
+		facing = SpriteFacing.Sector( moveDir ); // matches the on-screen travel direction (T-035)
 		var anims = sheet.Anims;
 		int frame = 0;
 		if ( anims.Count > 0 )
@@ -131,14 +139,8 @@ public sealed class Staff : ModelEntity
 			frame = a.Start + ( a.Count > 0 ? (int)walkPhase % a.Count : 0 );
 		}
 		Model = sheet.FrameModel( frame );
-		Scale = new Vector3( spriteHeight * sheet.FrameAspect( frame ), 1f, spriteHeight );
-	}
-
-	// World movement angle → one of 8 compass sectors.
-	private static int DirSector( float dx, float dy )
-	{
-		int s = (int)MathF.Round( MathF.Atan2( dy, dx ) / (MathF.PI / 4f) );
-		return ((s % 8) + 8) % 8;
+		float p2w = spriteHeight / sheet.RefHeight;
+		Scale = new Vector3( p2w, 1f, p2w );
 	}
 
 	// Wander the park and lift the mood of every visitor within reach.
@@ -205,7 +207,7 @@ public sealed class Staff : ModelEntity
 		if ( !arrived )
 		{
 			Position += d.Normal * speed * Time.Delta;
-			facing = DirSector( d.X, d.Y );
+			moveDir = d.Normal; // world travel direction; the facing is derived from it per frame
 		}
 		DropToGround();
 		return arrived;
