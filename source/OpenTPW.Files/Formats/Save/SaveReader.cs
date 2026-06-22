@@ -1,12 +1,55 @@
-﻿using System.Text;
+using System.Buffers.Binary;
+using System.Text;
+using ICSharpCode.SharpZipLib.Zip.Compression;
 using ICSharpCode.SharpZipLib.Zip.Compression.Streams;
 
 namespace OpenTPW;
 
+/// <summary>
+/// Reader/writer for Theme Park World save files (<c>.TPWS</c> offline, <c>upload.LAYS</c> online). The
+/// <b>container</b> format is reverse-engineered from the no-CD <c>tp.exe</c> loader (Ghidra:
+/// <c>FUN_00414d40</c> → header <c>FUN_00416240</c>):
+/// <code>
+///   u32  version          (LE; current = 500. The loader rejects version &gt; 500 as "future").
+///   u8   headerByte
+///   1280 legalText        (the copyright/legal block; the loader checksums it)
+///   256  headerStruct     (a header/config struct; first 32 bytes copied to a global)
+///   u32  fileType         (BIG-endian / ntohl; current = 0x00012219, checked against a constant)
+///   u32  headerFlag       (0 = no embedded header, 1 = header present / online)
+///   BILZ block            "BILZ", u32 rawSize, u32 packedSize, 16 bytes, then a zlib stream
+/// </code>
+/// The previous reader mistook the leading <c>F4 01 00 00</c> for a magic — it is the little-endian
+/// version <b>500</b>. The decompressed <see cref="Payload"/> is the concatenation of the engine's
+/// <c>SAD_*</c> module chunks (UI, Advisor, Coasters, Ridesystem, Particles, …); decoding those
+/// individual modules is out of scope here and the payload is kept opaque. See docs/tickets/T-017.
+/// </summary>
 public class SaveReader : BaseFormat
 {
-	private ExpandedMemoryStream memoryStream = null!;
+	/// <summary>The current/maximum save version the game accepts (loader rejects anything higher).</summary>
+	public const uint CurrentVersion = 500;
+
+	/// <summary>The expected big-endian <c>fileType</c> tag (<c>00 01 22 19</c>).</summary>
+	public const uint OfflineFileType = 0x00012219;
+
+	private const int LegalTextLength = 0x500;   // 1280
+	private const int HeaderStructLength = 0x100; // 256
+	private const int HeaderEnd = 4 + 1 + LegalTextLength + HeaderStructLength + 4 + 4; // 1549, where BILZ starts
+	private const int BilzSideBytes = 16;
+
 	public byte[] buffer = null!;
+
+	/// <summary>Save-format version (LE u32 at offset 0). Current saves are <see cref="CurrentVersion"/>.</summary>
+	public uint Version { get; private set; }
+	public byte HeaderByte { get; private set; }
+	public byte[] LegalText { get; private set; } = new byte[LegalTextLength];
+	public byte[] HeaderStruct { get; private set; } = new byte[HeaderStructLength];
+	/// <summary>The big-endian <c>fileType</c> tag (offline saves: <see cref="OfflineFileType"/>).</summary>
+	public uint FileType { get; private set; }
+	/// <summary>Header/online flag (1 = an embedded header is present / online save).</summary>
+	public uint HeaderFlag { get; private set; }
+
+	/// <summary>The decompressed module data (the <c>SAD_*</c> chunk stream). Opaque — see the class note.</summary>
+	public byte[] Payload { get; private set; } = Array.Empty<byte>();
 
 	public SaveReader( string path )
 	{
@@ -14,127 +57,98 @@ public class SaveReader : BaseFormat
 		ReadFromStream( fileStream );
 	}
 
-	public SaveReader( Stream stream )
-	{
-		ReadFromStream( stream );
-	}
-	public void Dispose()
-	{
-		memoryStream.Dispose();
-	}
+	public SaveReader( Stream stream ) => ReadFromStream( stream );
 
 	protected override void ReadFromStream( Stream stream )
 	{
-		// Set up read buffer
-		var tempStreamReader = new StreamReader( stream );
-		var fileLength = (int)tempStreamReader.BaseStream.Length;
-
-		buffer = new byte[fileLength];
-		tempStreamReader.BaseStream.Read( buffer, 0, fileLength );
-		tempStreamReader.Close();
-		memoryStream = new ExpandedMemoryStream( buffer );
+		using var ms = new MemoryStream();
+		stream.CopyTo( ms );
+		buffer = ms.ToArray();
 	}
 
+	/// <summary>Parses the container header and returns the decompressed module payload.</summary>
 	public byte[] ReadFile()
 	{
-		memoryStream.Seek( 0, SeekOrigin.Begin );
+		if ( buffer.Length < HeaderEnd + 4 )
+			throw new InvalidDataException( $"TPWS: file too small ({buffer.Length} bytes)." );
 
-		/*
-			
-		Header
-			4 bytes: Magic number - F4 01 00 00
-			Copyright notice - 0x0004 to 0x033B
-			Padding - 0x033C to 0x0603
-			
-		File info
-			4 bytes: File type (00 01 22 19)
-			1 byte: File version (85)
-			1 byte: Online flag (00 = offline save, 01 = upload.LAYS)
-			2 bytes: Padding
-			If online flag set: 	Unknown data - 0x060C to 0x0846
-			
-		Data	
-			## ZLIB Header ##
-			4 bytes: Magic number - BILZ
-			4 bytes: Unknown
-			4 bytes: Compressed length
-			16 bytes: Unknown
-			2 bytes: ZLIB Compression Header
-			ZLIB stream begins after this point, continues to end of file
-		*/
+		Version = BinaryPrimitives.ReadUInt32LittleEndian( buffer.AsSpan( 0, 4 ) );
+		if ( Version > CurrentVersion )
+			throw new InvalidDataException( $"TPWS: future-version save ({Version} > {CurrentVersion}); needs a newer game." );
 
-		var magicNumber = memoryStream.ReadHex( 4 );
+		HeaderByte = buffer[4];
+		LegalText = buffer[5..(5 + LegalTextLength)];
+		var structStart = 5 + LegalTextLength;
+		HeaderStruct = buffer[structStart..(structStart + HeaderStructLength)];
 
-		if ( magicNumber != "F4010000" )
-			throw new Exception( $"Magic number did not match: {magicNumber}" );
+		// fileType is stored big-endian (the loader runs it through ntohl before comparing).
+		FileType = BinaryPrimitives.ReadUInt32BigEndian( buffer.AsSpan( structStart + HeaderStructLength, 4 ) );
+		HeaderFlag = BinaryPrimitives.ReadUInt32LittleEndian( buffer.AsSpan( structStart + HeaderStructLength + 4, 4 ) );
 
-		int copyrightSize = 824; //Character count with spaces adds to 824
+		// BILZ block: magic + raw/packed sizes + 16 bytes, then a zlib stream to EOF.
+		var p = HeaderEnd;
+		var magic = Encoding.ASCII.GetString( buffer, p, 4 );
+		if ( magic != "BILZ" )
+			throw new InvalidDataException( $"TPWS: expected BILZ block, found '{magic}'." );
+		var rawSize = (int)BinaryPrimitives.ReadUInt32LittleEndian( buffer.AsSpan( p + 4, 4 ) );
+		p += 4 + 4 + 4 + BilzSideBytes; // magic + rawSize + packedSize + 16 side bytes
 
-		var copyrightCharacters = memoryStream.ReadChars( copyrightSize );
-		string copyright = "";
-		foreach ( char c in copyrightCharacters )
-		{
-			copyright += c;
-		}
-
-		memoryStream.Seek( 0x0604, SeekOrigin.Begin );
-
-		var fileType = memoryStream.ReadInt32();
-
-		var fileVersion = memoryStream.ReadByte();
-		if ( fileVersion != 133 )
-			throw new Exception( $"File version is not 133." );
-
-		// File flag
-		bool isOnline = memoryStream.ReadByte() != 0 ? true : false;
-
-		// Padding
-		_ = memoryStream.ReadBytes( 2 );
-
-		if ( isOnline )
-			throw new Exception( "File is online, no compatibility for this yet." );
-
-		// Padding
-		_ = memoryStream.ReadByte();
-
-		// Start of Data
-		var dataMagicNumber = memoryStream.ReadString( 4 );
-
-		if ( dataMagicNumber != "BILZ" )
-			throw new Exception( $"Magic number did not match: {dataMagicNumber}" );
-
-		// Unknown
-		_ = memoryStream.ReadInt32();
-
-		var compressedLength = memoryStream.ReadInt32();
-
-		// Unknown - 16 bytes
-		_ = memoryStream.ReadBytes( 16 );
-
-		// get bytes before ZLIB Header
-		var initialPos = memoryStream.Position;
-
-		// Compression header
-		//var compressionHeader = memoryStream.ReadBytes( 2 );
-
-		byte[] output = new byte[compressedLength];
-
-		using ( MemoryStream uncompressedStream = new MemoryStream() )
-		using ( InflaterInputStream compressed = new InflaterInputStream( memoryStream ) )
-		{
-			compressed.CopyTo( uncompressedStream );
-			return uncompressedStream.ToArray();
-		}
+		using var compressed = new MemoryStream( buffer, p, buffer.Length - p );
+		using var inflater = new InflaterInputStream( compressed );
+		using var outStream = new MemoryStream( rawSize > 0 ? rawSize : 0 );
+		inflater.CopyTo( outStream );
+		Payload = outStream.ToArray();
+		return Payload;
 	}
 
 	/// <summary>
-	/// Converts the save file from byte array to a "readable" string
-	/// (removes all null entries after string conversion)
+	/// Serialises the container back to bytes (header + BILZ + zlib(<see cref="Payload"/>)). This
+	/// round-trips a loaded save: <c>Read → Write → Read</c> yields the same header fields and payload.
+	/// The inner module data is written verbatim from <see cref="Payload"/> (it is not re-modelled).
 	/// </summary>
-	/// <returns></returns>
-	public string FileToString()
+	public byte[] Serialize() =>
+		Build( Version, FileType, HeaderFlag, HeaderByte, LegalText, HeaderStruct, Payload );
+
+	/// <summary>Builds a complete <c>.TPWS</c> container from its parts (used by <see cref="Serialize"/>).</summary>
+	public static byte[] Build( uint version, uint fileType, uint headerFlag, byte headerByte,
+		byte[] legalText, byte[] headerStruct, byte[] payload )
 	{
-		var output = ReadFile();
-		return Encoding.ASCII.GetString( output ).Replace( "\0", string.Empty );
+		if ( legalText.Length != LegalTextLength )
+			throw new ArgumentException( $"legalText must be {LegalTextLength} bytes.", nameof( legalText ) );
+		if ( headerStruct.Length != HeaderStructLength )
+			throw new ArgumentException( $"headerStruct must be {HeaderStructLength} bytes.", nameof( headerStruct ) );
+
+		var packed = ZlibCompress( payload );
+
+		using var ms = new MemoryStream();
+		using var bw = new BinaryWriter( ms );
+		Span<byte> u32 = stackalloc byte[4];
+
+		BinaryPrimitives.WriteUInt32LittleEndian( u32, version ); bw.Write( u32 );
+		bw.Write( headerByte );
+		bw.Write( legalText );
+		bw.Write( headerStruct );
+		BinaryPrimitives.WriteUInt32BigEndian( u32, fileType ); bw.Write( u32 );
+		BinaryPrimitives.WriteUInt32LittleEndian( u32, headerFlag ); bw.Write( u32 );
+
+		bw.Write( Encoding.ASCII.GetBytes( "BILZ" ) );
+		BinaryPrimitives.WriteUInt32LittleEndian( u32, (uint)payload.Length ); bw.Write( u32 ); // rawSize
+		BinaryPrimitives.WriteUInt32LittleEndian( u32, (uint)packed.Length ); bw.Write( u32 );  // packedSize
+		bw.Write( new byte[BilzSideBytes] );
+		bw.Write( packed );
+
+		bw.Flush();
+		return ms.ToArray();
 	}
+
+	private static byte[] ZlibCompress( byte[] data )
+	{
+		using var ms = new MemoryStream();
+		using ( var deflater = new DeflaterOutputStream( ms, new Deflater( Deflater.BEST_COMPRESSION ) ) { IsStreamOwner = false } )
+			deflater.Write( data, 0, data.Length );
+		return ms.ToArray();
+	}
+
+	/// <summary>The decompressed save as an ASCII string with NULs stripped (debug aid).</summary>
+	public string FileToString() => Encoding.ASCII.GetString( ReadFile() ).Replace( "\0", string.Empty );
 }
