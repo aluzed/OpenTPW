@@ -2,11 +2,13 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine / UI / reverse engineering
-- **Status**: ⚠️ Slices 1–3a done — the coaster **station** is placeable via the build catalog and
-  renders/queues like any ride, a **track-laying tool** extends elevated track segments from the
-  station's `>` connector and **closes into a circuit** at the `<` entry connector, and a **train of
-  real `CrocCar.MD2` cars** runs the track (shuttling when open, a continuous loop when closed).
-  Remaining: 3D *curved* pieces from `.hmp`, peep boarding + scream (slice 3b), below.
+- **Status**: ⚠️ Slices 1–3b (boarding+scream) done — the coaster **station** is placeable via the build
+  catalog and renders/queues like any ride, a **track-laying tool** extends elevated track segments from
+  the station's `>` connector and **closes into a circuit** at the `<` entry connector, a **train of
+  real `CrocCar.MD2` cars** runs the track (shuttling when open, a continuous loop when closed), **real
+  peeps board the train** (they ride it in view from their queue, replacing the seat-marker stand-ins)
+  and the **rider scream** plays while anyone is aboard. Remaining (slice 3b polish): authentic curved
+  track-piece geometry / rail profile from `.hmp`, and segment rotation / `STACKUP/DOWN` elevation editing.
 - **Parent**: [T-038](T-038-park-management-ui.md). **Needs**: [T-041](T-041-ride-shop-placement.md).
   **Related**: [T-032](T-032-ride-engine.md), [T-033](T-033-ride-animation-keyframes.md).
 
@@ -87,13 +89,26 @@
   station logs `autotrack segments=9 closed=True`, the looping train runs with no exceptions, and the
   smooth textured track ribbon + riders render (confirmed in-frame).
 
+## Done (slice 3b — rideable CrocCar + scream)
+
+- **Real peep boarding**: `Ride.Train` back-references the coaster's `CoasterTrain` (set by
+  `CoasterTrack`), so when a peep reaches the front of the coaster's queue it climbs *onto* the train
+  (`CoasterTrain.TryBoard`) and rides it **in view** — sitting on a seat the train repositions each frame
+  (`Peep.SeatAt`, still camera-facing) instead of vanishing like an ordinary-ride rider. The old yellow
+  seat-marker stand-ins are gone. A peep boarding a track-less coaster, or one past the train's 6 seats,
+  falls back to the hidden-rider path. On ride-end the peep unboards and reappears at the exit as before.
+- **Scream**: the train raises the ride's sustained scream the moment the first peep boards and ends it
+  when the last leaves (`Ride.StartRiderScream`/`StopRiderScream` → the engine's existing
+  `StartScream`/`StopScream`, which re-plays a `KidsHD` peep voice every period — T-037).
+- Verified via `OPENTPW_AUTOPLACE`: peeps walk from the crowd to the auto-laid 9-segment looped coaster,
+  board the train (logged `peep boarded train (n/6 seats)`, seats filling), and `STARTSCREAM`/`STOPSCREAM`
+  bracket the occupancy. Build clean (0 errors), 65/0 tests.
+
 ## Remaining slices
 
-3b. **Rideable CrocCar + authentic pieces** — wire real peep boarding (peeps leave the queue *onto* the
-    train rather than the current marker stand-ins) + scream (ties into the ride engine, T-032/T-033),
-    and (polish) authoring the ribbon profile from the
-    `.hmp` templates (rails + cross-ties geometry) rather than a flat textured strip. Rotation /
-    `STACKUP/DOWN` elevation editing of segments also lands here.
+3b (polish). **Authentic pieces** — authoring the track profile from the `.hmp` templates (rails +
+    cross-ties geometry) rather than a flat textured ribbon strip, and 3D *curved* piece meshes.
+    Rotation / `STACKUP/DOWN` elevation editing of segments also lands here.
 
 ## Context
 

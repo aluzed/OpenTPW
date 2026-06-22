@@ -5,13 +5,14 @@ namespace OpenTPW;
 /// along the track's smoothed centre-line, advancing by arc length and orienting to the local tangent
 /// (shuttling on an open track, looping on a closed circuit). The car is the ride's real
 /// <c>CrocCar.MD2</c> mesh when it loads (single mesh, 6 materials), falling back to a procedural box.
-/// The train carries **visible riders** — seat markers reflecting the coaster's live occupancy
-/// (<see cref="CoasterTrack.Riders"/>). Scream SFX awaits the ride engine (T-032).
+/// The train carries **real boarded peeps** — a peep that reaches the front of the coaster's queue
+/// climbs onto a seat (<see cref="TryBoard"/>) and rides the train in view until its ride ends (slice
+/// 3b), and the ride's rider scream plays while anyone is aboard.
 /// </summary>
 public sealed class CoasterTrain : Entity
 {
 	private const int CarCount = 3;
-	private const int RidersPerCar = 2;
+	private const int SeatsPerCar = 2;
 	private const float Speed = 16f;   // world units / second along the track
 	private const float AnimFps = 8f;  // CrocCar frame cadence
 	private static readonly Vector3 Offscreen = new( 0, 0, -100000f );
@@ -20,9 +21,13 @@ public sealed class CoasterTrain : Entity
 	private readonly float tileSize;
 	private readonly float spacing;     // arc-length gap between cars
 	private readonly ModelEntity[] cars;
-	private readonly ModelEntity[] seats; // CarCount*RidersPerCar rider markers
+	private readonly List<Peep> riders = new(); // boarded peeps, seat order (front car first)
 	private readonly Model[] frames;      // CrocCar animation frames (base + CrocCarM1..3)
 	private float dist;                 // lead car's distance travelled along the shuttle cycle
+	private bool screaming;             // true while the train carries ≥1 rider (drives the ride scream)
+
+	/// <summary>How many seats the train has across all cars.</summary>
+	public int SeatCount => cars.Length * SeatsPerCar;
 
 	public CoasterTrain( CoasterTrack track, float tileSize, string archive )
 	{
@@ -36,22 +41,32 @@ public sealed class CoasterTrain : Entity
 		cars = new ModelEntity[CarCount];
 		for ( int i = 0; i < CarCount; i++ )
 			cars[i] = new ModelEntity { Model = frames[0], Scale = scale, Position = Offscreen };
-
-		// Bright little markers standing in for seated riders (shown per occupied seat).
-		var seatMat = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader" );
-		seatMat.Set( "Color", new Texture( [250, 210, 80, 255], 1, 1 ) );
-		seats = new ModelEntity[CarCount * RidersPerCar];
-		for ( int i = 0; i < seats.Length; i++ )
-			seats[i] = new ModelEntity { Model = Primitives.Cube.GenerateModel( seatMat ), Scale = new Vector3( tileSize * 0.08f ), Position = Offscreen };
 	}
 
-	/// <summary>Despawn the train's car + rider entities (called when the track is torn down).</summary>
+	/// <summary>A peep at the front of the queue climbs aboard, taking the next free seat. Returns false
+	/// (so the caller hides the peep as on an ordinary ride) when the train is already full.</summary>
+	public bool TryBoard( Peep peep )
+	{
+		if ( riders.Count >= SeatCount || riders.Contains( peep ) )
+			return false;
+		riders.Add( peep );
+		return true;
+	}
+
+	/// <summary>A peep's ride ends — it leaves its seat (the train frees up for the next in line).</summary>
+	public void Unboard( Peep peep ) => riders.Remove( peep );
+
+	/// <summary>Despawn the train's car entities + end any scream (called when the track is torn down).</summary>
 	public void Despawn()
 	{
 		foreach ( var c in cars )
 			Entity.All.Remove( c );
-		foreach ( var s in seats )
-			Entity.All.Remove( s );
+		riders.Clear();
+		if ( screaming )
+		{
+			track.Coaster.StopRiderScream();
+			screaming = false;
+		}
 		Entity.All.Remove( this );
 	}
 
@@ -78,7 +93,9 @@ public sealed class CoasterTrain : Entity
 		float period = closed ? length : 2f * length;
 		dist = (dist + Speed * Time.Delta) % period;
 
-		int occupied = Math.Min( track.Riders, seats.Length ); // how many seat markers to show
+		// The ride screams while it carries anyone (sustained by the ride engine; T-037 plays KidsHD voices).
+		UpdateScream();
+
 		var frame = frames[CurrentFrame()];
 		for ( int i = 0; i < cars.Length; i++ )
 		{
@@ -99,23 +116,31 @@ public sealed class CoasterTrain : Entity
 			var rot = System.Numerics.Quaternion.CreateFromAxisAngle( System.Numerics.Vector3.UnitZ, yaw );
 			cars[i].Rotation = rot;
 
-			// Seat the riders this car carries, side by side across its width (perp to travel).
+			// Seat the real boarded peeps this car carries, side by side across its width (perp to travel);
+			// each rider sits on the car and keeps facing the camera (the peep itself idles while aboard).
 			var side = new Vector3( -tan.Y, tan.X, 0f ).Normal;
-			for ( int r = 0; r < RidersPerCar; r++ )
+			for ( int r = 0; r < SeatsPerCar; r++ )
 			{
-				int seat = i * RidersPerCar + r;
-				if ( seat < occupied )
-				{
-					float off = (r == 0 ? 1f : -1f) * tileSize * 0.12f;
-					seats[seat].Position = pos + Vector3.Up * (tileSize * 0.10f) + side * off;
-					seats[seat].Rotation = rot;
-				}
-				else
-				{
-					seats[seat].Position = Offscreen;
-				}
+				int seat = i * SeatsPerCar + r;
+				if ( seat >= riders.Count )
+					break;
+				float off = (r == 0 ? 1f : -1f) * tileSize * 0.12f;
+				riders[seat].SeatAt( pos + Vector3.Up * (tileSize * 0.10f) + side * off );
 			}
 		}
+	}
+
+	// Start the ride's scream the moment the first peep boards and stop it once the last one leaves.
+	private void UpdateScream()
+	{
+		bool occupied = riders.Count > 0;
+		if ( occupied == screaming )
+			return;
+		screaming = occupied;
+		if ( occupied )
+			track.Coaster.StartRiderScream();
+		else
+			track.Coaster.StopRiderScream();
 	}
 
 	// Position + forward tangent at arc-length d along the polyline.

@@ -115,8 +115,17 @@ public class Ride : Entity
 	public RideQueue? Queue { get; internal set; }
 	public int Riders => Queue?.Riders ?? 0;
 
+	/// <summary>The coaster train running this ride's player-laid track, if any (set by
+	/// <see cref="CoasterTrack"/>). A boarding peep rides it in view instead of being hidden (T-045 3b).</summary>
+	public CoasterTrain? Train { get; internal set; }
+
 	/// <summary>Run (true) or idle (false) the ride's animation — driven by occupancy (see RideQueue / Peep).</summary>
 	public void SetActive( bool active ) => engine.SetActive( active );
+
+	/// <summary>Begin / end the sustained rider scream — the coaster train raises it while it carries
+	/// riders (the VM-driven rides scream from their own scripts instead). See T-045 3b / T-037.</summary>
+	public void StartRiderScream() => engine.StartScream( 0, 70 );
+	public void StopRiderScream() => engine.StopScream();
 
 	private readonly RideEngine engine = new();
 

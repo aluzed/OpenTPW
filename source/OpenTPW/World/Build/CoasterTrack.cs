@@ -32,6 +32,9 @@ public sealed class CoasterTrack
 	/// <summary>Live rider count of the parent coaster — the train carries this many and runs while &gt; 0.</summary>
 	public int Riders => coaster.Riders;
 
+	/// <summary>The coaster this track belongs to (the train uses it to start/stop the rider scream).</summary>
+	public Ride Coaster => coaster;
+
 	public CoasterTrack( Ride coaster, PlacementGrid grid, ParkTerrain terrain )
 	{
 		this.grid = grid;
@@ -59,6 +62,7 @@ public sealed class CoasterTrack
 
 		// The train hides itself until at least one segment is laid (path has < 2 points).
 		train = new CoasterTrain( this, grid.TileSize, coaster.Archive );
+		coaster.Train = train; // peeps boarding this coaster ride the train in view (T-045 3b)
 	}
 
 	/// <summary>The track centre-line as elevated world points (one per laid tile) — the raw control path.</summary>
@@ -134,6 +138,8 @@ public sealed class CoasterTrack
 			Entity.All.Remove( ribbon );
 		ribbon = null;
 		train.Despawn();
+		if ( coaster.Train == train )
+			coaster.Train = null;
 	}
 
 	// A slim grey pillar from the ground up to the track, under the laid tile's centre.

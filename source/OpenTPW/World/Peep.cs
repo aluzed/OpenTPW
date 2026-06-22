@@ -49,6 +49,7 @@ public sealed class Peep : ModelEntity
 	private RideQueue? lastRoute;
 	private float rideTimer;
 	private bool riding;
+	private CoasterTrain? mount; // the coaster train this peep is riding in view (null = ordinary hidden ride)
 	private bool leaving;
 	private Shop? shopTarget;
 	private float happiness = StartHappiness;
@@ -104,6 +105,8 @@ public sealed class Peep : ModelEntity
 				happiness = Math.Min( 100f, happiness + route!.Ride.Excitement * RideRewardScale );
 				riding = false;
 				route.Leave();
+				mount?.Unboard( this ); // climb off the coaster train (no-op for ordinary rides)
+				mount = null;
 				Model = billboard;
 				Position = route.ExitPoint;
 				if ( WantsToLeave() )
@@ -190,7 +193,14 @@ public sealed class Peep : ModelEntity
 			route.Board( this );
 			riding = true;
 			rideTimer = route.RideDuration;
-			Model = null;
+			// A coaster carries the peep on its train in view; any other ride (or a full/track-less coaster)
+			// hides the peep until it reappears at the exit.
+			mount = route.Ride.Train;
+			if ( mount == null || !mount.TryBoard( this ) )
+			{
+				mount = null;
+				Model = null;
+			}
 			return;
 		}
 
@@ -276,6 +286,15 @@ public sealed class Peep : ModelEntity
 
 	/// <summary>An entertainer lifts this peep's mood (capped at full); a happier peep stays longer.</summary>
 	public void Cheer( float amount ) => happiness = Math.Min( 100f, happiness + amount );
+
+	/// <summary>Place this peep on a moving coaster seat (T-045 3b): sit at <paramref name="seat"/> and
+	/// keep facing the camera. Called by the <see cref="CoasterTrain"/> each frame while the peep is aboard;
+	/// the peep's own update skips its walk logic while riding, so the train fully owns its transform.</summary>
+	public void SeatAt( Vector3 seat )
+	{
+		Position = seat;
+		FaceCamera();
+	}
 
 	// The closest shop to head to when hungry (null if the park has none).
 	private Shop? NearestShop()
