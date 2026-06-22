@@ -6,7 +6,7 @@ dispatched by the executor `FUN_00551cb0` (opcode word tagged `0x80`, bounds `< 
 table at `0x5567d8`). The **Operands** column is authoritative (the reflection dispatcher must
 match it). **Kind**: `pure` = VM-state only (done); `engine` = needs the ride engine.
 
-Status: **78 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus a growing set of
+Status: **83 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus a growing set of
 Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sound, the animation +
 `WAIT*` family, and now the **rider scream family** `STARTSCREAM`/`STOPSCREAM`/`SINGLESCREAM`/
 `SCREAMLEVEL`). See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md) / [T-032](tickets/T-032-ride-engine.md).
@@ -71,11 +71,11 @@ Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sou
 | 55 | `COAST` | 2 | ✅ | engine | coaster control, multiplexed by subcommand (1 load·2 can-load?·3 wants-off?·4 state·5 mode·6 capacity·7 worn·8 init); queries set the Zero flag |
 | 56 | `ADDHEAD` | 1 | ☐ | engine |
 | 57 | `DELHEAD` | 1 | ☐ | engine |
-| 58 | `LIMBO` | 2 | ☐ | engine |
-| 59 | `UNLIMBO` | 1 | ☐ | engine |
-| 60 | `FORCEUNLIMBO` | 1 | ☐ | engine |
-| 61 | `INLIMBO` | 1 | ☐ | engine |
-| 62 | `LIMBOSPACE` | 1 | ☐ | engine |
+| 58 | `LIMBO` | 2 | ✅ | engine | park a value in the per-VM timed limbo list (expiry = now+secs); pure VM state |
+| 59 | `UNLIMBO` | 1 | ✅ | engine | release the first **expired** limbo value into dest |
+| 60 | `FORCEUNLIMBO` | 1 | ✅ | engine | release the first limbo value into dest regardless of expiry |
+| 61 | `INLIMBO` | 1 | ✅ | engine | read the limbo count into dest |
+| 62 | `LIMBOSPACE` | 1 | ✅ | engine | read the free limbo slots into dest |
 | 63 | `SPAWNCHILD` | 1 | ✅ | engine |
 | 64 | `SPAWNSOUND` | 1 | ☐ | engine |
 | 65 | `REMOVECHILD` | 0 | ☐ | engine |

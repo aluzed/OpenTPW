@@ -2,12 +2,12 @@
 
 - **Priority**: 🟡 Feature (core of ride gameplay)
 - **Type**: Feature / reverse engineering
-- **Status**: ⚠️ **Partial.** The `.RSE` **loader / disassembler is restored and working**
-  (`source/OpenTPW/VM/RideScriptFile.cs`, recovered from git history where a refactor had
-  deleted it). `RideVM` now actually parses the script; variable init is made defensive
-  (`EnsureCommonVariables`). Validated by `RideScriptTests.LoadsTestScript` against a real
-  `content/testscripts/Test.RSE` fixture (also recovered from history). **Remaining**:
-  implement the ~180 missing opcodes, harden `BranchTo`, and execute scripts on real rides.
+- **Status**: ⚠️ **Partial — 83 / 106 opcodes.** The `.RSE` loader / disassembler is restored and
+  working; `RideVM` parses + runs scripts. **Batch A (all 43 `pure`) complete**; Batch B is well
+  underway — object spawn/lifecycle, the animation + `WAIT*` family, sound, the rider-scream family, and
+  now the **limbo family** (`LIMBO`/`UNLIMBO`/`FORCEUNLIMBO`/`INLIMBO`/`LIMBOSPACE` — RE'd as a per-VM
+  timed value queue, pure VM state) are all in and unit-tested. **Remaining: 23 opcodes** — lights,
+  walk-on/off, heads, cross-VM remote vars, and a few effect/particle ops (see docs/06).
 
 ## Findings
 
@@ -89,11 +89,26 @@ runtime). Classification: **43 `pure`** (VM-state only — implementable now) an
     child/parent-var opcodes usable in real scripts. Coverage **50 → 51 / 106**. Covered by
     `RideScriptTests.SpawnChildLinksAndDrivesChildVars`.
 
-**Remaining: Batch B (the other 55 `engine` opcodes)** — objects (`ADDOBJ`…), animations,
-sound, lights, walk/limbo, scream. These create world entities / trigger render+audio, so they
-need the **ride engine** to build and verify (not a headless VM task). Reversed semantics are
-available; the engine is the next subsystem. The remaining wiring (e.g. setting `ChildLoader`
-to the real VFS loader where ride VMs are created) is engine glue done with the running engine.
+13. ✅ **Limbo family** (`LIMBO`/`UNLIMBO`/`FORCEUNLIMBO`/`INLIMBO`/`LIMBOSPACE`, opcodes 58–62) — reversed
+    from the executor cases (`op_58..op_62`): the limbo table lives in the **VM struct** (`+0x24` entries,
+    count `+0x60`, capacity `+0x58`), not the engine, so these are **pure VM** despite the old "engine"
+    tag. `LIMBO(value, secs)` parks `(value, now+secs×1000)` in a free slot (result 1/0);
+    `UNLIMBO(dest)` releases the first **expired** entry; `FORCEUNLIMBO(dest)` the first regardless;
+    `INLIMBO(dest)` = count; `LIMBOSPACE(dest)` = free slots. Each sets the Zero/Sign flags from its
+    result (the original's `+0x48` register). New `RideVM.Limbo` list + `Handlers/Limbo.cs`. Coverage
+    **78 → 83 / 106**. Covered by `RideScriptTests.LimboOpcodes`.
+
+**Remaining: 23 opcodes**, in families:
+- **Lights** (`ENABLELIGHT`/`DISABLELIGHT`/`SETLIGHT`/`COLOURLIGHT`) — need a light subsystem on the engine.
+- **Walk** (`WALKON`/`WALKOFF`/`WALKGET`/`WALKST_FLOAT`/`WALKFLOATSTAT`/`WALKFLOATSTOP`) — peeps walking on/off a ride; ties into the peep system.
+- **Heads** (`ADDHEAD`/`DELHEAD`), **effects** (`ADDOBJ_EXT`/`SPARK`/`REPAIREFFECT`/`GETCUSTPTCLCODE`).
+- **Cross-VM** (`GETREMOTEVAR`/`SETREMOTEVAR`/`FINDSCRIPTRAND`/`REMOVECHILD`) + `TURBO`/`TOUR`/`BUMP` —
+  several of these are likely **pure VM** (like the limbo + child/parent-var families turned out to be);
+  worth reversing their executor cases next, as they're headless-testable.
+
+Most have clear names + known operand counts; reverse each from its executor case (`op_<n>` in
+`FUN_00551cb0`) before implementing, as the limbo family showed (the "engine" tag is often wrong — limbo
+was pure VM state). The light/walk/head families do need engine subsystems to build + verify.
 
 > Note: the instruction doc describes `CMP` as a *bitwise-AND* comparison, but the current
 > `Math.Compare` does equality/less-than. Left as-is for now (changing it could shift branch

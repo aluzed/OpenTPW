@@ -77,6 +77,12 @@ public partial class RideVM
 	// the bottom (index +0x44). Modelled here as an independent stack. See Handlers/Misc.cs.
 	public Stack<int> HushStack { get; set; } = new();
 
+	// The timed "limbo" list (the original VM struct's +0x24 table, count +0x60, capacity +0x58):
+	// (value, expiry) pairs. LIMBO parks a value with an expiry; UNLIMBO releases the first expired one,
+	// FORCEUNLIMBO the first regardless. A per-VM scheduling queue (pure VM state). See Handlers/Limbo.cs.
+	public const int LimboCapacity = 100; // the original's fixed per-VM allocation (exact value isn't gameplay-critical)
+	public List<(int Value, int Expiry)> Limbo { get; } = new();
+
 	private Dictionary<Opcode, MethodInfo> OpcodeHandlers { get; } = Assembly.GetExecutingAssembly().GetTypes()
 		.SelectMany( t => t.GetMethods() )
 		.Where( x => x.GetCustomAttribute<OpcodeHandlerAttribute>() != null )

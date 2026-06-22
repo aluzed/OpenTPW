@@ -324,6 +324,51 @@ public class RideScriptTests
 		Assert.AreEqual( 1, parent.Children.Count );
 	}
 
+	// The limbo opcodes: a per-VM timed queue of values. LIMBO parks (value, now+secs*1000); UNLIMBO
+	// releases the first EXPIRED entry, FORCEUNLIMBO the first regardless; INLIMBO=count, LIMBOSPACE=free.
+	// Result feeds the Zero flag (so a following JZ reacts). Semantics recovered from the executor (T-007).
+	[TestMethod]
+	public void LimboOpcodes()
+	{
+		Log = new();
+		var vm = LoadTestVm();
+		vm.GameTime = 1000;
+		var dest = new Operand( vm, Operand.Type.Variable, 0, 0 );
+
+		// Park two values: A expires at 1000+1*1000=2000, B at 1000+5*1000=6000.
+		OpcodeHandlers.Limbo.Park( ref vm, Lit( vm, 42 ), Lit( vm, 1 ) );
+		Assert.IsFalse( vm.Flags.HasFlag( RideVM.VMFlags.Zero ), "added → result 1" );
+		OpcodeHandlers.Limbo.Park( ref vm, Lit( vm, 99 ), Lit( vm, 5 ) );
+
+		OpcodeHandlers.Limbo.Count( ref vm, dest );
+		Assert.AreEqual( 2, dest.Value );
+		OpcodeHandlers.Limbo.Space( ref vm, dest );
+		Assert.AreEqual( RideVM.LimboCapacity - 2, dest.Value );
+
+		// Nothing expired yet at t=1500 → UNLIMBO returns 0 and sets Zero.
+		vm.GameTime = 1500;
+		OpcodeHandlers.Limbo.Release( ref vm, dest );
+		Assert.AreEqual( 0, dest.Value );
+		Assert.IsTrue( vm.Flags.HasFlag( RideVM.VMFlags.Zero ) );
+
+		// At t=3000, A (expiry 2000) is expired → released; B remains.
+		vm.GameTime = 3000;
+		OpcodeHandlers.Limbo.Release( ref vm, dest );
+		Assert.AreEqual( 42, dest.Value );
+		OpcodeHandlers.Limbo.Count( ref vm, dest );
+		Assert.AreEqual( 1, dest.Value );
+
+		// FORCEUNLIMBO releases B even though it hasn't expired.
+		OpcodeHandlers.Limbo.ForceRelease( ref vm, dest );
+		Assert.AreEqual( 99, dest.Value );
+		OpcodeHandlers.Limbo.Count( ref vm, dest );
+		Assert.AreEqual( 0, dest.Value );
+
+		// Empty: both release ops return 0 (guarded, no throw).
+		OpcodeHandlers.Limbo.ForceRelease( ref vm, dest );
+		Assert.AreEqual( 0, dest.Value );
+	}
+
 	private static RideVM LoadTestVm()
 	{
 		var path = Path.Combine( AppContext.BaseDirectory, "content", "testscripts", "Test.RSE" );
