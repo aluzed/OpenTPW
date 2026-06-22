@@ -314,6 +314,103 @@ public sealed class RideEngine : IRideEngine
 
 	public void DipMusic( int amount ) => Log.Trace( $"[ride] DIPMUSIC {amount}" );
 
+	//
+	// Ride lights (opcodes ENABLELIGHT/DISABLELIGHT/SETLIGHT/COLOURLIGHT, RE'd from op_82..op_85). The
+	// original toggles a light object's enable flag and sets its colour×intensity on the scene light. Our
+	// renderer is unlit (no dynamic per-pixel lighting), so each enabled light shows a small **emissive
+	// colour proxy** at its position — a visible, verifiable stand-in. Real scene lighting is a renderer
+	// follow-up. State is kept regardless so the proxy reflects the latest colour/brightness/enable.
+	//
+	private sealed class RideLight
+	{
+		public bool Enabled;
+		public float R = 1f, G = 1f, B = 1f; // colour 0..1
+		public float Brightness = 1f;        // intensity 0..1
+		public ModelEntity? Proxy;           // emissive marker, present only while enabled
+	}
+
+	private readonly Dictionary<int, RideLight> lights = new();
+
+	/// <summary>How many ride lights are currently enabled (diagnostics / tests).</summary>
+	public int EnabledLightCount => lights.Values.Count( l => l.Enabled );
+
+	public void EnableLight( int id )
+	{
+		var light = GetLight( id );
+		light.Enabled = true;
+		UpdateLightProxy( id, light );
+		Log.Info( $"[ride] ENABLELIGHT {id} (now {EnabledLightCount} on)" );
+	}
+
+	public void DisableLight( int id )
+	{
+		var light = GetLight( id );
+		light.Enabled = false;
+		UpdateLightProxy( id, light );
+		Log.Info( $"[ride] DISABLELIGHT {id} (now {EnabledLightCount} on)" );
+	}
+
+	public void SetLight( int id, float brightness )
+	{
+		var light = GetLight( id );
+		light.Brightness = Math.Clamp( brightness, 0f, 1f );
+		UpdateLightProxy( id, light );
+	}
+
+	public void ColourLight( int id, float r, float g, float b )
+	{
+		var light = GetLight( id );
+		light.R = Math.Clamp( r, 0f, 1f );
+		light.G = Math.Clamp( g, 0f, 1f );
+		light.B = Math.Clamp( b, 0f, 1f );
+		UpdateLightProxy( id, light );
+	}
+
+	private RideLight GetLight( int id ) =>
+		lights.TryGetValue( id, out var l ) ? l : lights[id] = new RideLight();
+
+	// Show/refresh (or hide) the emissive colour proxy for a light. Best-effort: any renderer failure
+	// (e.g. headless) is swallowed so the VM keeps running and the light state stays correct.
+	private void UpdateLightProxy( int id, RideLight light )
+	{
+		try
+		{
+			if ( !light.Enabled )
+			{
+				if ( light.Proxy != null )
+				{
+					Entity.All.Remove( light.Proxy );
+					light.Proxy = null;
+				}
+				return;
+			}
+
+			byte R = (byte)(Math.Clamp( light.R * light.Brightness, 0f, 1f ) * 255f);
+			byte G = (byte)(Math.Clamp( light.G * light.Brightness, 0f, 1f ) * 255f);
+			byte B = (byte)(Math.Clamp( light.B * light.Brightness, 0f, 1f ) * 255f);
+
+			var mat = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader", MaterialFlags.DoubleSided );
+			mat.Set( "Color", new Texture( [R, G, B, 255], 1, 1 ) );
+			light.Proxy ??= new ModelEntity { Scale = new Vector3( 3f ) };
+			light.Proxy.Model = Primitives.Cube.GenerateModel( mat );
+			light.Proxy.Position = LightPosition( id ) + Vector3.Up * 6f;
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( $"[ride] light {id} proxy failed: {e.Message}" );
+		}
+	}
+
+	// A light's world position: its own object's first part if it has one, else the ride body, else origin.
+	private Vector3 LightPosition( int id )
+	{
+		if ( objects.TryGetValue( id, out var obj ) && obj.Parts.Count > 0 )
+			return obj.Parts[0].Entity.Position;
+		if ( objects.TryGetValue( SelfId, out var body ) && body.Parts.Count > 0 )
+			return body.Parts[0].Entity.Position;
+		return Vector3.Zero;
+	}
+
 	// Play an actual peep scream at the given volume, and stamp the time so a sustained scream paces its
 	// re-triggers. Screams are peep voices in KidsHD.sdt (sceem*/screem*/yell*/whoop*), NOT RideHD — the
 	// script's scream code (0) is not an index into a sound bank, so we pick a scream sample by name.

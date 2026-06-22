@@ -6,7 +6,7 @@ dispatched by the executor `FUN_00551cb0` (opcode word tagged `0x80`, bounds `< 
 table at `0x5567d8`). The **Operands** column is authoritative (the reflection dispatcher must
 match it). **Kind**: `pure` = VM-state only (done); `engine` = needs the ride engine.
 
-Status: **87 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus a growing set of
+Status: **91 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus a growing set of
 Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sound, the animation +
 `WAIT*` family, and now the **rider scream family** `STARTSCREAM`/`STOPSCREAM`/`SINGLESCREAM`/
 `SCREAMLEVEL`). See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md) / [T-032](tickets/T-032-ride-engine.md).
@@ -95,10 +95,10 @@ Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sou
 | 79 | `WALKST_FLOAT` | 3 | ☐ | engine |
 | 80 | `WALKFLOATSTAT` | 1 | ☐ | engine |
 | 81 | `WALKFLOATSTOP` | 0 | ☐ | engine |
-| 82 | `ENABLELIGHT` | 1 | ☐ | engine |
-| 83 | `DISABLELIGHT` | 1 | ☐ | engine |
-| 84 | `SETLIGHT` | 2 | ☐ | engine |
-| 85 | `COLOURLIGHT` | 4 | ☐ | engine |
+| 82 | `ENABLELIGHT` | 1 | ✅ | engine | turn on ride light `id` (engine: emissive colour proxy — renderer is unlit) |
+| 83 | `DISABLELIGHT` | 1 | ✅ | engine | turn off ride light `id` |
+| 84 | `SETLIGHT` | 2 | ✅ | engine | set light `id` brightness (operand 0..100 ÷100 → 0..1) |
+| 85 | `COLOURLIGHT` | 4 | ✅ | engine | set light `id` colour (r,g,b each 0..100 ÷100 → 0..1) |
 | 86 | `STARTSCREAM` | 2 | ✅ | engine | `(soundCode, level 0..100)` — sustained rider scream |
 | 87 | `STOPSCREAM` | 0 | ✅ | engine | end the sustained scream |
 | 88 | `SINGLESCREAM` | 2 | ✅ | engine | `(soundCode, level)` one-shot (`-1` = default level) |

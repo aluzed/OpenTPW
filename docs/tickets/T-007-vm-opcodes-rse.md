@@ -2,12 +2,13 @@
 
 - **Priority**: 🟡 Feature (core of ride gameplay)
 - **Type**: Feature / reverse engineering
-- **Status**: ⚠️ **Partial — 87 / 106 opcodes.** The `.RSE` loader / disassembler is restored and
+- **Status**: ⚠️ **Partial — 91 / 106 opcodes.** The `.RSE` loader / disassembler is restored and
   working; `RideVM` parses + runs scripts. **Batch A (all 43 `pure`) complete**; Batch B is well
   underway — object spawn/lifecycle, the animation + `WAIT*` family, sound, the rider-scream family, the
-  **limbo family**, and now the **cross-VM family** (`FINDSCRIPTRAND`/`GETREMOTEVAR`/`SETREMOTEVAR`/
-  `REMOVECHILD` — RE'd as a global VM registry keyed by handle, pure VM state) are all in and unit-tested.
-  **Remaining: 19 opcodes** — lights, walk-on/off, heads, and a few effect/particle ops (see docs/06).
+  **limbo family**, the **cross-VM family**, and now the **light family**
+  (`ENABLELIGHT`/`DISABLELIGHT`/`SETLIGHT`/`COLOURLIGHT` — engine subsystem, RE'd from op_82..op_85) are
+  all in and tested. **Remaining: 15 opcodes** — walk-on/off (6), heads (2), effects/particles (4), and
+  the motion ops `TURBO`/`TOUR`/`BUMP` (see docs/06).
 
 ## Findings
 
@@ -109,8 +110,20 @@ runtime). Classification: **43 `pure`** (VM-state only — implementable now) an
     active child and clears the link. Pure VM/registry state — no engine needed. Coverage **83 → 87 /
     106**. Covered by `RideScriptTests.CrossVmRemoteVarsAndFindScript` / `RemoveChildDetachesAndUnregisters`.
 
-**Remaining: 19 opcodes**, all needing engine subsystems:
-- **Lights** (`ENABLELIGHT`/`DISABLELIGHT`/`SETLIGHT`/`COLOURLIGHT`) — need a light subsystem on the engine.
+15. ✅ **Light family** (`ENABLELIGHT` 82, `DISABLELIGHT` 83, `SETLIGHT` 84, `COLOURLIGHT` 85) — reversed
+    from op_82..op_85: each resolves a ride light object by the script id (a type-`0x20000` object) and
+    toggles it / sets its intensity / colour. The brightness + colour operands are integer **percentages**
+    scaled by `_DAT_00700fe0 = 0.01` (0..100 → 0..1) before the light setters (`FUN_004587e0` /
+    `FUN_00458890`). Added to `IRideEngine` (`EnableLight`/`DisableLight`/`SetLight`/`ColourLight`),
+    implemented in `RideEngine` with a per-id light state + an **emissive colour proxy** at the light's
+    position (our renderer is unlit, so the proxy is the visible stand-in; real per-pixel lighting is a
+    renderer follow-up). New `Handlers/Lights.cs` (dispatch + 0.01 scale). Coverage **87 → 91 / 106**.
+    Routing + scale covered by `RideEngineTests.LightOpcodesRouteToEngineWithPercentScale`; the engine
+    proxy path is exercised in-game via the `OPENTPW_AUTOPLACE` light drive (no ride *script* uses lights —
+    they're for scenery objects, which aren't loaded yet — so the diagnostic drives a placed ride's engine
+    directly; verified: `ENABLELIGHT 1/2` then `DISABLELIGHT 2`, proxy renders, no exceptions).
+
+**Remaining: 15 opcodes**, all needing engine subsystems:
 - **Walk** (`WALKON`/`WALKOFF`/`WALKGET`/`WALKST_FLOAT`/`WALKFLOATSTAT`/`WALKFLOATSTOP`) — peeps walking on/off a ride; ties into the peep system.
 - **Heads** (`ADDHEAD`/`DELHEAD`), **effects** (`ADDOBJ_EXT`/`SPARK`/`REPAIREFFECT`/`GETCUSTPTCLCODE`), and the motion ops `TURBO`/`TOUR`/`BUMP`.
 

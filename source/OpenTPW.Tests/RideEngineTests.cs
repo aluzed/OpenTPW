@@ -39,6 +39,12 @@ public class RideEngineTests
 		public void Event( int type, int p1, int p2 ) => Effects.Add( $"event({type},{p1},{p2})" );
 		public void SetReverb( int level ) => Effects.Add( $"reverb({level})" );
 		public void DipMusic( int amount ) => Effects.Add( $"dip({amount})" );
+		public List<string> LightCalls = new(); // light opcode trace (id + scaled values)
+		private static string F( float v ) => v.ToString( "0.00", System.Globalization.CultureInfo.InvariantCulture );
+		public void EnableLight( int id ) => LightCalls.Add( $"enable({id})" );
+		public void DisableLight( int id ) => LightCalls.Add( $"disable({id})" );
+		public void SetLight( int id, float brightness ) => LightCalls.Add( $"set({id},{F( brightness )})" );
+		public void ColourLight( int id, float r, float g, float b ) => LightCalls.Add( $"colour({id},{F( r )},{F( g )},{F( b )})" );
 	}
 
 	private static RideVM NewVm()
@@ -83,6 +89,25 @@ public class RideEngineTests
 		Assert.AreEqual( (5, 2, false), fake.Anims[0] );
 		Assert.AreEqual( (5, 3, true), fake.Anims[1] );
 		Assert.AreEqual( (5, 1, 99), fake.Params[0] );
+	}
+
+	// Light opcodes route to the engine; the brightness/colour operands are 0..100 percentages that the
+	// handler scales by 0.01 (the original's _DAT_00700fe0) before the engine sees them. See T-007.
+	[TestMethod]
+	public void LightOpcodesRouteToEngineWithPercentScale()
+	{
+		var vm = NewVm();
+		var fake = new FakeEngine();
+		vm.Engine = fake;
+
+		vm.CallOpcodeHandler( Opcode.ENABLELIGHT, Lit( vm, 3 ) );
+		vm.CallOpcodeHandler( Opcode.SETLIGHT, Lit( vm, 3 ), Lit( vm, 50 ) );           // 50% → 0.50
+		vm.CallOpcodeHandler( Opcode.COLOURLIGHT, Lit( vm, 3 ), Lit( vm, 100 ), Lit( vm, 0 ), Lit( vm, 25 ) ); // → 1.00, 0.00, 0.25
+		vm.CallOpcodeHandler( Opcode.DISABLELIGHT, Lit( vm, 3 ) );
+
+		CollectionAssert.AreEqual(
+			new[] { "enable(3)", "set(3,0.50)", "colour(3,1.00,0.00,0.25)", "disable(3)" },
+			fake.LightCalls );
 	}
 
 	[TestMethod]

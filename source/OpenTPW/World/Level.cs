@@ -121,6 +121,17 @@ public class Level
 				bool researched = ride.NextResearched;
 				ride.ApplyUpgrade();
 				Log.Info( $"[build] upgrade-test {ride.Name}: L0 cap {before} -> researched={researched} L{ride.UpgradeLevel} cap {ride.Capacity} (levels={ride.Upgrades.Count})" );
+
+				// Exercise the ride light opcodes (T-007 82-85) through the real engine: no jungle ride
+				// script uses lights (they're for scenery), so drive them here to prove the engine proxy
+				// path renders without throwing. Enable two lights, colour + dim one, disable the other.
+				var v = ride.VM;
+				Operand Lit( int n ) => new( v, Operand.Type.Literal, n );
+				v.CallOpcodeHandler( Opcode.ENABLELIGHT, Lit( 1 ) );
+				v.CallOpcodeHandler( Opcode.ENABLELIGHT, Lit( 2 ) );
+				v.CallOpcodeHandler( Opcode.COLOURLIGHT, Lit( 1 ), Lit( 100 ), Lit( 40 ), Lit( 0 ) ); // warm orange
+				v.CallOpcodeHandler( Opcode.SETLIGHT, Lit( 1 ), Lit( 75 ) );                          // 75% brightness
+				v.CallOpcodeHandler( Opcode.DISABLELIGHT, Lit( 2 ) );
 			}
 		}
 

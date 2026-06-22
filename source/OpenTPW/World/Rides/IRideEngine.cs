@@ -61,6 +61,18 @@ public interface IRideEngine
 	/// <summary>EVENT / EVENT_EXT — fire a ride event (type + params): sounds, effects, messages, …</summary>
 	void Event( int type, int p1, int p2 );
 
+	/// <summary>ENABLELIGHT — turn on the ride light addressed by <paramref name="id"/>.</summary>
+	void EnableLight( int id );
+
+	/// <summary>DISABLELIGHT — turn off the ride light <paramref name="id"/>.</summary>
+	void DisableLight( int id );
+
+	/// <summary>SETLIGHT — set light <paramref name="id"/>'s brightness (0..1; the script's 0..100 ÷ 100).</summary>
+	void SetLight( int id, float brightness );
+
+	/// <summary>COLOURLIGHT — set light <paramref name="id"/>'s colour (each channel 0..1; the script's 0..100 ÷ 100).</summary>
+	void ColourLight( int id, float r, float g, float b );
+
 	/// <summary>SETREVERB — set the audio reverb preset/level.</summary>
 	void SetReverb( int level );
 
