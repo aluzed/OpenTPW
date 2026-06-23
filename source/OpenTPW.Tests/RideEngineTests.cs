@@ -36,6 +36,8 @@ public class RideEngineTests
 		public void SetScreamLevel( int level ) => Screams.Add( $"level({level})" );
 		public List<string> Effects = new(); // COAST / EVENT / SETREVERB / DIPMUSIC trace
 		public void Coast( int sub, int arg ) => Effects.Add( $"coast({sub},{arg})" );
+		public void Tour( int sub, int arg ) => Effects.Add( $"tour({sub},{arg})" );
+		public void Bump( int sub, int arg ) => Effects.Add( $"bump({sub},{arg})" );
 		public void Event( int type, int p1, int p2 ) => Effects.Add( $"event({type},{p1},{p2})" );
 		public void SetReverb( int level ) => Effects.Add( $"reverb({level})" );
 		public void DipMusic( int amount ) => Effects.Add( $"dip({amount})" );
@@ -217,6 +219,43 @@ public class RideEngineTests
 		Assert.IsFalse( vm.Flags.HasFlag( RideVM.VMFlags.Zero ), "COAST can-load? should clear Zero" );
 		vm.CallOpcodeHandler( Opcode.COAST, Lit( vm, 3 ), Lit( vm, 0 ) );
 		Assert.IsTrue( vm.Flags.HasFlag( RideVM.VMFlags.Zero ), "COAST wants-off? should set Zero" );
+	}
+
+	[TestMethod]
+	public void CarMultiplexersRouteToEngine()
+	{
+		// TOUR (op_53) and BUMP (op_54) are fixed 2-operand multiplexers like COAST: every (sub, arg)
+		// routes to the engine, which records it. Verifies arity + routing for the last two opcodes.
+		var vm = NewVm();
+		var fake = new FakeEngine();
+		vm.Engine = fake;
+
+		vm.CallOpcodeHandler( Opcode.TOUR, Lit( vm, 1 ), Lit( vm, 7 ) );   // TOUR_INITIALISE
+		vm.CallOpcodeHandler( Opcode.BUMP, Lit( vm, 3 ), Lit( vm, 0 ) );   // BUMP_STARTRIDE
+		vm.CallOpcodeHandler( Opcode.BUMP, Lit( vm, 11 ), Lit( vm, 0 ) );  // BUMP_CARSONRIDE (a query)
+		CollectionAssert.AreEqual( new[] { "tour(1,7)", "bump(3,0)", "bump(11,0)" }, fake.Effects );
+	}
+
+	[TestMethod]
+	public void CarMultiplexerQueriesReturnZeroWithoutEngine()
+	{
+		// Engine-absent (no car subsystem) — exactly the original's `0x4a454647`-magic-missing path:
+		// a query subcommand returns 0 (writes the dest variable + sets the Zero flag the next BRANCH
+		// reads); a command is a guarded no-op. Must not throw.
+		var vm = NewVm(); // Engine is null
+		var dest = new Operand( vm, Operand.Type.Variable, 0 );
+		dest.Value = 123;
+
+		vm.Flags = RideVM.VMFlags.None;
+		vm.CallOpcodeHandler( Opcode.BUMP, Lit( vm, 11 ), dest ); // CARSONRIDE query → 0
+		Assert.AreEqual( 0, dest.Value, "query should write 0 into the destination variable" );
+		Assert.IsTrue( vm.Flags.HasFlag( RideVM.VMFlags.Zero ), "query result 0 should set Zero" );
+
+		// A command subcommand leaves the Zero flag untouched (pure no-op without an engine).
+		vm.Flags = RideVM.VMFlags.None;
+		vm.CallOpcodeHandler( Opcode.BUMP, Lit( vm, 3 ), Lit( vm, 5 ) ); // STARTRIDE command
+		vm.CallOpcodeHandler( Opcode.TOUR, Lit( vm, 1 ), Lit( vm, 5 ) ); // INITIALISE command
+		Assert.IsFalse( vm.Flags.HasFlag( RideVM.VMFlags.Zero ), "a command must not force the Zero flag" );
 	}
 
 	[TestMethod]

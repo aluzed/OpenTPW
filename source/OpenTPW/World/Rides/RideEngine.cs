@@ -289,6 +289,15 @@ public sealed class RideEngine : IRideEngine
 	// Silent: coaster1's loops call this thousands of times per second, so it must not log.
 	public void Coast( int sub, int arg ) { }
 
+	// Tour-ride / bumper-kart control, multiplexed by subcommand (RE'd from op_53 / op_54). Like COAST,
+	// these drive an authored car-object subsystem (tour-route cars / bumper cars). We don't model that
+	// subsystem, so — exactly as the original does when the subsystem isn't live (every helper bails on
+	// the `0x4a454647` magic) — commands are no-ops here and the queries return 0 (set in the handler).
+	// Our car rides still show visible motion via the occupancy-driven RideVehicle (T-032). Silent: these
+	// fire in tight per-tick loops, so they must not log.
+	public void Tour( int sub, int arg ) { }
+	public void Bump( int sub, int arg ) { }
+
 	private readonly Dictionary<int, float> lastEventAt = new();
 	private const float EventDebounce = 0.5f; // ride loops re-fire EVENT each tick — don't restart too fast
 

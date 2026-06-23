@@ -61,20 +61,37 @@ public class ScriptDefs
 		WALK_ACTION_CHEER = 6,
 	}
 
+	// BUMP (op_54) subcommands — the bumper/kart multiplexer (DinoKart, Space Water Ride). Indices RE'd
+	// from the executor's jump table at 0x5546f5; names from the called bumper-car methods + log strings.
+	// Queries (write the VM result register): ADDPEEP, GETLOADCAR, ADDCAR, GETMODE, CARSONRIDE, GETSTATE,
+	// REMOVECAR.
 	public enum Bumper
 	{
-		// Bumper (DinoKart, Space Water Ride) specific
-		BUMP_LAUNCHCAR = -1,
-		BUMP_HALTRIDE = 0,
-		BUMP_PEEPOFF = 7,
-		BUMP_STARTRACE = 32,
-		BUMP_OPENRIDE = 38,
-		BUMP_PEEPON = 47,
-		BUMP_ISTRACKVALID = 54,
-		BUMP_SETBROKEN = 93,
-		BUMP_CLOSERIDE = 115,
-		BUMP_CARSONRIDE = 121,
-		BUMP_SETLAPS = 134,
-		BUMP_WATERCLOSED = 18770
+		BUMP_ADDPEEP = 1,      // "Peep %d added to next car to be loaded" — returns whether a car was free
+		BUMP_GETLOADCAR = 2,   // query the next car being loaded
+		BUMP_STARTRIDE = 3,    // "Start Bump Ride" — release the loaded cars
+		BUMP_ADDCAR = 4,       // spawn a car if cars-on-ride < max; returns the new car
+		BUMP_GETMODE = 5,      // read ride field +0x2c
+		BUMP_RESET = 6,
+		BUMP_OPENRIDE = 7,     // "Open ride %d"
+		BUMP_HALT_A = 8,       // arg!=0 → halt path A, else stop
+		BUMP_HALT_B = 9,       // arg!=0 → halt path B, else stop
+		BUMP_CLOSERIDE = 10,
+		BUMP_CARSONRIDE = 11,  // returns the live car count (ride field +0x17)
+		BUMP_GETSTATE = 12,
+		BUMP_SETLAPS = 13,     // set lap target (arg × 30)
+		BUMP_SETTIME = 14,     // set a negative timer (−arg)
+		BUMP_REMOVECAR = 16,   // destroy a car (arg!=0 → only empties); returns whether one was removed
+		BUMP_SETOPEN = 17      // toggle the ride's open/closed visual state
+	}
+
+	// TOUR (op_53) subcommands — the tour-ride multiplexer. Indices RE'd from the jump table at 0x5542fe,
+	// dispatching onto a tour-ride object class (FUN_0055a620 create / FUN_0055d3d0 destroy + per-car
+	// query/setter helpers). Queries (write the VM result register): 3, 4, 10, 11, 15, 16.
+	public enum Tour
+	{
+		TOUR_INITIALISE = 1,   // allocate + register the tour-ride object
+		TOUR_SHUTDOWN = 2      // tear it down and free it
+		// 3..18: per-car position/animation queries (3,4,10,11,15,16) and setters (5,8,9,12,14,17,18)
 	}
 }

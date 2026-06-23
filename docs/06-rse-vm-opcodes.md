@@ -6,10 +6,11 @@ dispatched by the executor `FUN_00551cb0` (opcode word tagged `0x80`, bounds `< 
 table at `0x5567d8`). The **Operands** column is authoritative (the reflection dispatcher must
 match it). **Kind**: `pure` = VM-state only (done); `engine` = needs the ride engine.
 
-Status: **104 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus a growing set of
+Status: **106 / 106 implemented (100%)** — **Batch A (all 43 `pure`) complete**, plus the full set of
 Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sound, the animation +
-`WAIT*` family, and now the **rider scream family** `STARTSCREAM`/`STOPSCREAM`/`SINGLESCREAM`/
-`SCREAMLEVEL`). See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md) / [T-032](tickets/T-032-ride-engine.md).
+`WAIT*` family, the **rider scream family** `STARTSCREAM`/`STOPSCREAM`/`SINGLESCREAM`/`SCREAMLEVEL`,
+and the three **car-object multiplexers** `COAST`/`TOUR`/`BUMP`). See
+[tickets/T-007](tickets/T-007-vm-opcodes-rse.md) / [T-032](tickets/T-032-ride-engine.md).
 
 | # | Opcode | Operands | Implemented | Kind |
 |---|--------|:--------:|:-----------:|------|
@@ -23,24 +24,24 @@ Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sou
 | 7 | `GETTIME` | 1 | ✅ | pure |
 | 8 | `ADDOBJ` | 4 | ✅ | engine |
 | 9 | `ADDOBJ_EXT` | 5 | ✅ | engine | extended ADDOBJ (type, node, code, volume, +extra): registers like ADDOBJ + spawns the .PLB particle for types 3-10 |
-| 10 | `KILLOBJ` | 1 | ☐ | engine |
-| 11 | `FADEOBJ` | 1 | ☐ | engine |
-| 12 | `SETOBJPARAM` | 3 | ☐ | engine |
+| 10 | `KILLOBJ` | 1 | ✅ | engine |
+| 11 | `FADEOBJ` | 1 | ✅ | engine |
+| 12 | `SETOBJPARAM` | 3 | ✅ | engine |
 | 13 | `EVENT` | 3 | ✅ | engine | ride event dispatch (routed; full sound/effect map is a follow-up) |
 | 14 | `EVENT_EXT` | 4 | ✅ | engine | as EVENT with an extra parameter |
-| 15 | `FLUSHANIM` | 0 | ☐ | engine |
-| 16 | `TRIGANIM` | 3 | ☐ | engine |
-| 17 | `WAITANIM` | 2 | ☐ | engine |
-| 18 | `LOOPANIM` | 2 | ☐ | engine |
-| 19 | `TRIGWAITANIM` | 3 | ☐ | engine |
-| 20 | `GETANIM` | 1 | ☐ | engine |
-| 21 | `TRIGANIMSPEED` | 4 | ☐ | engine |
-| 22 | `FLUSHANIM_CH` | 1 | ☐ | engine |
-| 23 | `TRIGANIM_CH` | 4 | ☐ | engine |
-| 24 | `WAITANIM_CH` | 3 | ☐ | engine |
-| 25 | `LOOPANIM_CH` | 3 | ☐ | engine |
-| 26 | `TRIGWAITANIM_CH` | 4 | ☐ | engine |
-| 27 | `GETANIM_CH` | 2 | ☐ | engine |
+| 15 | `FLUSHANIM` | 0 | ✅ | engine |
+| 16 | `TRIGANIM` | 3 | ✅ | engine |
+| 17 | `WAITANIM` | 2 | ✅ | engine |
+| 18 | `LOOPANIM` | 2 | ✅ | engine |
+| 19 | `TRIGWAITANIM` | 3 | ✅ | engine |
+| 20 | `GETANIM` | 1 | ✅ | engine |
+| 21 | `TRIGANIMSPEED` | 4 | ✅ | engine |
+| 22 | `FLUSHANIM_CH` | 1 | ✅ | engine |
+| 23 | `TRIGANIM_CH` | 4 | ✅ | engine |
+| 24 | `WAITANIM_CH` | 3 | ✅ | engine |
+| 25 | `LOOPANIM_CH` | 3 | ✅ | engine |
+| 26 | `TRIGWAITANIM_CH` | 4 | ✅ | engine |
+| 27 | `GETANIM_CH` | 2 | ✅ | engine |
 | 28 | `RAND` | 2 | ✅ | pure |
 | 29 | `JSR` | 1 | ✅ | pure |
 | 30 | `RETURN` | 0 | ✅ | pure |
@@ -59,15 +60,15 @@ Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sou
 | 43 | `HOP` | 1 | ✅ | pure |
 | 44 | `WAIT` | 1 | ✅ | pure |
 | 45 | `WAITABS` | 1 | ✅ | pure |
-| 46 | `WAIT4ANIM` | 0 | ☐ | engine |
+| 46 | `WAIT4ANIM` | 0 | ✅ | engine |
 | 47 | `ADD` | 2 | ✅ | pure |
 | 48 | `MULT` | 3 | ✅ | pure |
 | 49 | `DIV` | 3 | ✅ | pure |
 | 50 | `MOD` | 3 | ✅ | pure |
 | 51 | `TURBO` | 1 | ✅ | engine | store the turbo flag in the VM (struct +0xb8); pure VM state, motion engine would read it |
 | 52 | `END` | 0 | ✅ | pure |
-| 53 | `TOUR` | 2 | ☐ | engine |
-| 54 | `BUMP` | 2 | ☐ | engine |
+| 53 | `TOUR` | 2 | ✅ | engine | tour-ride control, multiplexed by subcommand (1 init·2 shutdown·3/4/10/11/15/16 query·rest setters); queries return 0 (set Zero) without a car engine |
+| 54 | `BUMP` | 2 | ✅ | engine | bumper/kart control, multiplexed by subcommand (1 add-peep·3 start·4 add-car·7 open·11 cars-on-ride·13 set-laps·16 remove-car·17 set-open); queries {1,2,4,5,11,12,16} set Zero without a car engine |
 | 55 | `COAST` | 2 | ✅ | engine | coaster control, multiplexed by subcommand (1 load·2 can-load?·3 wants-off?·4 state·5 mode·6 capacity·7 worn·8 init); queries set the Zero flag |
 | 56 | `ADDHEAD` | 1 | ✅ | engine | mount a head value in a random free head slot (VM head-slot table; visual needs head-node geometry) |
 | 57 | `DELHEAD` | 1 | ✅ | engine | remove every head slot holding the value |
@@ -77,7 +78,7 @@ Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sou
 | 61 | `INLIMBO` | 1 | ✅ | engine | read the limbo count into dest |
 | 62 | `LIMBOSPACE` | 1 | ✅ | engine | read the free limbo slots into dest |
 | 63 | `SPAWNCHILD` | 1 | ✅ | engine |
-| 64 | `SPAWNSOUND` | 1 | ☐ | engine |
+| 64 | `SPAWNSOUND` | 1 | ✅ | engine |
 | 65 | `REMOVECHILD` | 0 | ✅ | engine | destroy the active child VM + clear the child link (pure VM/registry) |
 | 66 | `SETVARINCHILD` | 2 | ✅ | pure |
 | 67 | `GETVARINCHILD` | 2 | ✅ | pure |

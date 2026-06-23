@@ -58,6 +58,16 @@ public interface IRideEngine
 	/// 7 worn · 8 init. Query subcommands' Zero-flag result is set by the opcode handler.</summary>
 	void Coast( int sub, int arg );
 
+	/// <summary>TOUR — multiplexed tour-ride control (subcommand + arg). RE'd from op_53: 1 initialise ·
+	/// 2 shut down · 3/4/10/11/15/16 queries · the rest setters, all onto a tour-ride object class
+	/// (FUN_0055a620 et al). Query subcommands' result is set by the opcode handler.</summary>
+	void Tour( int sub, int arg );
+
+	/// <summary>BUMP — multiplexed bumper/kart-ride control (subcommand + arg). RE'd from op_54: 1 add peep
+	/// · 3 start · 4 add car · 7 open · 11 cars-on-ride · 13 set laps · 16 remove car · 17 set open;
+	/// queries {1,2,4,5,11,12,16} write the result register read by the following BRANCH.</summary>
+	void Bump( int sub, int arg );
+
 	/// <summary>EVENT / EVENT_EXT — fire a ride event (type + params): sounds, effects, messages, …</summary>
 	void Event( int type, int p1, int p2 );
 

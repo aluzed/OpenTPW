@@ -2,13 +2,12 @@
 
 - **Priority**: 🟡 Feature (core of ride gameplay)
 - **Type**: Feature / reverse engineering
-- **Status**: ⚠️ **Partial — 104 / 106 opcodes.** The `.RSE` loader / disassembler is restored and
-  working; `RideVM` parses + runs scripts. **Batch A (all 43 `pure`) complete**; Batch B is all but done —
+- **Status**: ✅ **Done — 106 / 106 opcodes (100%).** The `.RSE` loader / disassembler is restored and
+  working; `RideVM` parses + runs scripts. **Batch A (all 43 `pure`) complete**; Batch B complete —
   object spawn/lifecycle (incl. `ADDOBJ_EXT`), the animation + `WAIT*` family, sound, the rider-scream
   family, the **limbo**, **cross-VM**, **light**, **walk**, **particle effects** (decoded `.PLB`, T-019),
-  **head**, `GETCUSTPTCLCODE`, and `TURBO` are all in and tested. **Remaining: 2 opcodes** — `TOUR` and
-  `BUMP`, each a multiplexed command over its own engine subsystem (guided-tour object / bumper-car
-  physics) that doesn't exist yet.
+  **head**, `GETCUSTPTCLCODE`, `TURBO`, and the three **car-object multiplexers** `COAST`/`TOUR`/`BUMP`
+  are all in and tested. The VM logs `Implemented 106 / 106 (100%) opcodes` at load.
 
 ## Findings
 
@@ -181,13 +180,25 @@ runtime). Classification: **43 `pure`** (VM-state only — implementable now) an
     tested directly (`RideVM.Turbo`, `Handlers/Effects.cs`). Coverage **103 → 104 / 106**. Covered by
     `RideScriptTests.TurboStoresFlag`.
 
-**Remaining: 2 opcodes** — `TOUR` (op 53) and `BUMP` (op 54). Both are **multiplexed commands** (a
-subcommand switch, like `COAST`) over an engine subsystem that doesn't exist yet:
-- `TOUR` drives a **guided-tour object** (`vm+0x9c`): create/destroy + ~16 get/set subcommands
-  (`FUN_0055a620`/`d3d0`/`d610`/…), positioned at tour node 99.
-- `BUMP` drives the **bumper-car system** (`FUN_004cd300` → `FUN_0054xxxx`/`00544xxx`): per-car
-  add/query/start/stop subcommands.
-Both need their engine subsystem (and node geometry) to build + verify — the genuine engine frontier.
+22. ✅ **TOUR** (op 53) + **BUMP** (op 54) — the last two opcodes; **the VM is now 106/106 (100%)**.
+    Disassembling the jump-table entries (`op_53` @ `0x5542fe`, `op_54` @ `0x5546f5`) settled the open
+    question: both are **fixed 2-operand `(sub, arg)` multiplexers** exactly like `COAST` — the executor
+    reads precisely two operands per call regardless of subcommand (`FUN_00557a70` fetch ×2), so they take
+    ordinary fixed-arity handlers (the earlier "variable operands" assumption was wrong). Each switches the
+    subcommand into a car-object class: TOUR → a guided-tour object (`FUN_0055a620` create / `0055d3d0`
+    destroy / per-car query+setter helpers); BUMP → the bumper/kart class (`FUN_004cd300`→`+0x28`; subs RE'd
+    as 1 add-peep · 3 start · 4 add-car · 7 open · 11 cars-on-ride · 13 set-laps · 16 remove-car · 17
+    set-open). **Crucially every helper guards on the car-subsystem magic `0x4a454647` ('GFEJ') and, when
+    it isn't live, returns 0 / no-ops** — which is precisely our engine-less state, so the *faithful* model
+    is trivial: route every `(sub,arg)` to `IRideEngine.Tour`/`Bump` (no-op stubs), and for a **query**
+    subcommand (TOUR `{3,4,10,11,15,16}`, BUMP `{1,2,4,5,11,12,16}` — the cases the original writes its
+    result register from) return 0: write 0 into the dest variable + set the Zero flag the next `BRANCH`
+    reads. Handlers in `Handlers/Effects.cs` (shared `RunCarMultiplexer`); subcommand maps documented in
+    `ScriptDefs.Bumper`/`Tour`. Car rides keep their visible motion via the occupancy-driven `RideVehicle`
+    (T-032). Coverage **104 → 106 / 106**. Covered by `RideEngineTests.CarMultiplexersRouteToEngine` +
+    `CarMultiplexerQueriesReturnZeroWithoutEngine`; verified in-game (`OPENTPW_AUTOPLACE`) — the VM logs
+    `Implemented 106 / 106 (100%)`, the `tourride` car ride runs its TOUR script with **no "No handler"
+    warnings** and no exceptions.
 
 > Note: the instruction doc describes `CMP` as a *bitwise-AND* comparison, but the current
 > `Math.Compare` does equality/less-than. Left as-is for now (changing it could shift branch

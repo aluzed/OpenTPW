@@ -5,9 +5,11 @@
 - **Status**: ⚠️ In progress — the seam + object lifecycle + channel-aware keyframe animation + scream +
   queue→VM boarding bridge + VM tick fix are done, and the engine now backs almost the whole VM:
   **lights**, **particle effects** (decoded `.PLB`), **limbo**, **walk** (slot scheduler) and **heads**
-  all landed via T-007 (**104/106 opcodes**; only the coaster-car `TOUR`/`BUMP` motion engine remains),
-  and **ride breakdown + a mechanic staff role** are in. Remaining engine work: coaster car/track motion,
-  walk-node geometry for visual peep movement, and 3D-positioned EVENT sound.
+  all landed via T-007 (**106/106 opcodes** — the `COAST`/`TOUR`/`BUMP` car-object multiplexers are in too,
+  routed to no-op engine stubs with the faithful queries-return-0 behaviour the original uses when its car
+  subsystem isn't live), and **ride breakdown + a mechanic staff role** are in. Remaining engine work: a
+  full authored car-physics subsystem, walk-node geometry for visual peep movement, and 3D-positioned
+  EVENT sound.
 - **Related**: [T-007](T-007-vm-opcodes-rse.md) (the VM + opcode RE), [T-033](T-033-ride-animation-keyframes.md) (animation keyframes), [05](../05-ghidra-reverse.md)/[07](../07-ghidra-render.md)/[08](../08-ghidra-animation.md).
 
 ## Problem
@@ -89,10 +91,11 @@ is what makes a ride *do* anything, and it backs the remaining VM opcodes (T-007
    Verified in-game: `car-test: tourride isCarRide=True vehicle=True`, no exceptions. *Stand-in path:* the
    loop is generated (an ellipse in the footprint), not the ride's authored track — the real car path
    (tour nodes / track geometry) isn't decoded, and the `TOUR`/`BUMP` opcodes that drive the authentic
-   car-object engine are multiplexed commands (variable operands) over a car class we don't model, so they
-   stay no-ops (now silenced — the ride runs via the boarding bridge + this vehicle). The coaster's own
-   cars remain the player-laid-track `CoasterTrain` (T-045). **TOUR/BUMP** (the last 2 VM opcodes) +
-   3D-positioned `EVENT` sound are the remaining engine frontier.
+   car-object engine are now **implemented** (T-007: fixed 2-operand `(sub,arg)` multiplexers) but route to
+   no-op engine stubs — the faithful behaviour the original itself uses when its car subsystem isn't live
+   (queries return 0, commands no-op), so the ride runs via the boarding bridge + this vehicle. The
+   coaster's own cars remain the player-laid-track `CoasterTrain` (T-045). A full authored car-physics
+   subsystem + 3D-positioned `EVENT` sound are the remaining engine frontier.
 5. ⚠️ **Scream / coaster** — the **scream family** (`STARTSCREAM`/`STOPSCREAM`/`SINGLESCREAM`/
    `SCREAMLEVEL`) is **done and audible in-game**: routed through `IRideEngine`, `RideEngine` plays a
    real peep scream at the script's level (`Audio.PlaySfx` gained a per-effect volume), and a sustained

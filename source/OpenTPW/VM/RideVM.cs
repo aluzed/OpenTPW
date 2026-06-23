@@ -177,11 +177,9 @@ public partial class RideVM
 
 		if ( handlerAttribute == null )
 		{
-			// TOUR/BUMP/COAST are multiplexed car-object commands (variable operands) backed by an authored
-			// car engine we don't model; car rides instead show a generic RideVehicle (T-032). They fire in
-			// tight script loops, so don't spam — the ride still runs (boarding bridge + occupancy vehicle).
-			if ( opcodeId is not (Opcode.TOUR or Opcode.BUMP or Opcode.COAST) )
-				Log.Warning( $"No handler for {opcodeId}, treating as no-op" );
+			// All 106 opcodes now have handlers (TOUR/BUMP/COAST are the car-object multiplexers in
+			// Effects.cs), so this path only fires for a genuine gap — warn.
+			Log.Warning( $"No handler for {opcodeId}, treating as no-op" );
 			return;
 		}
 
