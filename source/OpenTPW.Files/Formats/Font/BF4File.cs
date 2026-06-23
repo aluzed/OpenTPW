@@ -31,8 +31,9 @@ namespace OpenTPW;
 ///
 /// All of the above were confirmed by rendering: a real font's glyph atlas is legible, and laying glyphs
 /// out by their advance produces correctly-spaced text ("GAME OVER"). The 1bpp + raw-4bpp paths render
-/// clean masks / antialiased coverage; the compressed-4bpp variant (menu/title faces) is not yet decoded.
-/// See docs/tickets/T-025. No published spec exists; reverse-engineered from sample fonts.
+/// clean masks / antialiased coverage; the compressed-4bpp variant (menu/title faces) is a nibble-RLE
+/// over 4bpp values, decoded from the original's font decompressor. See docs/tickets/T-025. No published
+/// spec exists; reverse-engineered from sample fonts + tp.exe.
 /// </summary>
 public sealed class BF4File : BaseFormat
 {
@@ -44,7 +45,8 @@ public sealed class BF4File : BaseFormat
 	{
 		/// <summary>Raw 4-bit-per-pixel coverage (antialiased): continuous nibbles, high nibble first.</summary>
 		Raw4Bpp = 0,
-		/// <summary>Compressed 4bpp (menu/title faces) — not yet decoded; falls back to a 1bpp read.</summary>
+		/// <summary>Nibble-RLE-compressed 4bpp (the big menu/title faces) — decoded by
+		/// <see cref="DecodeCompressed4Bpp"/>.</summary>
 		Compressed4Bpp = 1,
 		/// <summary>1-bit-per-pixel mask: a continuous MSB-first bitstream, width bits per row.</summary>
 		OneBpp = 2,
@@ -174,8 +176,9 @@ public sealed class BF4File : BaseFormat
 	/// <list type="bullet">
 	/// <item><see cref="GlyphEncoding.Raw4Bpp"/>: continuous 4-bit coverage nibbles (high nibble first),
 	///   scaled 0..15 → 0..255 — verified to render clean antialiased glyphs.</item>
-	/// <item>otherwise (1bpp, or the not-yet-decoded compressed variant): a continuous MSB-first 1bpp
-	///   bitstream → 0/255. The compressed variant therefore renders as a rough 1bpp mask for now.</item>
+	/// <item><see cref="GlyphEncoding.Compressed4Bpp"/>: a nibble-RLE over the same 4bpp values — decoded
+	///   then scaled 0..15 → 0..255 (see <see cref="DecodeCompressed4Bpp"/>).</item>
+	/// <item><see cref="GlyphEncoding.OneBpp"/>: a continuous MSB-first 1bpp bitstream → 0/255.</item>
 	/// </list>
 	/// </summary>
 	private static byte[] DecodeCoverage( byte[] block, int width, int height, GlyphEncoding encoding )
@@ -184,29 +187,86 @@ public sealed class BF4File : BaseFormat
 		var count = width * height;
 		var coverage = new byte[count < 0 ? 0 : count];
 
-		if ( encoding == GlyphEncoding.Raw4Bpp )
+		switch ( encoding )
 		{
-			for ( var i = 0; i < coverage.Length; i++ )
-			{
-				var byteIndex = bitmapOffset + (i >> 1);
-				if ( byteIndex >= block.Length )
-					break;
-				var nibble = (i & 1) == 0 ? block[byteIndex] >> 4 : block[byteIndex] & 0xF;
-				coverage[i] = (byte)(nibble * 17); // 0..15 → 0..255
-			}
-		}
-		else
-		{
-			for ( var i = 0; i < coverage.Length; i++ )
-			{
-				var byteIndex = bitmapOffset + (i >> 3);
-				if ( byteIndex >= block.Length )
-					break;
-				if ( ( (block[byteIndex] >> (7 - (i & 7))) & 1 ) != 0 )
-					coverage[i] = 255;
-			}
+			case GlyphEncoding.Raw4Bpp:
+				for ( var i = 0; i < coverage.Length; i++ )
+				{
+					var byteIndex = bitmapOffset + (i >> 1);
+					if ( byteIndex >= block.Length )
+						break;
+					var nibble = (i & 1) == 0 ? block[byteIndex] >> 4 : block[byteIndex] & 0xF;
+					coverage[i] = (byte)(nibble * 17); // 0..15 → 0..255
+				}
+				break;
+
+			case GlyphEncoding.Compressed4Bpp:
+				DecodeCompressed4Bpp( block, bitmapOffset, coverage );
+				break;
+
+			default: // OneBpp
+				for ( var i = 0; i < coverage.Length; i++ )
+				{
+					var byteIndex = bitmapOffset + (i >> 3);
+					if ( byteIndex >= block.Length )
+						break;
+					if ( ( (block[byteIndex] >> (7 - (i & 7))) & 1 ) != 0 )
+						coverage[i] = 255;
+				}
+				break;
 		}
 
 		return coverage;
+	}
+
+	/// <summary>
+	/// Decodes the compressed-4bpp glyph stream (the big menu/title faces) into <paramref name="coverage"/>
+	/// (0..255). RE'd from the original's font decompressor (<c>FUN_006b4aa0</c> in tp.exe): the pixel data
+	/// is a stream of 4-bit nibbles (high nibble of each byte first), run-length coded with <c>0</c> as the
+	/// escape:
+	/// <list type="bullet">
+	/// <item>a non-zero nibble <c>c</c> emits one pixel of coverage <c>c</c>;</item>
+	/// <item>a <c>0</c> nibble starts a run: the next nibble is the run <c>count</c> (<c>0</c> = end of
+	///   glyph), the one after is the pixel <c>value</c>, emitted <c>count</c> times.</item>
+	/// </list>
+	/// Each 0..15 value is scaled ×17 to 0..255, matching the raw-4bpp path.
+	/// </summary>
+	private static void DecodeCompressed4Bpp( byte[] block, int bitmapOffset, byte[] coverage )
+	{
+		var nibblePos = bitmapOffset * 2;
+		var totalNibbles = block.Length * 2;
+
+		int NextNibble()
+		{
+			if ( nibblePos >= totalNibbles )
+				return -1;
+			var byteIndex = nibblePos >> 1;
+			var v = (nibblePos & 1) == 0 ? block[byteIndex] >> 4 : block[byteIndex] & 0xF;
+			nibblePos++;
+			return v;
+		}
+
+		var p = 0;
+		while ( p < coverage.Length )
+		{
+			var c = NextNibble();
+			if ( c < 0 )
+				break;
+			if ( c != 0 )
+			{
+				coverage[p++] = (byte)(c * 17);
+				continue;
+			}
+
+			var count = NextNibble();
+			if ( count <= 0 ) // 0 (or end-of-stream) terminates the glyph
+				break;
+			var value = NextNibble();
+			if ( value < 0 )
+				break;
+			var scaled = (byte)(value * 17);
+			for ( var r = 0; r < count && p < coverage.Length; r++ )
+				coverage[p++] = scaled;
+		}
 	}
 }

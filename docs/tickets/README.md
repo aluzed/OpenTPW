@@ -44,7 +44,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-022](T-022-ea-adpcm-mono.md) | 🟡 Feature | ⚠️ Implemented | EA-ADPCM **mono** path added (channel dispatch + `DecodeScdlMono`, two samples/byte per FFmpeg adpcm_ea) + synthesised test; waveform verification awaits a real mono sample (none in install) |
 | [T-023](T-023-linux-vulkan-libdl.md) | 🔴 High | ✅ Done | Linux runtime: Vulkan `libdl` load fix — game now boots on Linux |
 | [T-024](T-024-linux-black-screen.md) | 🟠 Medium | ✅ Done | Linux "black screen" was the synchronous load; lobby renders (loading screen + text) |
-| [T-025](T-025-bf4-antialiased-fonts.md) | 🟢 Low | ⚠️ Partial | `.BF4`: encoding tag found at glyph offset 12 (1bpp/raw-4bpp/compressed-4bpp); **raw-4bpp AA decoded** (the `*AA` faces, coverage→alpha in `FontAtlas`, verified+tested); the compressed-4bpp menu/title faces remain |
+| [T-025](T-025-bf4-antialiased-fonts.md) | 🟢 Low | ✅ Done | `.BF4`: all three glyph encodings decoded (1bpp / raw-4bpp / **compressed-4bpp** = a nibble-RLE, RE'd from tp.exe's font decompressor `FUN_006b4aa0`); coverage→alpha in `FontAtlas`; the UI's menu buttons now use the intended antialiased `MENUMED` face (verified in-game), unit-tested |
 | [T-026](T-026-render-resource-churn.md) | 🔴 High | ✅ Done | Renderer: killed per-frame GPU resource churn (sync submit + ephemeral sets) → lobby at 60fps |
 | [T-027](T-027-ui-draw-batching.md) | 🟠 Medium | ✅ Done | Renderer: UI draws batched (merge same-texture), per-quad allocs + set-churn removed |
 | [T-028](T-028-frame-cpu-hygiene.md) | ⚪ Debt | ✅ Done | Renderer: per-frame CPU hygiene (dirty-shader registry, `Stopwatch`) |

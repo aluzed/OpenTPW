@@ -109,6 +109,34 @@ public class BF4FileTests
 	}
 
 	[TestMethod]
+	public void DecodesCompressed4BppGlyph()
+	{
+		// A 4×2 compressed-4bpp glyph. Nibble-RLE (high nibble first), 0 = run escape:
+		//   0,4,F  -> run of 4 × value F  (row 0 = all opaque)
+		//   8       -> literal pixel 8
+		//   0,3,0   -> run of 3 × value 0  (rest of row 1 transparent)
+		//   0,0     -> terminator
+		// Nibbles: 0 4 F 8 0 3 0 0 0  -> bytes 04 F8 03 00 0?  (pad the last nibble)
+		var block = new byte[24 + 5];
+		BinaryPrimitives.WriteUInt32LittleEndian( block.AsSpan( 0, 4 ), 'A' );
+		BinaryPrimitives.WriteUInt32LittleEndian( block.AsSpan( 12, 4 ), 1 ); // encoding: Compressed4Bpp
+		BinaryPrimitives.WriteUInt16LittleEndian( block.AsSpan( 16, 2 ), 4 ); // width
+		BinaryPrimitives.WriteUInt16LittleEndian( block.AsSpan( 18, 2 ), 2 ); // height
+		block[24] = 0x04; // nibbles 0,4
+		block[25] = 0xF8; // nibbles F,8
+		block[26] = 0x03; // nibbles 0,3
+		block[27] = 0x00; // nibbles 0,0 (terminator)
+		block[28] = 0x00;
+
+		var font = new BF4File( new MemoryStream( BuildFont( block ) ) );
+		var g = font.Glyphs.Single();
+
+		Assert.AreEqual( BF4File.GlyphEncoding.Compressed4Bpp, g.Encoding );
+		// Row 0: 4× F (255); row 1: 8 (136) then 3× 0.
+		CollectionAssert.AreEqual( new byte[] { 255, 255, 255, 255, 136, 0, 0, 0 }, g.Coverage );
+	}
+
+	[TestMethod]
 	public void RejectsBadMagic()
 	{
 		var bytes = new byte[16];

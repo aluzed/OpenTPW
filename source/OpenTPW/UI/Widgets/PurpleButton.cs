@@ -5,14 +5,14 @@ namespace OpenTPW;
 
 internal class PurpleButton : Panel
 {
-	// Shared across every button so we only build the atlas/texture once. GAME12 is used (not the
-	// menu fonts) because it is a 1bpp font the decoder reads cleanly; MENU*/*AA are antialiased
-	// (multi-bit) and that format isn't decoded yet, so they render as noise.
+	// Shared across every button so we only build the atlas/texture once. MENUMED is the game's intended
+	// button face — an antialiased (compressed-4bpp) font now decoded (T-025), blitted through FontAtlas
+	// as coverage→alpha so the labels render smooth rather than as the 1bpp GAME12 stand-in.
 	private static Font? labelFont;
-	private static Font LabelFont => labelFont ??= new Font( "Language/English/GAME12.bf4" );
+	private static Font LabelFont => labelFont ??= new Font( "Language/English/MENUMED.bf4" );
 
-	// How big the label is drawn relative to its native glyph size.
-	private const float LabelScale = 2f;
+	// How big the label is drawn relative to its native glyph size (MENUMED is ~29px native).
+	private const float LabelScale = 1f;
 
 	private Texture ButtonText1;
 	private Texture ButtonText2;

@@ -2,9 +2,10 @@
 
 - **Priority**: 🟢 Low (1bpp fonts work; AA fonts are a visual upgrade)
 - **Type**: File format / reverse engineering
-- **Status**: ⚠️ Partial — the **raw-4bpp antialiased** variant is decoded (all the `*AA` faces + several
-  others); the **compressed-4bpp** variant (menu/title big faces) remains.
-- **Blocks**: nicer UI typography (menu/title fonts).
+- **Status**: ✅ Done — both antialiased variants decode: **raw-4bpp** (`*AA` faces) and **compressed-4bpp**
+  (the big menu/title faces). The UI's `PurpleButton`s now use the intended `MENUMED` face (verified
+  in-game: "Create New Player" / "Quit Game" render smooth antialiased, not the 1bpp GAME12 stand-in).
+- **Blocks**: ~~nicer UI typography~~ (delivered).
 
 ## Solved: the encoding is in the glyph block (offset 12)
 
@@ -17,11 +18,20 @@ the stored byte count — which is why the byte-ratio heuristic below was noisy.
   glyphs. `BF4File` now exposes `GlyphEncoding` + per-pixel `Coverage`, and `FontAtlas` blits coverage as
   the alpha channel (1bpp glyphs stay 0/255). Covers the `*AA` faces, the `DATE*`/`SESHSMALL`/`TITLESMALL`
   /`GAMEBOLD9/10` faces. Unit-tested (`DecodesRaw4BppAntialiasedGlyph`).
-- **Compressed 4bpp (tag 1) — remaining.** The big menu/title faces (`MENU*`, `TITLE*BIG/MED`, `CASH*`,
-  `SESH*`, `MATISSE*`, `GAME12AA`) store fewer bytes than `width*height/2`, so they're a compressed 4bpp
-  stream. The decompression scheme isn't cracked yet; these still fall back to a rough 1bpp read. Needs the
-  BF4 blit/decompressor traced in Ghidra (no `.bf4`/`F4FB` string xref — search the `F4FB` magic constant
-  `0x42464634`), or more sample analysis of the byte stream.
+- **Compressed 4bpp (tag 1) — done.** The big menu/title faces (`MENU*`, `TITLE*BIG/MED`, `CASH*`,
+  `SESH*`, `MATISSE*`, `GAME12AA`) store fewer bytes than `width*height/2` because the 4bpp pixels are
+  **nibble-RLE compressed**. Decoded by `BF4File.DecodeCompressed4Bpp`, unit-tested
+  (`DecodesCompressed4BppGlyph`) and verified by rendering real `MENUMED` glyphs ('1','H','E','M' come out
+  crisp). The scheme (a stream of 4-bit nibbles, high nibble first; `0` is a run escape):
+  - a non-zero nibble `c` → one pixel of coverage `c`;
+  - a `0` nibble → run: next nibble = `count` (`0` ends the glyph), next = `value`, emitted `count` times.
+
+  RE'd from tp.exe: the loader `FUN_006b0680` checks the `0x42463446` ("F4FB") magic then constructs the
+  font (`FUN_006b0480`, vtable `0x70a158`). The two glyph **blitters** (`FUN_006b0760` RGB555 /
+  `FUN_006b0c50` RGB565) alpha-blend raw 4bpp into the framebuffer; the decompressor is the on-demand
+  glyph-prep `FUN_006b4aa0`, which reads the encoding flag at block offset 12, allocates a scratch buffer
+  sized by block offset 8 (`width*height/2`), and runs the nibble-RLE loop above
+  (`FUN_006b54c0`/`54a0` = the nibble reader, `FUN_006b5450` = the nibble writer).
 
 ## Problem
 
@@ -44,14 +54,14 @@ So `GAME12` (and the other ratio-~1 `GAME*`/`CONSOLE*` fonts) decode cleanly; `M
 the `*AA` variants and the bold faces do not. The current UI therefore uses `GAME12` everywhere
 text is drawn (loading screen, `PurpleButton` labels).
 
-## To do
+## Done
 
-1. Determine the multi-bit encoding: bits-per-pixel (the ratios suggest ~2–4 bpp, possibly
-   variable), row alignment, and whether a palette/gamma is involved. Cross-check in Ghidra on the
-   font blit path.
-2. Decode coverage into the alpha channel of `FontAtlas` (it already stores RGBA with alpha = the
-   mask; an AA glyph would write a gradient instead of 0/255).
-3. Switch the UI to the intended menu/title faces once they decode.
+1. ✅ Determined the encoding: 4bpp coverage, raw (tag 0) or **nibble-RLE** (tag 1), tag at block
+   offset 12 — cross-checked against the font decompressor `FUN_006b4aa0` in tp.exe.
+2. ✅ Coverage is decoded into the `FontAtlas` alpha channel (AA glyphs write a 0..255 gradient; 1bpp
+   stays 0/255).
+3. ✅ The UI's `PurpleButton` labels now use the intended `MENUMED` menu face (HUD body text stays on the
+   compact 1bpp `GAME12`, which suits the dense readout).
 
 ## Affected files
 
