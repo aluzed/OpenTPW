@@ -456,6 +456,10 @@ public class Level
 			layout.OnInit();
 		}
 
+		// Advisor lip-sync demo (T-020): plays a real speech clip + drives a viseme mouth from its .LIP.
+		if ( Environment.GetEnvironmentVariable( "OPENTPW_ADVISOR_DEMO" ) == "1" )
+			Hud.AddChild( new AdvisorPanel() );
+
 		Hud.AddChild( new Cursor() ); // the cursor is shown in both states
 	}
 

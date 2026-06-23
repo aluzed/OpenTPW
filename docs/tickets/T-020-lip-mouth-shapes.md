@@ -2,9 +2,11 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Reverse engineering
-- **Status**: ⚠️ Partial — **mouth-shape semantics resolved** (item 1): shapes are *not* in the file; the
-  engine has five visemes and picks one per keyframe interval at runtime. Exposed + headless timing test.
-  Real engine wiring to an on-screen advisor mouth (item 2) remains.
+- **Status**: ⚠️ Mostly done — **mouth-shape semantics resolved** (item 1) and the **lip-sync is wired to
+  real speech playback with visible output** (item 2): an in-engine advisor face plays a real `sp_001.mp2`
+  clip and changes its mouth per viseme from the companion `.LIP`, in sync. The viseme→advisor-mesh-part
+  names are RE'd (`mouth - normal/aah/eee/ooh/sss`). Only rendering the *real* advisor model's named
+  sub-meshes (vs the demo's procedural mouth) remains.
 - **Split from**: [T-008](T-008-unimplemented-formats.md).
 
 ## Context
@@ -27,12 +29,26 @@ levels), exposed via `Duration` / `TimeOf` / `UnitsPerSecond`.
   the clip). Headless timing test (`ResolvesIntervalsAndCyclesVisemesInSync`) + the real jungle sample
   pass.
 
-## Remaining (item 2 — wiring)
+## Done (item 2 — wiring to real playback)
 
-- Drive a real advisor character's mouth mesh from `ShapeAt` in sync with the speech clip (engine
-  integration — needs the advisor model + speech playback hooked together; the advisor head's per-viseme
-  mesh parts are what `FUN_0044b2e0` resolves). If the exact runtime viseme-selection (random vs cycling)
-  matters, it can be traced from the speech-update caller; the file format itself is fully settled.
+- **Viseme → advisor mesh-part names RE'd** (`FUN_0044b2e0`): the engine resolves a viseme by string-
+  matching the advisor model's named sub-meshes — `1 = "mouth - normal"`, `2 = "mouth - aah"`,
+  `3 = "mouth - eee"`, `4 = "mouth - ooh"`, `5 = "mouth - sss"`, `0` = closed (no part), `-1` = "bug head"
+  (whole head). Exposed as `MouthShape.MeshPartName()` (unit-tested).
+- **Lip-sync wired to real speech + visible output** (`AdvisorPanel`, enabled by `OPENTPW_ADVISOR_DEMO=1`):
+  loads `levels/jungle/Speech/speechHD.SDT`, plays `sp_001.mp2` via the audio system, loads the companion
+  `lips/sp_001.LIP`, and each frame drives a visible advisor mouth from `LipSyncFile.ShapeAt(elapsed)` in
+  sync with the audio clock. Verified in-game: the mouth + on-screen label step through the visemes as the
+  clip plays (e.g. `Ooh [mouth - ooh]` @14.6s → `Sss [mouth - sss]` @23.8s of the 28.6 s clip), the elapsed
+  time tracks the audio, and the clip loops.
+
+## Remaining (rendering polish)
+
+- Swap the **real advisor model's** named `mouth - *` sub-meshes (now unblocked — the part names are RE'd)
+  instead of the demo's procedurally-drawn mouth, and place the advisor in its proper screen position with
+  the message system (`Advisor.sam`). The exact runtime viseme selection (the `.LIP` only marks phoneme
+  boundaries; `ShapeAt` currently cycles the five visemes) can be traced from the speech-update caller if
+  the precise per-interval viseme matters; the file format + the engine wiring are settled.
 
 ## Affected files
 

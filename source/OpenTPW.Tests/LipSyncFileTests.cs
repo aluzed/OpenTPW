@@ -52,6 +52,18 @@ public class LipSyncFileTests
 		Assert.AreEqual( MouthShape.Normal, lip.ShapeAt( TimeSpan.FromSeconds( 5.5 ) ) ); // interval 5 -> wraps to 1
 	}
 
+	[TestMethod]
+	public void VisemesMapToTheAdvisorMeshPartNames()
+	{
+		// RE'd from FUN_0044b2e0: each viseme names a sub-mesh of the advisor model; Closed has none.
+		Assert.IsNull( MouthShape.Closed.MeshPartName() );
+		Assert.AreEqual( "mouth - normal", MouthShape.Normal.MeshPartName() );
+		Assert.AreEqual( "mouth - aah", MouthShape.Aah.MeshPartName() );
+		Assert.AreEqual( "mouth - eee", MouthShape.Eee.MeshPartName() );
+		Assert.AreEqual( "mouth - ooh", MouthShape.Ooh.MeshPartName() );
+		Assert.AreEqual( "mouth - sss", MouthShape.Sss.MeshPartName() );
+	}
+
 	// Optional validation against a real .LIP. Set TPW_LIP_SAMPLE.
 	[TestMethod]
 	public void ParsesRealLipSample()

@@ -17,6 +17,26 @@ public enum MouthShape
 	Sss = 5,
 }
 
+/// <summary>Helpers for <see cref="MouthShape"/>.</summary>
+public static class MouthShapeExtensions
+{
+	/// <summary>
+	/// The advisor model's named sub-mesh that the engine shows for this viseme — RE'd verbatim from the
+	/// mouth-mesh selector <c>FUN_0044b2e0</c> (it string-matches the model's parts against these names).
+	/// <see cref="MouthShape.Closed"/> has no part (the mouth is hidden); the others map to the
+	/// "mouth - *" parts. (The whole-head part is "bug head".)
+	/// </summary>
+	public static string? MeshPartName( this MouthShape shape ) => shape switch
+	{
+		MouthShape.Normal => "mouth - normal",
+		MouthShape.Aah => "mouth - aah",
+		MouthShape.Eee => "mouth - eee",
+		MouthShape.Ooh => "mouth - ooh",
+		MouthShape.Sss => "mouth - sss",
+		_ => null, // Closed → no mouth part shown
+	};
+}
+
 /// <summary>
 /// Reader for Theme Park World lip-sync files (<c>.LIP</c> / <c>.LIPS</c>, found under
 /// <c>SPEECH/LIPS/</c>).
