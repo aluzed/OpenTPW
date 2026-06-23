@@ -132,6 +132,11 @@ public class Level
 				v.CallOpcodeHandler( Opcode.COLOURLIGHT, Lit( 1 ), Lit( 100 ), Lit( 40 ), Lit( 0 ) ); // warm orange
 				v.CallOpcodeHandler( Opcode.SETLIGHT, Lit( 1 ), Lit( 75 ) );                          // 75% brightness
 				v.CallOpcodeHandler( Opcode.DISABLELIGHT, Lit( 2 ) );
+
+				// Exercise the particle opcodes (T-007 93/105) through the engine's .PLB-driven effect system
+				// (T-019): no ride script uses them, so drive them here — proves the effect lookup + proxy.
+				v.CallOpcodeHandler( Opcode.REPAIREFFECT, Lit( 0 ) );
+				v.CallOpcodeHandler( Opcode.SPARK, Lit( 0 ), Lit( 0 ), Lit( 0 ), Lit( 0 ) );
 			}
 		}
 

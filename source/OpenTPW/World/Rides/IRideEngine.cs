@@ -73,6 +73,10 @@ public interface IRideEngine
 	/// <summary>COLOURLIGHT — set light <paramref name="id"/>'s colour (each channel 0..1; the script's 0..100 ÷ 100).</summary>
 	void ColourLight( int id, float r, float g, float b );
 
+	/// <summary>Spawn a particle effect by its <c>par_lib.h</c> <c>P_EFFECT_*</c> code at the ride (the
+	/// <c>.PLB</c>-driven effect system behind REPAIREFFECT / SPARK).</summary>
+	void SpawnParticleEffect( int effectCode );
+
 	/// <summary>SETREVERB — set the audio reverb preset/level.</summary>
 	void SetReverb( int level );
 

@@ -39,6 +39,8 @@ public class RideEngineTests
 		public void Event( int type, int p1, int p2 ) => Effects.Add( $"event({type},{p1},{p2})" );
 		public void SetReverb( int level ) => Effects.Add( $"reverb({level})" );
 		public void DipMusic( int amount ) => Effects.Add( $"dip({amount})" );
+		public List<int> ParticleEffects = new(); // SpawnParticleEffect codes
+		public void SpawnParticleEffect( int effectCode ) => ParticleEffects.Add( effectCode );
 		public List<string> LightCalls = new(); // light opcode trace (id + scaled values)
 		private static string F( float v ) => v.ToString( "0.00", System.Globalization.CultureInfo.InvariantCulture );
 		public void EnableLight( int id ) => LightCalls.Add( $"enable({id})" );
@@ -108,6 +110,21 @@ public class RideEngineTests
 		CollectionAssert.AreEqual(
 			new[] { "enable(3)", "set(3,0.50)", "colour(3,1.00,0.00,0.25)", "disable(3)" },
 			fake.LightCalls );
+	}
+
+	// Particle opcodes route to the engine's particle system with the par_lib effect codes:
+	// REPAIREFFECT → P_EFFECT_Repair (51), SPARK → P_EFFECT_Sparks (1). See T-007 / T-019.
+	[TestMethod]
+	public void ParticleOpcodesRouteToEngine()
+	{
+		var vm = NewVm();
+		var fake = new FakeEngine();
+		vm.Engine = fake;
+
+		vm.CallOpcodeHandler( Opcode.REPAIREFFECT, Lit( vm, 0 ) );
+		vm.CallOpcodeHandler( Opcode.SPARK, Lit( vm, 0 ), Lit( vm, 0 ), Lit( vm, 0 ), Lit( vm, 0 ) );
+
+		CollectionAssert.AreEqual( new[] { 51, 1 }, fake.ParticleEffects );
 	}
 
 	[TestMethod]

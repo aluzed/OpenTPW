@@ -6,7 +6,7 @@ dispatched by the executor `FUN_00551cb0` (opcode word tagged `0x80`, bounds `< 
 table at `0x5567d8`). The **Operands** column is authoritative (the reflection dispatcher must
 match it). **Kind**: `pure` = VM-state only (done); `engine` = needs the ride engine.
 
-Status: **97 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus a growing set of
+Status: **99 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus a growing set of
 Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sound, the animation +
 `WAIT*` family, and now the **rider scream family** `STARTSCREAM`/`STOPSCREAM`/`SINGLESCREAM`/
 `SCREAMLEVEL`). See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md) / [T-032](tickets/T-032-ride-engine.md).
@@ -106,7 +106,7 @@ Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sou
 | 90 | `FINDSCRIPTRAND` | 2 | ✅ | engine | random live script matching a name string → its handle in dest (pure VM/registry) |
 | 91 | `GETREMOTEVAR` | 3 | ✅ | engine | read var[index] from the VM with the given handle into dest |
 | 92 | `SETREMOTEVAR` | 3 | ✅ | engine | write var[index] in the VM with the given handle |
-| 93 | `REPAIREFFECT` | 1 | ☐ | engine |
+| 93 | `REPAIREFFECT` | 1 | ✅ | engine | play the `P_EFFECT_Repair` particle effect at the ride (.PLB-driven proxy, T-019) |
 | 94 | `GETCUSTPTCLCODE` | 2 | ☐ | engine |
 | 95 | `SETTIMER` | 1 | ✅ | pure |
 | 96 | `GETTIMER` | 1 | ✅ | pure |
@@ -118,5 +118,5 @@ Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sou
 | 102 | `SEC` | 1 | ✅ | pure |
 | 103 | `SETREVERB` | 1 | ✅ | engine | audio reverb (routed) |
 | 104 | `DIPMUSIC` | 1 | ✅ | engine | duck background music (routed) |
-| 105 | `SPARK` | 4 | ☐ | engine |
+| 105 | `SPARK` | 4 | ✅ | engine | emit the `P_EFFECT_Sparks` particle effect at the ride |
 _Generated from the binary opcode table; method in docs/05-ghidra-reverse.md._

@@ -310,6 +310,90 @@ public sealed class RideEngine : IRideEngine
 		}
 	}
 
+	//
+	// Particle effects (opcodes REPAIREFFECT/SPARK, RE'd from op_93/op_105 → the spawner FUN_0051bfc0).
+	// The original instantiates a .PLB effect at a 3D position. Our renderer has no particle system, so we
+	// use the **decoded .PLB** (T-019): look the effect up by its par_lib code, take a representative colour
+	// from its colour ramp, and spawn a short-lived emissive proxy of that colour at the ride. A visible,
+	// .PLB-driven stand-in; a real GPU particle system is a renderer follow-up.
+	//
+	private static ParticleLibraryFile? particleLib;
+	private static bool particleLibTried;
+	private static ParticleLibraryFile? ParticleLib
+	{
+		get
+		{
+			if ( !particleLibTried )
+			{
+				particleLibTried = true;
+				try
+				{
+					// Through the VFS (rooted at the install's data/), case-insensitive (T-014).
+					using var s = FileSystem.OpenRead( "Particle/Tp2.plb" );
+					if ( s != null )
+						particleLib = new ParticleLibraryFile( s );
+				}
+				catch ( Exception e ) { Log.Warning( $"[ride] particle library load failed: {e.Message}" ); }
+			}
+			return particleLib;
+		}
+	}
+
+	private const float ParticleProxyLife = 1.2f; // seconds an effect proxy stays before fading out
+	private readonly List<(ModelEntity Entity, float Expire)> particleProxies = new();
+	private float lastNow; // most recent Update time, for timing proxy expiry
+
+	public void SpawnParticleEffect( int effectCode )
+	{
+		var (name, r, g, b) = ResolveEffectColour( effectCode );
+		try
+		{
+			var mat = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader",
+				MaterialFlags.DoubleSided | MaterialFlags.DisableDepthWrite );
+			mat.Set( "Color", new Texture( [r, g, b, 255], 1, 1 ) );
+			var proxy = new ModelEntity
+			{
+				Model = Primitives.Cube.GenerateModel( mat ),
+				Scale = new Vector3( 2.5f ),
+				Position = LightPosition( SelfId ) + Vector3.Up * 8f,
+			};
+			particleProxies.Add( (proxy, lastNow + ParticleProxyLife) );
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( $"[ride] particle effect {effectCode} proxy failed: {e.Message}" );
+		}
+		Log.Info( $"[ride] particle effect {effectCode} ({name})" );
+	}
+
+	// The effect's name + a representative colour (its brightest ramp stop) from the decoded .PLB (T-019);
+	// a white fallback if the library/effect isn't available.
+	private static (string Name, byte R, byte G, byte B) ResolveEffectColour( int effectCode )
+	{
+		var lib = ParticleLib;
+		if ( lib == null || effectCode < 0 || effectCode >= lib.Effects.Count )
+			return ("?", 255, 255, 255);
+
+		var fx = lib.Effects[effectCode];
+		if ( fx.ColorRamp.Count == 0 )
+			return (fx.Name, 255, 255, 255);
+
+		var stop = fx.ColorRamp.OrderByDescending( c => c.R + c.G + c.B ).First();
+		return (fx.Name, stop.R, stop.G, stop.B);
+	}
+
+	private void ExpireParticleProxies( float now )
+	{
+		lastNow = now;
+		for ( var i = particleProxies.Count - 1; i >= 0; i-- )
+		{
+			if ( now < particleProxies[i].Expire )
+				continue;
+			Entity.All.Remove( particleProxies[i].Entity );
+			particleProxies.RemoveAt( i );
+		}
+	}
+
 	public void SetReverb( int level ) => Log.Trace( $"[ride] SETREVERB {level}" );
 
 	public void DipMusic( int amount ) => Log.Trace( $"[ride] DIPMUSIC {amount}" );
@@ -605,6 +689,8 @@ public sealed class RideEngine : IRideEngine
 		// sfx source). STOPSCREAM clears `screaming`.
 		if ( screaming && now - lastScreamAt >= ScreamPeriod )
 			PlayScream( screamCode, screamGain );
+
+		ExpireParticleProxies( now ); // remove finished particle-effect proxies
 
 		foreach ( var obj in objects.Values )
 		{

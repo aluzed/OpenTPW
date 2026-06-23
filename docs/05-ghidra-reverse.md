@@ -117,7 +117,7 @@ confirmation** below is what Ghidra would add (on a GOG/decrypted build).
 | `.LIP` lip-sync | ⚠️ timestamps (µs) + **shapes resolved** (not in file; engine has 5 visemes) | live advisor-mouth wiring | [T-020](tickets/T-020-lip-mouth-shapes.md) |
 | `.MD2` models | ⚠️ animated done | the static (frameCount-0) header | [T-015](tickets/T-015-md2-static-variant.md) |
 | `.MAP` catalogs | ⚠️ names + SFX header | BANK record fields + SFX per-sound list | [T-016](tickets/T-016-map-entry-records.md) |
-| `.RSE` VM opcodes | ⚠️ 97/106 | per-opcode semantics (table + arities recovered) | [T-007](tickets/T-007-vm-opcodes-rse.md) |
+| `.RSE` VM opcodes | ⚠️ 99/106 | per-opcode semantics (table + arities recovered) | [T-007](tickets/T-007-vm-opcodes-rse.md) |
 
 ## See also
 

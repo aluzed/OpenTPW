@@ -2,13 +2,12 @@
 
 - **Priority**: 🟡 Feature (core of ride gameplay)
 - **Type**: Feature / reverse engineering
-- **Status**: ⚠️ **Partial — 97 / 106 opcodes.** The `.RSE` loader / disassembler is restored and
+- **Status**: ⚠️ **Partial — 99 / 106 opcodes.** The `.RSE` loader / disassembler is restored and
   working; `RideVM` parses + runs scripts. **Batch A (all 43 `pure`) complete**; Batch B is nearly done —
   object spawn/lifecycle, the animation + `WAIT*` family, sound, the rider-scream family, the **limbo**,
-  **cross-VM**, **light**, and now the **walk family**
-  (`WALKON`/`WALKOFF`/`WALKGET`/`WALKST_FLOAT`/`WALKFLOATSTAT`/`WALKFLOATSTOP` — a per-VM walk-slot
-  scheduler + float timer, RE'd from op_76..op_81) are all in and tested. **Remaining: 9 opcodes** — heads
-  (2), effects/particles (4), and the motion ops `TURBO`/`TOUR`/`BUMP` (see docs/06).
+  **cross-VM**, **light**, **walk**, and now the **particle effects** (`REPAIREFFECT`/`SPARK`, driven by
+  the decoded `.PLB` from T-019) families are all in and tested. **Remaining: 7 opcodes** — heads (2),
+  the object/particle ops `ADDOBJ_EXT`/`GETCUSTPTCLCODE`, and the motion ops `TURBO`/`TOUR`/`BUMP`.
 
 ## Findings
 
@@ -136,12 +135,26 @@ runtime). Classification: **43 `pure`** (VM-state only — implementable now) an
     `atan2` facing need the ride's walk-node geometry, which isn't decoded yet; and WALKON's 7-operand
     order follows `FUN_00556f40`'s param order, unverified (no shipped `.rse` uses the walk opcodes).
 
-**Remaining: 9 opcodes**, all needing engine subsystems:
-- **Heads** (`ADDHEAD`/`DELHEAD`), **effects** (`ADDOBJ_EXT`/`SPARK`/`REPAIREFFECT`/`GETCUSTPTCLCODE`), and the motion ops `TURBO`/`TOUR`/`BUMP`.
+17. ✅ **Particle effects** (`REPAIREFFECT` 93, `SPARK` 105) — reversed from op_93/op_105 → the particle
+    spawner `FUN_0051bfc0(lib, effectCode, x, y, z)`. Added a particle subsystem to `RideEngine` that
+    **uses the decoded `.PLB`** (T-019): it loads `Tp2.plb` via the VFS, resolves the effect by its
+    `par_lib.h` code (`P_EFFECT_Repair` 51 / `P_EFFECT_Sparks` 1 — names matched exactly), takes a
+    representative colour from the effect's colour ramp, and spawns a short-lived emissive proxy of that
+    colour at the ride (our renderer has no particle system; the proxy is the `.PLB`-driven stand-in, real
+    GPU particles a renderer follow-up). New `IRideEngine.SpawnParticleEffect` + `Handlers/Particles.cs`.
+    Coverage **97 → 99 / 106**. Routing unit-tested (`RideEngineTests.ParticleOpcodesRouteToEngine`); the
+    `.PLB` lookup + proxy verified in-game via the `OPENTPW_AUTOPLACE` drive — logs `particle effect 51
+    (Repair)` / `1 (Sparks)`, proxies render, no exceptions.
 
-These create/drive world entities or particles, so (unlike the limbo / cross-VM / walk-slot bookkeeping,
-which is pure VM) they need ride-engine subsystems to build + verify. Reverse each from its executor case
-(`op_<n>` in `FUN_00551cb0`) when its subsystem comes online.
+**Remaining: 7 opcodes**, all needing engine subsystems:
+- **Heads** (`ADDHEAD`/`DELHEAD`) — head-node attachments (ties into the walk-node geometry).
+- **Object/particle** (`ADDOBJ_EXT` — the 5-operand extended object spawn; `GETCUSTPTCLCODE` — its
+  executor case `op_94` lost the code computation in the decompile, so its contract is unclear).
+- **Motion** (`TURBO`/`TOUR`/`BUMP`).
+
+These create/drive world entities, so (unlike the limbo / cross-VM / walk-slot bookkeeping, which is pure
+VM) they need ride-engine subsystems to build + verify. Reverse each from its executor case (`op_<n>` in
+`FUN_00551cb0`) when its subsystem comes online.
 
 > Note: the instruction doc describes `CMP` as a *bitwise-AND* comparison, but the current
 > `Math.Compare` does equality/less-than. Left as-is for now (changing it could shift branch

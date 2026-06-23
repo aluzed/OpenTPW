@@ -29,6 +29,14 @@ colour ramp** at the tail of each record.
 - One per-effect field noted from the loader's post-read fix-up: byte 162 (short 81) defaults to 1000 when
   zero. The engine treats each record as a `short[160]`.
 
+## Consumed by the ride engine (T-007)
+
+The decode is now used at runtime: `RideEngine`'s particle subsystem loads `Tp2.plb` and resolves effects
+by their `par_lib.h` code (e.g. `P_EFFECT_Repair`/`P_EFFECT_Sparks`) — using the effect **name** + a
+representative **colour-ramp** stop — to render the `REPAIREFFECT`/`SPARK` opcodes' effects. So the names
++ ramp this ticket decoded are wired into live gameplay; the unlabelled per-effect params below would add
+real spawn-rate/velocity/size to those effects once decoded.
+
 ## Remaining
 
 1. **Per-effect parameter field labels** (item 1): lifetime, spawn rate/count, velocity/spread, gravity,
