@@ -7,12 +7,14 @@ namespace OpenTPW;
 /// peeps and rides (see <see cref="ParkFinances"/>), plus the visitor count. Renders nothing until a
 /// park economy exists, so it is harmless in the plain lobby. Text only; no background.
 /// </summary>
-internal sealed class ParkStatsPanel : Panel
+internal sealed class ParkStatsPanel : HudPanel
 {
-	// GAME12 is the 1bpp font the decoder reads cleanly (the antialiased menu fonts aren't decoded yet —
-	// see PurpleButton), shared so the atlas is built once.
-	private static Font? font;
-	private static Font Font => font ??= new Font( "Language/English/GAME12.bf4" );
+	private static Texture? bg, track, ratGood, ratMid, ratBad;
+	private static Texture Bg => bg ??= Solid( 16, 16, 26, 170 );
+	private static Texture Track => track ??= Solid( 50, 50, 62, 220 );
+	private static Texture RatGood => ratGood ??= Solid( 80, 185, 90, 240 );
+	private static Texture RatMid => ratMid ??= Solid( 210, 180, 60, 240 );
+	private static Texture RatBad => ratBad ??= Solid( 200, 70, 60, 240 );
 
 	private const float Scale = 1.5f;
 	private const float Left = 30f;   // top-left margin (UI space is Y-up, origin bottom-left)
@@ -83,7 +85,29 @@ internal sealed class ParkStatsPanel : Panel
 				lines.Add( "BUILD: pick an item on the right -->" );
 		}
 
+		// Park rating = average visitor happiness (T-039); shown as a coloured gauge under the stats.
+		float rating = Peep.AverageHappiness;
+		if ( rating >= 0f )
+			lines.Add( $"PARK RATING {rating:0}%" );
+
+		// Translucent backing so the text reads over the bright park; covers the lines + the rating bar.
+		int n = lines.Count;
+		float blockTop = Top + 8f;
+		float lastLineTop = Top - (n - 1) * LineStep;
+		float barH = 12f;
+		float barTop = lastLineTop - 20f; // just below the PARK RATING text line
+		float backBottom = barTop - barH - 8f;
+		var mat = Material.UI;
+		mat.Set( "Color", Bg );
+		Graphics.Quad( new Rectangle( Left - 12f, backBottom, 392f, blockTop - backBottom ), mat );
+
 		for ( int i = 0; i < lines.Count; i++ )
 			Graphics.DrawText( Font, lines[i], Left, Top - i * LineStep, TextAlign.Left, Scale );
+
+		if ( rating >= 0f )
+		{
+			var fill = rating >= 66f ? RatGood : rating >= 33f ? RatMid : RatBad;
+			DrawBar( new Rectangle( Left, barTop - barH, 364f, barH ), rating / 100f, fill, Track );
+		}
 	}
 }

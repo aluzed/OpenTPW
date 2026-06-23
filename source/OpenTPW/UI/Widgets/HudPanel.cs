@@ -43,4 +43,18 @@ internal abstract class HudPanel : Panel
 		Graphics.Quad( rect, mat );
 		Graphics.DrawText( Font, label, rect.X + 8f, rect.Y + rect.Height - 7f, TextAlign.Left, LabelScale );
 	}
+
+	// Draw a horizontal progress/gauge bar: background track + a fill clamped to [0,1] of the width.
+	protected static void DrawBar( Rectangle rect, float fraction, Texture fill, Texture track )
+	{
+		var mat = Material.UI;
+		mat.Set( "Color", track );
+		Graphics.Quad( rect, mat );
+
+		fraction = Math.Clamp( fraction, 0f, 1f );
+		if ( fraction <= 0f )
+			return;
+		mat.Set( "Color", fill );
+		Graphics.Quad( new Rectangle( rect.X, rect.Y, rect.Width * fraction, rect.Height ), mat );
+	}
 }

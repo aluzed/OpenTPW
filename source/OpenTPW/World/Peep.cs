@@ -41,6 +41,19 @@ public sealed class Peep : ModelEntity
 	/// signal they're used.</summary>
 	public static int ToiletVisits { get; private set; }
 
+	/// <summary>Average visitor happiness (0–100) across the live crowd — the park rating; -1 if empty.</summary>
+	public static float AverageHappiness
+	{
+		get
+		{
+			float sum = 0f;
+			int n = 0;
+			foreach ( var e in Entity.All )
+				if ( e is Peep p ) { sum += p.happiness; n++; }
+			return n == 0 ? -1f : sum / n;
+		}
+	}
+
 	// A small palette of clothing colours so the crowd reads as varied people.
 	private static readonly (byte R, byte G, byte B)[] Palette =
 	{

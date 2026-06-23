@@ -73,10 +73,18 @@
   Unit-tested (`RideShapeTests.Rotated*`); verified in-game via `OPENTPW_AUTOPLACE`: `rotate-test: totem
   placed rot1, footprint 4x3` (upright 3×4), scene renders cleanly, no exceptions.
 
+## Done (HUD polish)
+
+- A shared `HudPanel.DrawBar` gauge helper backs two readouts: `ParkStatsPanel` now draws a translucent
+  **backing panel** behind the stats (readable over the bright park) and a **PARK RATING** bar = average
+  visitor happiness (`Peep.AverageHappiness`), colour-coded green/amber/red; `ManagePanel` renders the
+  selected ride's **research** as a live progress bar instead of a flat % button. Verified in-game (rating
+  bar always visible — e.g. amber `PARK RATING 56%`), no exceptions.
+
 ## Remaining (follow-up)
 
-- None blocking — T-041 covers catalog/preview/place/manage/sell/rotate. (Nice-to-haves: a real
-  drag-to-rotate handle, and shop price controls.)
+- None blocking — T-041 covers catalog/preview/place/manage/sell/rotate + HUD readouts. (Nice-to-haves: a
+  real drag-to-rotate handle, and shop price controls.)
 
 ## Context
 

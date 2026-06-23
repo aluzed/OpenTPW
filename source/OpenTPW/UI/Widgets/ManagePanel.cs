@@ -16,13 +16,15 @@ internal sealed class ManagePanel : HudPanel
 	private const float RideY = 22f;  // bottom of the ride row buttons
 	private const float BtnH = 26f;
 
-	private static Texture? bg, normal, disabled, warn;
+	private static Texture? bg, normal, disabled, warn, research;
 	private static Texture Bg => bg ??= Solid( 18, 18, 28, 190 );
 	private static Texture Normal => normal ??= Solid( 58, 58, 92, 230 );
 	private static Texture Disabled => disabled ??= Solid( 45, 45, 55, 170 );
 	private static Texture Warn => warn ??= Solid( 150, 110, 50, 235 );
+	private static Texture Research => research ??= Solid( 80, 140, 210, 235 );
 
-	private readonly record struct Btn( Rectangle Rect, string Label, bool Enabled, System.Action Act, bool Warned = false );
+	// Progress ≥ 0 renders the button as a progress bar (used for the live research gauge).
+	private readonly record struct Btn( Rectangle Rect, string Label, bool Enabled, System.Action Act, bool Warned = false, float Progress = -1f );
 
 	public ManagePanel() => Current = this;
 
@@ -83,7 +85,7 @@ internal sealed class ManagePanel : HudPanel
 	{
 		var rect = new Rectangle( 176f, RideY, 170f, BtnH );
 		if ( ride.IsResearching )
-			return new Btn( rect, $"RESEARCHING {ride.ResearchFraction * 100f:0}%", false, () => { } );
+			return new Btn( rect, $"RESEARCHING {ride.ResearchFraction * 100f:0}%", false, () => { }, Progress: ride.ResearchFraction );
 		if ( ride.NextResearched )
 			return new Btn( rect, $"UPGRADE ${ride.NextUpgradeCost:0}", fin.CanAfford( ride.NextUpgradeCost ),
 				() => { fin.PayBuild( ride.NextUpgradeCost ); ride.ApplyUpgrade(); }, Warned: true );
@@ -118,6 +120,17 @@ internal sealed class ManagePanel : HudPanel
 		Graphics.Quad( PanelBounds(), mat );
 
 		foreach ( var b in Buttons() )
-			DrawButton( b.Rect, b.Label, !b.Enabled ? Disabled : b.Warned ? Warn : Normal );
+		{
+			if ( b.Progress >= 0f )
+			{
+				// Live progress gauge (research) — fill + label, not a flat button.
+				DrawBar( b.Rect, b.Progress, Research, Disabled );
+				Graphics.DrawText( Font, b.Label, b.Rect.X + 8f, b.Rect.Y + b.Rect.Height - 7f, TextAlign.Left, LabelScale );
+			}
+			else
+			{
+				DrawButton( b.Rect, b.Label, !b.Enabled ? Disabled : b.Warned ? Warn : Normal );
+			}
+		}
 	}
 }
