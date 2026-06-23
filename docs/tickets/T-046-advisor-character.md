@@ -2,7 +2,9 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine / rendering
-- **Status**: ☐ To do
+- **Status**: ⚠️ Implemented — functionally verified (model + 5 visemes + lip-sync + speech all confirmed
+  in logs); the on-screen placement/scale/orientation still needs a visual pass (the screenshot tooling
+  was unavailable this session). The message system (`Advisor.sam`) is not wired yet.
 - **Parent**: [T-020](T-020-lip-mouth-shapes.md) (lip-sync format + wiring done — this is the render tail).
 - **Related**: [T-031](T-031-game-audio.md).
 
@@ -23,12 +25,32 @@ drawn** mouth in sync. What remains is rendering the *real* advisor.
    discard-after-slaps rules) so tips fire on real events (tutorial, golden-ticket, research, congrats)
    with the right speech clip + its `.LIP`.
 
-## Open questions
+## Done (so far)
 
-- Whether the `Advisorm*.MD2` parts are separate meshes assembled at runtime or named sub-meshes of
-  `Advisor.MD2` — the `FUN_0044b2e0` string-match suggests named parts; confirm against the loaded model.
-- Exact runtime viseme selection (the `.LIP` only marks phoneme boundaries; `ShapeAt` currently cycles
-  the five) — can be traced from the speech-update caller if precise per-interval visemes matter.
+- **Resolved the model structure.** `Advisor.MD2` ("Bug Head") loads cleanly through our `ModelFile`
+  (25 named sub-meshes) and **contains the five viseme mouths as named meshes** exactly matching the
+  RE'd selector — `Mouth - Normal/Aah/Eee/Ooh/Sss` (textures `Mouth1a..e.wct`) — plus `Bug Head`, eyes,
+  `ShutEye` (blink), `Body`, antennae, hands, spatula and the context **hats** (Ticket/Kiosk/Bowler/
+  Security/Handyman/Research/Fast Food/Hardhat). So it's **mesh-part swapping**, not the
+  `Advisorm*.MD2` files (which are a separate sub-format we don't need).
+- **`Advisor` world entity** (`source/OpenTPW/World/Advisor.cs`): builds a `ModelEntity` per relevant
+  mesh (the bug face + the five mouths), anchors the whole assembly upright in front of / facing the
+  camera each frame, shows only the active viseme's `Mouth - *` mesh (hides the other four), and plays a
+  real `sp_001.mp2` clip driving the viseme from its `.LIP` via `ShapeAt`. `AdvisorPanel` is now a thin
+  HUD label. Enabled by `OPENTPW_ADVISOR_DEMO=1`.
+- **Verified (functional, in-game logs):** `Advisor.MD2 loaded: 25 mesh(es)` → `built 11 part(s)` (6 base
+  + 5 visemes) → `speaking 'sp_001.mp2', 35 keyframes, 28.6s`, no exceptions.
+
+## Remaining
+
+- **Visual pass**: confirm/tune the on-screen position, scale and facing (anchoring constants in
+  `Advisor.cs`) — not done this session (screenshot tooling unavailable).
+- Textures: the `.wct` are loaded from `global/advisor/textures/` via the VFS; verify they resolve (else
+  the advisor renders untextured — still geometrically correct).
+- Hook the **message system** (`Advisor.sam`: `MessageGroups`, min-time/say-once/discard-after-slaps) so
+  tips fire on real events with the right clip, and pick the matching **hat** per advisor role.
+- Exact runtime viseme selection (the `.LIP` only marks phoneme boundaries; `ShapeAt` cycles the five) —
+  traceable from the speech-update caller if precise per-interval visemes matter.
 
 ## Acceptance criteria
 

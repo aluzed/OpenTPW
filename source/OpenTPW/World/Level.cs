@@ -456,9 +456,13 @@ public class Level
 			layout.OnInit();
 		}
 
-		// Advisor lip-sync demo (T-020): plays a real speech clip + drives a viseme mouth from its .LIP.
+		// Advisor lip-sync demo (T-046): the real bug-head model lip-syncing a speech clip (its .LIP drives
+		// which "Mouth - *" viseme sub-mesh shows), plus a small HUD label.
 		if ( Environment.GetEnvironmentVariable( "OPENTPW_ADVISOR_DEMO" ) == "1" )
+		{
+			_ = new Advisor();
 			Hud.AddChild( new AdvisorPanel() );
+		}
 
 		Hud.AddChild( new Cursor() ); // the cursor is shown in both states
 	}
