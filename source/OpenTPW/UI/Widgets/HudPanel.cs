@@ -1,0 +1,46 @@
+using System.Numerics;
+using OpenTPW.UI;
+
+namespace OpenTPW;
+
+/// <summary>
+/// Shared base for the in-park HUD panels (build catalog, manage buttons): mouse mapping into the fixed
+/// 1280×720 UI base space, hit-testing, solid-colour fills and a simple button drawer. Concrete panels
+/// keep a <c>static Current</c> so <see cref="PointerOverUi"/> can tell <see cref="BuildMode"/> when a
+/// click belongs to the UI (and must not also act on the tile behind it). See docs/tickets/T-038.
+/// </summary>
+internal abstract class HudPanel : Panel
+{
+	protected const float LabelScale = 1.3f;
+
+	private static Font? font;
+	protected static Font Font => font ??= new Font( "Language/English/GAME12.bf4" );
+
+	/// <summary>True when the cursor is over any interactive HUD panel (so world tools ignore the click).</summary>
+	public static bool PointerOverUi()
+		=> (BuildPanel.Current?.ContainsMouse() ?? false) || (ManagePanel.Current?.ContainsMouse() ?? false);
+
+	// Window mouse (pixels, Y-down) → base 1280×720 space (Y-up).
+	protected static Vector2 MouseBase()
+	{
+		var w = Screen.Width <= 0 ? 1f : Screen.Width;
+		var h = Screen.Height <= 0 ? 1f : Screen.Height;
+		return new Vector2(
+			Input.Mouse.Position.X / w * 1280f,
+			(1f - Input.Mouse.Position.Y / h) * 720f );
+	}
+
+	protected static bool Contains( Rectangle r, Vector2 p )
+		=> p.X >= r.X && p.X <= r.X + r.Width && p.Y >= r.Y && p.Y <= r.Y + r.Height;
+
+	protected static Texture Solid( byte r, byte g, byte b, byte a ) => new( [r, g, b, a], 1, 1 );
+
+	// Draw a labelled button (filled rect + left-aligned label).
+	protected static void DrawButton( Rectangle rect, string label, Texture fill )
+	{
+		var mat = Material.UI;
+		mat.Set( "Color", fill );
+		Graphics.Quad( rect, mat );
+		Graphics.DrawText( Font, label, rect.X + 8f, rect.Y + rect.Height - 7f, TextAlign.Left, LabelScale );
+	}
+}

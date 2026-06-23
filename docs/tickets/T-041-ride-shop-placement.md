@@ -12,13 +12,20 @@
 
 - **Catalog** (`BuildCatalogItem`): the jungle rides (footprint from `RideShape`, **cost read from the
   `.sam`** `Upgrades[0].CostOfUpgrade`) + a food shop.
-- **Clickable catalog UI** (`UI/Widgets/BuildPanel.cs`, T-038): a right-side column of buttons, one per
-  catalog item, that **selects on click** — so every item is mouse-reachable (the old number-key list
-  capped at 1–9; the added drink stall had pushed `researcher` past key 9). The selected item is
-  highlighted green, items the park can't afford are dimmed red, and clicking the selected item toggles it
-  off. `BuildMode` consults `BuildPanel.ContainsMouse()` so a click on the panel doesn't also act on the
-  tile behind it. Number keys still work. `ParkStatsPanel` no longer duplicates the list (shows a
-  "PLACING: …" hint instead). Verified in-game: all 10 items render + are selectable; no exceptions.
+- **Clickable build/manage UI** (T-038): a shared `UI/Widgets/HudPanel` base (mouse→base-space mapping,
+  hit-test, button drawing) backs two panels —
+  - **`BuildPanel`** (right column): a button per catalog item that **selects on click**, so every item is
+    mouse-reachable (the old number-key list capped at 1–9; the added drink stall had pushed `researcher`
+    past key 9). Selected item highlighted green, unaffordable items dimmed red, re-click toggles off.
+  - **`ManagePanel`** (bottom-left bar): clickable buttons for the previously keyboard-only manage actions
+    — admission fee ±, take/repay loan, and (when a ride is selected via the Default tool) its ticket
+    price ± and research/upgrade. Each calls the same `ParkFinances`/`Ride` methods as the keyboard
+    shortcuts (those methods are covered by the T-042/T-044 tests); disabled actions are dimmed.
+  `BuildMode` consults `HudPanel.PointerOverUi()` so a click on either panel doesn't also act on the tile
+  behind it; the number-key/keyboard shortcuts still work. `ParkStatsPanel` no longer duplicates the
+  catalog. Verified in-game: panels render (all 10 catalog items + the FEE−/FEE+/LOAN economy row), no
+  exceptions. (Clicks couldn't be synthesised in this env — no `xdotool` — so the hit-test glue is by code
+  review; the underlying actions are test-covered.)
 - **Footprint preview**: the selected item's `Width×Height` quad follows the cursor, **green** when
   `grid.CanPlace` & affordable, **red** otherwise.
 - **Commit** (`CommitPlacement` → `SpawnRideAt`/`SpawnShopAt`): validates + `TryPlace`, spawns the

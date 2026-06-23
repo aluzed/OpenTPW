@@ -66,9 +66,9 @@ public sealed class BuildMode : Entity
 	{
 		HandleSelectionKeys();
 
-		// While the cursor is over the build UI, don't interact with the world (the panel owns the click —
-		// otherwise selecting a catalog button would also place/select on the tile behind it). T-038.
-		if ( BuildPanel.Current?.ContainsMouse() == true )
+		// While the cursor is over any HUD panel, don't interact with the world (the panel owns the click —
+		// otherwise clicking a catalog/manage button would also place/select on the tile behind it). T-038.
+		if ( HudPanel.PointerOverUi() )
 		{
 			highlight.Position = Offscreen;
 			return;

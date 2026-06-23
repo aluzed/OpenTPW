@@ -348,6 +348,7 @@ public class Level
 
 		Hud.AddChild( new ParkStatsPanel() ); // live park finances/visitors readout (no-op without a park)
 		Hud.AddChild( new BuildPanel() );     // clickable build catalog (T-038); no-op outside build mode
+		Hud.AddChild( new ManagePanel() );    // clickable economy/ride manage buttons (T-038)
 		Hud.AddChild( new Cursor() );
 	}
 
