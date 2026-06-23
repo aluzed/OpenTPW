@@ -51,15 +51,17 @@
   clears the selection (and any active track-laying ref). Verified via `OPENTPW_AUTOPLACE`: demolishing
   the **coaster** (track + train + queue) gave `rides 3→2, queues 3→2, refund 5000` (of 10000), no
   exceptions.
+- **Shops are sellable too**: `Shop` gained a grid footprint (`TileX/Y/W/H`, `Covers`), `BuildCost` and
+  `Despawn`; the Default tool selects a ride *or* (if none covers the tile) a shop, and `Level.DemolishShop`
+  frees its cells + refunds 50%. The manage UI shows a `SELL <stall> $N` button for a selected shop.
+  Verified via `OPENTPW_AUTOPLACE`: `sell-test shop Food Stall: shops 2→1, refund 250` (of 500).
 - Note: peeps already en route to a sold ride hold its `RideQueue` and finish/re-route gracefully (the
-  queue object lives until they drop it); shops aren't sellable yet (they aren't selectable — follow-up).
+  queue object lives until they drop it).
 
 ## Remaining (follow-up)
 
 - **Rotation** (`ACTION_SET_RIDE_ROTATION`): needs rotating the ride's mesh parts about the placement
   centre + rotating the footprint/entrance — deferred.
-- **Shop sell**: shops aren't selectable yet (the Default tool only picks rides) — wire shop selection
-  then route it through the same teardown.
 
 ## Context
 

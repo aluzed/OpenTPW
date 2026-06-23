@@ -77,7 +77,8 @@ public class Level
 		var catalog = BuildCatalog();
 		_ = new BuildMode( grid, terrain, catalog,
 			( item, tx, ty ) => CommitPlacement( item, grid, terrain, tx, ty ),
-			ride => DemolishRide( ride, grid ) );
+			ride => DemolishRide( ride, grid ),
+			shop => DemolishShop( shop, grid ) );
 
 		// Diagnostic: deterministically exercise the placement pipeline (the same path a click commits).
 		if ( Environment.GetEnvironmentVariable( "OPENTPW_AUTOPLACE" ) != null )
@@ -149,18 +150,26 @@ public class Level
 				v.CallOpcodeHandler( Opcode.ADDOBJ_EXT, Lit( 4 ), Lit( 0 ), Lit( 11 ), Lit( 100 ), Lit( 0 ) );
 			}
 
-			// Exercise sell/demolish (T-041): tear down the shop and confirm the refund + entity cleanup.
-			var toSell = Entity.All.OfType<Ride>().LastOrDefault();
-			if ( toSell != null )
+			// Exercise sell/demolish (T-041): tear down a ride + a shop, confirming the refund + cleanup.
+			var rideToSell = Entity.All.OfType<Ride>().LastOrDefault();
+			if ( rideToSell != null )
 			{
 				int ridesBefore = Entity.All.Count( e => e is Ride );
 				int queuesBefore = parkQueues.Count;
 				float moneyBefore = ParkFinances.Current?.Money ?? 0f;
-				DemolishRide( toSell, grid );
+				DemolishRide( rideToSell, grid );
 				int ridesAfter = Entity.All.Count( e => e is Ride );
 				float refund = ParkFinances.Current?.Money - moneyBefore ?? 0f;
-				Log.Info( $"[build] sell-test {toSell.Name}: rides {ridesBefore}->{ridesAfter}, "
+				Log.Info( $"[build] sell-test ride {rideToSell.Name}: rides {ridesBefore}->{ridesAfter}, "
 					+ $"queues {queuesBefore}->{parkQueues.Count}, refund {refund:0}" );
+			}
+			if ( Shop.Stalls.FirstOrDefault() is { } shopToSell )
+			{
+				int shopsBefore = Shop.Stalls.Count;
+				float moneyBefore = ParkFinances.Current?.Money ?? 0f;
+				DemolishShop( shopToSell, grid );
+				float refund = ParkFinances.Current?.Money - moneyBefore ?? 0f;
+				Log.Info( $"[build] sell-test shop {shopToSell.Name}: shops {shopsBefore}->{Shop.Stalls.Count}, refund {refund:0}" );
 			}
 		}
 
@@ -232,7 +241,7 @@ public class Level
 			return false;
 
 		bool ok = item.RidePath == null
-			? SpawnShopAt( terrain, grid, tx, ty, item.Name == "drink" ? ShopKind.Drink : ShopKind.Food )
+			? SpawnShopAt( terrain, grid, tx, ty, item.Name == "drink" ? ShopKind.Drink : ShopKind.Food, item )
 			: SpawnRideAt( item.RidePath, grid, terrain, tx, ty, item.Cost );
 
 		if ( !ok )
@@ -287,11 +296,24 @@ public class Level
 		catch ( Exception e ) { Log.Warning( $"[build] ride '{path}' failed: {e.Message}" ); return false; }
 	}
 
-	private static bool SpawnShopAt( ParkTerrain terrain, PlacementGrid grid, int tx, int ty, ShopKind kind )
+	private static bool SpawnShopAt( ParkTerrain terrain, PlacementGrid grid, int tx, int ty, ShopKind kind, BuildCatalogItem item )
 	{
-		var c = grid.TileToWorld( tx, ty, 2, 2 );
-		_ = new Shop( terrain, c, kind );
+		var c = grid.TileToWorld( tx, ty, item.Width, item.Height );
+		_ = new Shop( terrain, c, kind )
+		{
+			TileX = tx, TileY = ty, TileW = item.Width, TileH = item.Height, BuildCost = item.Cost,
+		};
 		return true;
+	}
+
+	// Sell/demolish a placed stall (T-041): free its footprint cells, refund part of the cost, remove it.
+	private static void DemolishShop( Shop shop, PlacementGrid grid )
+	{
+		grid.Clear( shop.TileX, shop.TileY, shop.TileW, shop.TileH );
+		var refund = shop.BuildCost * Ride.SellRefundFraction;
+		ParkFinances.Current?.RefundBuild( refund );
+		shop.Despawn();
+		Log.Info( $"[build] sold {shop.Name} for ${refund:0} (built ${shop.BuildCost:0})" );
 	}
 
 	// Visualises a ride's entrance/exit cells (from its Info.Shape) as small markers on the terrain —

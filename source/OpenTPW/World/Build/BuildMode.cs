@@ -28,6 +28,7 @@ public sealed class BuildMode : Entity
 	private readonly ParkTerrain terrain;
 	private readonly Func<BuildCatalogItem, int, int, bool> commit;
 	private readonly Action<Ride> demolish;
+	private readonly Action<Shop> demolishShop;
 	private readonly ModelEntity highlight;
 	private readonly Material<ObjectUniformBuffer> mat;
 	private readonly Texture yellow = new( [255, 235, 40, 110], 1, 1 );
@@ -48,25 +49,35 @@ public sealed class BuildMode : Entity
 
 	public (int X, int Y)? HoveredTile { get; private set; }
 
-	/// <summary>Sell/demolish the selected ride: refunds part of its cost and tears it out of the park
-	/// (T-041). No-op if no ride is selected. Exposed for the manage UI + the Delete shortcut.</summary>
+	/// <summary>The shop currently selected (clicked) in the Default tool — sellable like a ride (T-041).</summary>
+	public Shop? SelectedShop { get; private set; }
+
+	/// <summary>Sell/demolish the selected ride or shop: refunds part of its cost and tears it out of the
+	/// park (T-041). No-op if nothing is selected. Exposed for the manage UI + the Delete shortcut.</summary>
 	public void SellSelected()
 	{
-		if ( SelectedRide is not { } ride )
-			return;
-		if ( track?.Coaster == ride )
-			track = null; // the coaster's track is owned by the ride; Ride.Despawn tears it down
-		demolish( ride );
-		SelectedRide = null;
+		if ( SelectedRide is { } ride )
+		{
+			if ( track?.Coaster == ride )
+				track = null; // the coaster's track is owned by the ride; Ride.Despawn tears it down
+			demolish( ride );
+			SelectedRide = null;
+		}
+		else if ( SelectedShop is { } shop )
+		{
+			demolishShop( shop );
+			SelectedShop = null;
+		}
 	}
 
 	public BuildMode( PlacementGrid grid, ParkTerrain terrain, IReadOnlyList<BuildCatalogItem> catalog,
-		Func<BuildCatalogItem, int, int, bool> commit, Action<Ride> demolish )
+		Func<BuildCatalogItem, int, int, bool> commit, Action<Ride> demolish, Action<Shop> demolishShop )
 	{
 		this.grid = grid;
 		this.terrain = terrain;
 		this.commit = commit;
 		this.demolish = demolish;
+		this.demolishShop = demolishShop;
 		Catalog = catalog;
 		Current = this;
 
@@ -194,7 +205,8 @@ public sealed class BuildMode : Entity
 			prevDown.Add( k );
 	}
 
-	// Default tool: highlight the hovered tile; click selects the ride covering it (for price control).
+	// Default tool: highlight the hovered tile; click selects the ride or shop covering it (for price
+	// control / sell). A ride takes precedence if one covers the tile; selecting one clears the other.
 	private void UpdateDefault( int tx, int ty )
 	{
 		if ( HoveredTile == null )
@@ -210,8 +222,9 @@ public sealed class BuildMode : Entity
 		if ( Input.MouseLeftPressed )
 		{
 			SelectedRide = Entity.All.OfType<Ride>().FirstOrDefault( r => r.Covers( tx, ty ) );
-			Log.Info( SelectedRide != null
-				? $"[build] selected {SelectedRide.Name} (price {SelectedRide.TicketPrice:0})"
+			SelectedShop = SelectedRide == null ? Shop.Stalls.FirstOrDefault( s => s.Covers( tx, ty ) ) : null;
+			Log.Info( SelectedRide != null ? $"[build] selected {SelectedRide.Name} (price {SelectedRide.TicketPrice:0})"
+				: SelectedShop != null ? $"[build] selected {SelectedShop.Name}"
 				: $"[build] click tile ({tx},{ty})" );
 		}
 	}

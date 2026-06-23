@@ -68,6 +68,13 @@ internal sealed class ManagePanel : HudPanel
 				$"SELL ${ride.BuildCost * Ride.SellRefundFraction:0}", true,
 				() => BuildMode.Current?.SellSelected(), Warned: true ) );
 		}
+		// Selected-shop row: stalls have no price/research, just a sell button.
+		else if ( BuildMode.Current?.SelectedShop is { } shop )
+		{
+			list.Add( new Btn( new Rectangle( 16f, RideY, 200f, BtnH ),
+				$"SELL {shop.Name} ${shop.BuildCost * Ride.SellRefundFraction:0}", true,
+				() => BuildMode.Current?.SellSelected(), Warned: true ) );
+		}
 		return list;
 	}
 

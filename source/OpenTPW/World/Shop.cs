@@ -25,6 +25,29 @@ public sealed class Shop : ModelEntity
 	/// <summary>What this stall sells (which need it satisfies).</summary>
 	public ShopKind Kind { get; }
 
+	/// <summary>Display name (for the manage UI), e.g. "Food Stall".</summary>
+	public string Name => Kind == ShopKind.Drink ? "Drink Stall" : "Food Stall";
+
+	/// <summary>Grid footprint (set when placed) — used to select it by clicking a covered tile, and to
+	/// free its cells on sell/demolish (T-041).</summary>
+	public int TileX { get; set; }
+	public int TileY { get; set; }
+	public int TileW { get; set; }
+	public int TileH { get; set; }
+
+	/// <summary>What the player paid to build this stall — used for the sell refund (T-041).</summary>
+	public float BuildCost { get; set; }
+
+	/// <summary>True if the grid tile (tx,ty) is within this stall's footprint.</summary>
+	public bool Covers( int tx, int ty ) => tx >= TileX && tx < TileX + TileW && ty >= TileY && ty < TileY + TileH;
+
+	/// <summary>Remove this stall from the world (sold/demolished) — caller frees its grid cells + refunds.</summary>
+	public void Despawn()
+	{
+		Stalls.Remove( this );
+		Entity.All.Remove( this );
+	}
+
 	private static readonly Dictionary<ShopKind, Model> sharedModels = new();
 
 	public Shop( ParkTerrain terrain, Vector3 position, ShopKind kind = ShopKind.Food, float price = 8f )
