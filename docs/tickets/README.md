@@ -9,12 +9,22 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 
 ## Build / test state (observed)
 
-- **Build**: ✅ `dotnet build OpenTPW.sln` → 6 projects, **0 errors, 0 warnings** (T-009).
-- **Tests**: ✅ `dotnet test` → **0 failed, 38 passed, 9 inconclusive** on a clean Linux
-  machine (was 7/7 failing). The inconclusive ones are integration tests that need a game
-  install (`OPENTPW_GAMEPATH`) or a real asset sample (`TPW_VIDEO_SAMPLE`, `TPW_FONT_SAMPLE`,
-  `TPW_MODEL_SAMPLE`, `TPW_MAP_SAMPLE`, `TPW_PLB_SAMPLE`, `TPW_MTR_SAMPLE`, `TPW_LIP_SAMPLE`).
-  All pass when the samples are provided.
+- **Build**: ✅ `dotnet build OpenTPW.sln` → 6 projects, **0 errors** (T-009).
+- **Tests**: ✅ `dotnet test` → **0 failed, 101 passed, 17 inconclusive/ignored** on a clean Linux
+  machine. The inconclusive ones are integration tests that need a game install (`OPENTPW_GAMEPATH`)
+  or a real asset sample (`TPW_VIDEO_SAMPLE`, `TPW_FONT_SAMPLE`, `TPW_MODEL_SAMPLE`, `TPW_MAP_SAMPLE`,
+  `TPW_PLB_SAMPLE`, `TPW_MTR_SAMPLE`, `TPW_LIP_SAMPLE`). All pass when the samples are provided.
+
+## Remaining work (open tickets)
+
+All format/VM decoding and the core gameplay loop are done. Open work falls into:
+- **Active feature tails** (actionable now): **T-046** advisor render · **T-047** EVENT 3D sound + particle
+  pools · **T-048** ride node geometry/movement · **T-049** management UI depth · **T-050** peep depth ·
+  **T-051** audio polish · **T-052** coaster `.hmp`/rotation.
+- **Blocked / deferred** (need an external sample or have no consumer): **T-017** (`SAD_*` save stream —
+  no sample), **T-022** (EA-ADPCM mono waveform — no sample), **T-019** (`.PLB` per-effect field labels —
+  no particle system to consume them; needs a dynamic capture), **T-021** (`.TQI` exact dequant — decoder
+  already renders correctly).
 
 ## Index
 
@@ -65,6 +75,13 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-043](T-043-staff-management.md) | 🟡 Feature | ⚠️ Core done | Staff hire+place via catalog (entertainer/handyman/guard/researcher), charged + wages (verified); fire/patrol-zones remain |
 | [T-044](T-044-research-upgrades.md) | 🟡 Feature | ⚠️ Core done | Research + ride capacity upgrades: full `Upgrades[*]` parsed, researchers advance research, apply bumps live capacity (verified); per-ride UI remains |
 | [T-045](T-045-coaster-track-editor.md) | 🟡 Feature | ⚠️ Slices 1–3b | Coaster: station + track-laying tool closing into a loop at the `<` entry, rendered by **sweeping the authored cross-section profile decoded from `coaster.sam`** (the real channel/rail silhouette) along the spline, on height-aware pylons, with a train of real CrocCar.MD2 cars (animated) gliding it; **real peeps board the train and ride it in view, the rider scream plays while occupied, and `STACKUP/DOWN` (`PageUp`/`PageDown`) builds hills** (verified) — only `.hmp` curved-piece meshes + segment rotation remain (nice-to-have) |
+| [T-046](T-046-advisor-character.md) | 🟡 Feature | ☐ To do | Render the **real advisor character** — load the `advisor.wad` bug-head MD2 + show the named `mouth - *` viseme sub-meshes driven by the (already-wired) `.LIP` lip-sync, plus the `Advisor.sam` message system. (Tail of T-020) |
+| [T-047](T-047-ride-event-3d-sound-particle-pools.md) | 🟡 Feature | ☐ To do | Ride `EVENT` **3D positioning** (`FUN_00556b90` node placement) + map the **7 particle effect-pools** (`DAT_00803a20..3c`) to their real `.PLB` libraries; `COAST`/`BUMP`/`ADDOBJ` sound residue. (Tail of T-037) |
+| [T-048](T-048-ride-node-geometry-movement.md) | 🟡 Feature | ☐ To do | Decode the ride model **node graph** (walk/head/car-path/particle nodes) → authored car paths (replace `RideVehicle`'s ellipse), real WALKON/ADDHEAD placement, and node positions for T-047. (Tail of T-032) |
+| [T-049](T-049-management-ui-depth.md) | 🟡 Feature | ☐ To do | Management UI depth: clickable **finance graph** + per-ride price, staff **fire/patrol-zones**, **per-ride upgrade/research panel** (systems already core-done). (Tails of T-042/043/044) |
+| [T-050](T-050-peep-simulation-depth.md) | 🟡 Feature | ☐ To do | Peep depth: **ride ratings & thoughts** feeding park rating, **water-aware** pathfinding, **real gate node** entry/exit. (Tails of T-039/036) |
+| [T-051](T-051-audio-polish.md) | 🟡 Feature | ☐ To do | Audio polish: **ambient loops** + a settings-screen **volume UI** (music/SFX/speech), persisted. (Tail of T-031) |
+| [T-052](T-052-coaster-track-polish.md) | 🟢 Low | ☐ To do | Coaster nice-to-haves: decode **`.hmp`** per-piece template → curved track pieces, and per-segment rotation. (Tail of T-045) |
 
 Priority legend: 🔴 blocking · 🟠 important · 🟡 desirable/feature · ⚪ technical debt/polish.
 Status legend: ✅ done · ⚠️ partial · ☐ to do · 🗂️ split into focused tickets · ⏸️ deferred.
