@@ -438,6 +438,50 @@ public class RideScriptTests
 		OpcodeHandlers.Hierarchy.RemoveChild( ref parent );
 	}
 
+	// The walk subsystem: WALKON parks a peep walking on, the per-tick advance moves it to Arrived at its
+	// end time, WALKOFF sends it back (Releasing → Done), and WALKGET hands the finished peep back. Plus
+	// the walk-float timer (WALKST_FLOAT / WALKFLOATSTAT / WALKFLOATSTOP). RE'd from op_76..op_81 (T-007).
+	[TestMethod]
+	public void WalkOpcodes()
+	{
+		Log = new();
+		var vm = LoadTestVm();
+		vm.GameTime = 0;
+		var dest = new Operand( vm, Operand.Type.Variable, 0, 0 );
+
+		// WALKON(peep=7, start=1, end=2, e5, e6, type, e8): one slot becomes active.
+		OpcodeHandlers.Walk.WalkOn( ref vm, Lit( vm, 7 ), Lit( vm, 1 ), Lit( vm, 2 ),
+			Lit( vm, 0 ), Lit( vm, 0 ), Lit( vm, 0 ), Lit( vm, 0 ) );
+		Assert.AreEqual( 1, vm.ActiveWalkCount );
+
+		// Nothing finished yet: WALKGET returns 0 (+ Zero flag).
+		OpcodeHandlers.Walk.WalkGet( ref vm, dest );
+		Assert.AreEqual( 0, dest.Value );
+		Assert.IsTrue( vm.Flags.HasFlag( RideVM.VMFlags.Zero ) );
+
+		// Advance past the walk duration → the peep has Arrived (still occupying its slot, not retrievable).
+		vm.GameTime = RideVM.DefaultWalkDuration + 1;
+		vm.WalkAdvance();
+		OpcodeHandlers.Walk.WalkGet( ref vm, dest );
+		Assert.AreEqual( 0, dest.Value, "an arrived (still-aboard) peep is not retrievable" );
+
+		// WALKOFF then advance → the peep finishes (Done) and WALKGET hands it back, freeing the slot.
+		OpcodeHandlers.Walk.WalkOff( ref vm, Lit( vm, 7 ) );
+		vm.GameTime += RideVM.DefaultWalkDuration + 1;
+		vm.WalkAdvance();
+		OpcodeHandlers.Walk.WalkGet( ref vm, dest );
+		Assert.AreEqual( 7, dest.Value, "the peep that finished walking off is returned" );
+		Assert.AreEqual( 0, vm.ActiveWalkCount, "its slot is freed" );
+
+		// Walk-float timer: start, read, stop.
+		OpcodeHandlers.Walk.WalkStartFloat( ref vm, Lit( vm, 250 ), Lit( vm, 1 ), Lit( vm, 2 ) );
+		OpcodeHandlers.Walk.WalkFloatStat( ref vm, dest );
+		Assert.AreEqual( 250, dest.Value );
+		OpcodeHandlers.Walk.WalkFloatStop( ref vm );
+		OpcodeHandlers.Walk.WalkFloatStat( ref vm, dest );
+		Assert.AreEqual( 1000, dest.Value, "STOP finalises the float value" );
+	}
+
 	private static RideVM LoadTestVm()
 	{
 		var path = Path.Combine( AppContext.BaseDirectory, "content", "testscripts", "Test.RSE" );

@@ -6,7 +6,7 @@ dispatched by the executor `FUN_00551cb0` (opcode word tagged `0x80`, bounds `< 
 table at `0x5567d8`). The **Operands** column is authoritative (the reflection dispatcher must
 match it). **Kind**: `pure` = VM-state only (done); `engine` = needs the ride engine.
 
-Status: **91 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus a growing set of
+Status: **97 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus a growing set of
 Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sound, the animation +
 `WAIT*` family, and now the **rider scream family** `STARTSCREAM`/`STOPSCREAM`/`SINGLESCREAM`/
 `SCREAMLEVEL`). See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md) / [T-032](tickets/T-032-ride-engine.md).
@@ -89,12 +89,12 @@ Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sou
 | 73 | `UNBOUNCE` | 1 | ✅ | engine |
 | 74 | `FORCEUNBOUNCE` | 1 | ✅ | engine |
 | 75 | `BOUNCING` | 1 | ✅ | engine |
-| 76 | `WALKON` | 7 | ☐ | engine |
-| 77 | `WALKOFF` | 1 | ☐ | engine |
-| 78 | `WALKGET` | 1 | ☐ | engine |
-| 79 | `WALKST_FLOAT` | 3 | ☐ | engine |
-| 80 | `WALKFLOATSTAT` | 1 | ☐ | engine |
-| 81 | `WALKFLOATSTOP` | 0 | ☐ | engine |
+| 76 | `WALKON` | 7 | ✅ | engine | send a peep walking between two walk nodes (VM walk-slot table; visual glide needs node geometry) |
+| 77 | `WALKOFF` | 1 | ✅ | engine | start a walking peep heading back off |
+| 78 | `WALKGET` | 1 | ✅ | engine | retrieve a peep that finished walking off into dest (0 if none) |
+| 79 | `WALKST_FLOAT` | 3 | ✅ | engine | start the walk-float timer (value, p3, p4) |
+| 80 | `WALKFLOATSTAT` | 1 | ✅ | engine | read the walk-float value into dest |
+| 81 | `WALKFLOATSTOP` | 0 | ✅ | engine | finalise the walk-float timer |
 | 82 | `ENABLELIGHT` | 1 | ✅ | engine | turn on ride light `id` (engine: emissive colour proxy — renderer is unlit) |
 | 83 | `DISABLELIGHT` | 1 | ✅ | engine | turn off ride light `id` |
 | 84 | `SETLIGHT` | 2 | ✅ | engine | set light `id` brightness (operand 0..100 ÷100 → 0..1) |

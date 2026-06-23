@@ -222,6 +222,7 @@ public partial class RideVM
 		// run this tick's slice.
 		GameTime += (int)( (float)TimeSinceLastTick * 1000f );
 		TimeSinceLastTick = 0;
+		WalkAdvance(); // progress walking peeps by the clock (WALKON → arrived, WALKOFF → done)
 		RunSlice();
 	}
 

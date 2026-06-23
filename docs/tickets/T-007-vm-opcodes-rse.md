@@ -2,13 +2,13 @@
 
 - **Priority**: 🟡 Feature (core of ride gameplay)
 - **Type**: Feature / reverse engineering
-- **Status**: ⚠️ **Partial — 91 / 106 opcodes.** The `.RSE` loader / disassembler is restored and
-  working; `RideVM` parses + runs scripts. **Batch A (all 43 `pure`) complete**; Batch B is well
-  underway — object spawn/lifecycle, the animation + `WAIT*` family, sound, the rider-scream family, the
-  **limbo family**, the **cross-VM family**, and now the **light family**
-  (`ENABLELIGHT`/`DISABLELIGHT`/`SETLIGHT`/`COLOURLIGHT` — engine subsystem, RE'd from op_82..op_85) are
-  all in and tested. **Remaining: 15 opcodes** — walk-on/off (6), heads (2), effects/particles (4), and
-  the motion ops `TURBO`/`TOUR`/`BUMP` (see docs/06).
+- **Status**: ⚠️ **Partial — 97 / 106 opcodes.** The `.RSE` loader / disassembler is restored and
+  working; `RideVM` parses + runs scripts. **Batch A (all 43 `pure`) complete**; Batch B is nearly done —
+  object spawn/lifecycle, the animation + `WAIT*` family, sound, the rider-scream family, the **limbo**,
+  **cross-VM**, **light**, and now the **walk family**
+  (`WALKON`/`WALKOFF`/`WALKGET`/`WALKST_FLOAT`/`WALKFLOATSTAT`/`WALKFLOATSTOP` — a per-VM walk-slot
+  scheduler + float timer, RE'd from op_76..op_81) are all in and tested. **Remaining: 9 opcodes** — heads
+  (2), effects/particles (4), and the motion ops `TURBO`/`TOUR`/`BUMP` (see docs/06).
 
 ## Findings
 
@@ -123,13 +123,25 @@ runtime). Classification: **43 `pure`** (VM-state only — implementable now) an
     they're for scenery objects, which aren't loaded yet — so the diagnostic drives a placed ride's engine
     directly; verified: `ENABLELIGHT 1/2` then `DISABLELIGHT 2`, proxy renders, no exceptions).
 
-**Remaining: 15 opcodes**, all needing engine subsystems:
-- **Walk** (`WALKON`/`WALKOFF`/`WALKGET`/`WALKST_FLOAT`/`WALKFLOATSTAT`/`WALKFLOATSTOP`) — peeps walking on/off a ride; ties into the peep system.
+16. ✅ **Walk family** (`WALKON` 76, `WALKOFF` 77, `WALKGET` 78, `WALKST_FLOAT` 79, `WALKFLOATSTAT` 80,
+    `WALKFLOATSTOP` 81) — reversed from op_76..op_81 + the helpers `FUN_00556f40` (add), `005571a0`
+    (release), `00557110` (retrieve), `00557160` (float). It's a per-VM **walk-slot table** (the original's
+    struct `+0x2c` array, count `+0x7c` = config `WalkSize`) + a **walk-float timer** (`+0x80`/`+0x84`) —
+    pure VM bookkeeping, like limbo. Modelled in `RideVM.Walk.cs` with the slot lifecycle
+    Free→WalkingOn→Arrived→Releasing→Done driven by a per-tick `WalkAdvance()` (wired into `Update`), plus
+    `Handlers/Walk.cs`. WALKON parks a peep walking between two nodes, WALKOFF reverses it, WALKGET hands
+    back a finished peep; the float ops drive the single-slot timer. Coverage **91 → 97 / 106**. Covered by
+    `RideScriptTests.WalkOpcodes`; no in-game regression from the per-tick advance (verified via autoplace).
+    *Caveats (documented in the source):* the **visual** glide along walk-node world positions + the
+    `atan2` facing need the ride's walk-node geometry, which isn't decoded yet; and WALKON's 7-operand
+    order follows `FUN_00556f40`'s param order, unverified (no shipped `.rse` uses the walk opcodes).
+
+**Remaining: 9 opcodes**, all needing engine subsystems:
 - **Heads** (`ADDHEAD`/`DELHEAD`), **effects** (`ADDOBJ_EXT`/`SPARK`/`REPAIREFFECT`/`GETCUSTPTCLCODE`), and the motion ops `TURBO`/`TOUR`/`BUMP`.
 
-These create/drive world entities, so (unlike limbo + cross-VM, which turned out pure VM) they need the
-ride-engine subsystems to build + verify. Reverse each from its executor case (`op_<n>` in `FUN_00551cb0`)
-when its subsystem comes online.
+These create/drive world entities or particles, so (unlike the limbo / cross-VM / walk-slot bookkeeping,
+which is pure VM) they need ride-engine subsystems to build + verify. Reverse each from its executor case
+(`op_<n>` in `FUN_00551cb0`) when its subsystem comes online.
 
 > Note: the instruction doc describes `CMP` as a *bitwise-AND* comparison, but the current
 > `Math.Compare` does equality/less-than. Left as-is for now (changing it could shift branch
