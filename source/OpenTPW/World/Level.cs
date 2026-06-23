@@ -9,6 +9,9 @@ public class Level
 	public RootPanel Hud { get; set; } = null!;
 	public Sun SunLight { get; set; } = null!;
 
+	/// <summary>True once a park has loaded — selects the in-park HUD over the lobby front-end (T-038).</summary>
+	public bool InPark { get; private set; }
+
 	public SettingsFile Global { get; private init; }
 
 	public Level( string levelName )
@@ -38,11 +41,13 @@ public class Level
 		try
 		{
 			SetupDevPark();
+			InPark = true; // a park is loaded → show the in-park HUD (not the lobby front-end)
 		}
 		catch ( Exception e )
 		{
 			Log.Warning( $"dev park failed to load: {e.Message}" );
 			Camera.SetCameraMode<LobbyCameraMode>();
+			InPark = false; // fall back to the lobby front-end
 		}
 	}
 
@@ -343,13 +348,21 @@ public class Level
 		LoadProgress.Report( "Loading interface...", 0.95f );
 		Hud = new();
 
-		var layout = new LobbyLayout() { Hud = Hud };
-		layout.OnInit();
+		// Separate the front-end from the in-park HUD: the lobby's logo + player/quit buttons only belong
+		// in the lobby (they were drawing over the loaded park), and the build/manage HUD only in a park.
+		if ( InPark )
+		{
+			Hud.AddChild( new ParkStatsPanel() ); // live park finances/visitors readout
+			Hud.AddChild( new BuildPanel() );     // clickable build catalog (T-038)
+			Hud.AddChild( new ManagePanel() );    // clickable economy/ride manage buttons (T-038)
+		}
+		else
+		{
+			var layout = new LobbyLayout() { Hud = Hud };
+			layout.OnInit();
+		}
 
-		Hud.AddChild( new ParkStatsPanel() ); // live park finances/visitors readout (no-op without a park)
-		Hud.AddChild( new BuildPanel() );     // clickable build catalog (T-038); no-op outside build mode
-		Hud.AddChild( new ManagePanel() );    // clickable economy/ride manage buttons (T-038)
-		Hud.AddChild( new Cursor() );
+		Hud.AddChild( new Cursor() ); // the cursor is shown in both states
 	}
 
 	private static float nextEconLog;

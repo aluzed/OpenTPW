@@ -26,6 +26,11 @@
   catalog. Verified in-game: panels render (all 10 catalog items + the FEE−/FEE+/LOAN economy row), no
   exceptions. (Clicks couldn't be synthesised in this env — no `xdotool` — so the hit-test glue is by code
   review; the underlying actions are test-covered.)
+- **Lobby vs in-park HUD split**: the lobby front-end (`LobbyLayout` — logo + Create-Player/Quit buttons)
+  was being drawn over the loaded park. `Level.InPark` (set when the park loads, cleared on load failure)
+  now selects the HUD: **in-park** → the build/manage/stats panels; **lobby** (or park-load failure) →
+  the front-end. The cursor shows in both. Verified in-game: the park HUD renders alone, no front-end
+  overlay; affordability dimming is now visible (e.g. `coaster1` $10000 dimmed at $9998 balance).
 - **Footprint preview**: the selected item's `Width×Height` quad follows the cursor, **green** when
   `grid.CanPlace` & affordable, **red** otherwise.
 - **Commit** (`CommitPlacement` → `SpawnRideAt`/`SpawnShopAt`): validates + `TryPlace`, spawns the
