@@ -33,7 +33,9 @@ public sealed class RideQueue
 
 	/// <summary>How many peeps are currently on the ride.</summary>
 	public int Riders => riders;
-	public bool HasFreeSlot => riders < Capacity;
+
+	/// <summary>A peep can board only while the ride has a free slot and isn't broken down (T-032).</summary>
+	public bool HasFreeSlot => riders < Capacity && !Ride.IsBroken;
 
 	/// <summary>How many peeps are currently lined up (waiting, not yet aboard).</summary>
 	public int LineLength => line.Count;

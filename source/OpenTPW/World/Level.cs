@@ -94,6 +94,7 @@ public class Level
 				+ $"ent={CommitPlacement( Item( "entertainer" ), grid, terrain, cx, cy + 2 )} "
 				+ $"hand={CommitPlacement( Item( "handyman" ), grid, terrain, cx + 2, cy + 2 )} "
 				+ $"rsch={CommitPlacement( Item( "researcher" ), grid, terrain, cx + 4, cy + 2 )} "
+				+ $"mech={CommitPlacement( Item( "mechanic" ), grid, terrain, cx + 4, cy )} "
 				+ $"guard={CommitPlacement( Item( "guard" ), grid, terrain, cx, cy )}" ); // guard patrols the centre (T-039 vandalism deterrence)
 
 			// Rotation (T-041): place a totem rotated 90° and confirm its footprint dims swapped (3x4 -> 4x3).
@@ -214,6 +215,7 @@ public class Level
 		list.Add( new BuildCatalogItem( "entertainer", null, StaffRole.Entertainer, 1, 1, 800f ) );
 		list.Add( new BuildCatalogItem( "handyman", null, StaffRole.Handyman, 1, 1, 600f ) );
 		list.Add( new BuildCatalogItem( "guard", null, StaffRole.Guard, 1, 1, 1000f ) );
+		list.Add( new BuildCatalogItem( "mechanic", null, StaffRole.Mechanic, 1, 1, 900f ) ); // repairs broken rides (T-032)
 		list.Add( new BuildCatalogItem( "researcher", null, StaffRole.Researcher, 1, 1, 1500f ) );
 		return list;
 	}
@@ -460,7 +462,8 @@ public class Level
 		{
 			nextEconLog = Time.Now + 5f;
 			Log.Info( $"[econ] money={f.Money:0}  ride+={f.RideRevenue:0}  entry+={f.EntryRevenue:0}  shop+={f.FoodRevenue:0}  upkeep-={f.UpkeepPaid:0}  wages-={f.WagesPaid:0}"
-				+ $"  vandalism={Peep.VandalismActs} deterred={Peep.VandalismDeterred} toilet={Peep.ToiletVisits}" );
+				+ $"  vandalism={Peep.VandalismActs} deterred={Peep.VandalismDeterred} toilet={Peep.ToiletVisits}"
+				+ $"  breakdowns={Ride.Breakdowns} repairs={Ride.Repairs}" );
 		}
 	}
 

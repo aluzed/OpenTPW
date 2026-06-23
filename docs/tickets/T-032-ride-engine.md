@@ -2,11 +2,12 @@
 
 - **Priority**: 🟡 Feature (the central unlock — backs Batch B of the VM and real gameplay)
 - **Type**: Engine
-- **Status**: ⚠️ In progress — slice 1 (seam + sound + ride in-scene), stage 1 (lifecycle +
-  procedural animation), stage 2 (animation system RE'd + channel-aware engine), real keyframe playback,
-  the **rider scream family**, the **queue→VM boarding bridge** and a **VM tick fix** (advance GameTime
-  + per-tick slice execution — ride scripts were hanging at their first WAIT) done; lights / walk-limbo /
-  coaster motion / park remain. (73/106 opcodes implemented.)
+- **Status**: ⚠️ In progress — the seam + object lifecycle + channel-aware keyframe animation + scream +
+  queue→VM boarding bridge + VM tick fix are done, and the engine now backs almost the whole VM:
+  **lights**, **particle effects** (decoded `.PLB`), **limbo**, **walk** (slot scheduler) and **heads**
+  all landed via T-007 (**104/106 opcodes**; only the coaster-car `TOUR`/`BUMP` motion engine remains),
+  and **ride breakdown + a mechanic staff role** are in. Remaining engine work: coaster car/track motion,
+  walk-node geometry for visual peep movement, and 3D-positioned EVENT sound.
 - **Related**: [T-007](T-007-vm-opcodes-rse.md) (the VM + opcode RE), [T-033](T-033-ride-animation-keyframes.md) (animation keyframes), [05](../05-ghidra-reverse.md)/[07](../07-ghidra-render.md)/[08](../08-ghidra-animation.md).
 
 ## Problem
@@ -67,10 +68,20 @@ is what makes a ride *do* anything, and it backs the remaining VM opcodes (T-007
 
 1. ✅ **Ride keyframe animation** — rotation, translation/scale and vertex morph all decoded and driven
    from real ride data at the authentic 30 FPS rate, with multi-frame channel merge — [T-033](T-033-ride-animation-keyframes.md).
-3. ☐ **Lights** — `ENABLELIGHT`/`DISABLELIGHT`/`SETLIGHT`/`COLOURLIGHT` (needs a multi-light render path).
-4. ⚠️ **Walk/limbo** — `WALKON`/`WALKOFF`/`LIMBO`/… still no-ops (only `totem` uses WALKON among the
-   jungle rides). No longer the scream blocker (the queue→`VAR_LETMEON` bridge replaced that path), but
-   needed for VM-driven peep movement onto rides — peep system started ([T-034](T-034-peeps.md)).
+2. ✅ **Lights** — `ENABLELIGHT`/`DISABLELIGHT`/`SETLIGHT`/`COLOURLIGHT` done (T-007): `RideEngine` keeps
+   per-id light state + an emissive colour proxy (our renderer is unlit; real per-pixel lighting is a
+   render follow-up).
+2a. ✅ **Particle effects** — `REPAIREFFECT`/`SPARK`/`ADDOBJ_EXT`(particle types) done (T-007): the engine
+   loads the decoded `.PLB` (T-019), resolves the effect by its `par_lib.h` code, and spawns a colour
+   proxy at the ride. `GETCUSTPTCLCODE` RE'd as a stub (returns 0).
+3. ✅ **Ride breakdown + mechanic** — rides wear down while carrying riders and **break down** at zero
+   reliability (stop boarding via `RideQueue.HasFreeSlot` + halt their cycle); a new **`StaffRole.Mechanic`**
+   walks to the nearest broken ride and **repairs** it (restores reliability + plays the `REPAIREFFECT`
+   particle). Park-wide `Ride.Breakdowns`/`Repairs` tallies. Verified in-game: a ride broke down and the
+   mechanic repaired it (`breakdowns=1 repairs=1`), no exceptions. (Closes a T-039 item too.)
+4. ⚠️ **Walk/limbo** — `LIMBO`/`WALKON`/… are implemented as VM-side state (T-007): limbo is a per-VM
+   timed queue, walk a slot scheduler (board/alight lifecycle). The **visual** peep glide along walk-node
+   world positions still needs the ride's walk-node geometry (not decoded) — peep system is up ([T-034](T-034-peeps.md)).
 5. ⚠️ **Scream / coaster** — the **scream family** (`STARTSCREAM`/`STOPSCREAM`/`SINGLESCREAM`/
    `SCREAMLEVEL`) is **done and audible in-game**: routed through `IRideEngine`, `RideEngine` plays a
    real peep scream at the script's level (`Audio.PlaySfx` gained a per-effect volume), and a sustained

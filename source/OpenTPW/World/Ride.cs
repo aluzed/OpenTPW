@@ -115,6 +115,45 @@ public class Ride : Entity
 	public RideQueue? Queue { get; internal set; }
 	public int Riders => Queue?.Riders ?? 0;
 
+	// Reliability & breakdown (T-032/T-039): reliability wears down while the ride carries riders; at 0 it
+	// breaks down — stops boarding + running until a mechanic repairs it. Wear is tuned for visible dev
+	// breakdowns; a real balance pass would slow it (and scale by upgrade level / age).
+	private const float WearPerSecond = 0.04f; // ~25 s of occupied running before a breakdown
+
+	/// <summary>Mechanical condition, 1 = perfect, 0 = broken down.</summary>
+	public float Reliability { get; private set; } = 1f;
+
+	/// <summary>True while the ride is broken down — it stops boarding + running until repaired.</summary>
+	public bool IsBroken { get; private set; }
+
+	/// <summary>Park-wide breakdown / repair tallies (diagnostics + HUD).</summary>
+	public static int Breakdowns { get; private set; }
+	public static int Repairs { get; private set; }
+
+	private void BreakDown()
+	{
+		if ( IsBroken )
+			return;
+		IsBroken = true;
+		Reliability = 0f;
+		Breakdowns++;
+		SetActive( false ); // halt the ride animation/cycle
+		Log.Info( $"[ride] {Name} broke down (total {Breakdowns})" );
+	}
+
+	/// <summary>Repair a broken-down ride (a mechanic, see <see cref="Staff"/>): restore it and play the
+	/// repair particle effect at the ride.</summary>
+	public void Repair()
+	{
+		if ( !IsBroken )
+			return;
+		IsBroken = false;
+		Reliability = 1f;
+		Repairs++;
+		engine.SpawnParticleEffect( 51 ); // P_EFFECT_Repair (T-019 .PLB / T-007)
+		Log.Info( $"[ride] {Name} repaired (total {Repairs})" );
+	}
+
 	/// <summary>The coaster train running this ride's player-laid track, if any (set by
 	/// <see cref="CoasterTrack"/>). A boarding peep rides it in view instead of being hidden (T-045 3b).</summary>
 	public CoasterTrain? Train { get; internal set; }
@@ -464,6 +503,14 @@ public class Ride : Entity
 
 		// Running the ride costs money over time (its upkeep drains the park balance).
 		ParkFinances.Current?.PayUpkeep( UpkeepPerSecond * Time.Delta );
+
+		// Carrying riders wears the ride down; at zero reliability it breaks (a mechanic must repair it).
+		if ( !IsBroken && Riders > 0 )
+		{
+			Reliability -= WearPerSecond * Time.Delta;
+			if ( Reliability <= 0f )
+				BreakDown();
+		}
 
 		// Researchers advance any in-progress upgrade research for this ride (T-044).
 		TickResearch( Time.Delta, Staff.ResearcherCount );

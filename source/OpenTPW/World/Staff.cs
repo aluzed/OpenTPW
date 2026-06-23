@@ -11,6 +11,8 @@ public enum StaffRole
 	Guard,
 	/// <summary>Researches ride upgrades (see T-044); for now wanders and draws a wage.</summary>
 	Researcher,
+	/// <summary>Repairs broken-down rides (T-032).</summary>
+	Mechanic,
 }
 
 /// <summary>
@@ -102,6 +104,7 @@ public sealed class Staff : ModelEntity
 		{
 			case StaffRole.Handyman: DoHandyman(); break;
 			case StaffRole.Guard: DoGuard(); break;         // patrol toward trouble (unhappy peeps)
+			case StaffRole.Mechanic: DoMechanic(); break;   // repair broken-down rides (T-032)
 			case StaffRole.Researcher: WanderStep(); break; // research is off-screen (T-044)
 			default: DoEntertainer(); break;
 		}
@@ -118,7 +121,7 @@ public sealed class Staff : ModelEntity
 	{
 		StaffRole.Handyman => SpriteSheet.Load( "esprites/Generic/Handymen", "SPR_HA" ),
 		StaffRole.Guard => SpriteSheet.Load( "esprites/Generic/Guards", "SPR_GU" ),
-		StaffRole.Researcher => null, // no dedicated sprite in this WAD — flat billboard fallback
+		StaffRole.Researcher or StaffRole.Mechanic => null, // no dedicated sprite in this WAD — flat billboard
 		_ => SpriteSheet.Load( "esprites/Fantasy/Entertainers", EntertainerSprites[Random.Shared.Next( EntertainerSprites.Length )] ),
 	};
 
@@ -184,6 +187,52 @@ public sealed class Staff : ModelEntity
 			WalkToward( trouble.Position );
 		else
 			WanderStep();
+	}
+
+	// Head for the nearest broken-down ride and repair it (over RepairTime once there); wander otherwise.
+	private const float RepairTime = 4f; // seconds of on-site work to fix a ride
+	private Ride? repairTarget;
+	private float repairTimer;
+	private void DoMechanic()
+	{
+		if ( repairTarget is { IsBroken: true } )
+		{
+			if ( WalkToward( repairTarget.Position ) ) // arrived at the ride
+			{
+				repairTimer -= Time.Delta;
+				if ( repairTimer <= 0f )
+				{
+					repairTarget.Repair();
+					repairTarget = null;
+				}
+			}
+			return;
+		}
+
+		// No (valid) target: find the nearest broken ride; idle-wander if the park is all running.
+		repairTarget = NearestBrokenRide();
+		repairTimer = RepairTime;
+		if ( repairTarget == null )
+			WanderStep();
+	}
+
+	private Ride? NearestBrokenRide()
+	{
+		Ride? best = null;
+		float bestD2 = float.MaxValue;
+		foreach ( var e in Entity.All )
+		{
+			if ( e is not Ride { IsBroken: true } r )
+				continue;
+			float dx = r.Position.X - Position.X, dy = r.Position.Y - Position.Y;
+			float d2 = dx * dx + dy * dy;
+			if ( d2 < bestD2 )
+			{
+				bestD2 = d2;
+				best = r;
+			}
+		}
+		return best;
 	}
 
 	// Head for the nearest litter and pick it up; wander if the park is clean.
@@ -253,12 +302,13 @@ public sealed class Staff : ModelEntity
 		if ( roleModels.TryGetValue( role, out var m ) )
 			return m;
 
-		// Distinct fallback colours per role: entertainer orange, handyman blue, guard dark navy.
+		// Distinct fallback colours per role: entertainer orange, handyman blue, guard navy, mechanic yellow.
 		var (r, g, b) = role switch
 		{
 			StaffRole.Handyman => ((byte)40, (byte)90, (byte)220),
 			StaffRole.Guard => ((byte)30, (byte)30, (byte)70),
 			StaffRole.Researcher => ((byte)235, (byte)235, (byte)245), // lab-coat white
+			StaffRole.Mechanic => ((byte)230, (byte)200, (byte)40),    // hi-vis yellow
 			_ => ((byte)255, (byte)140, (byte)0),
 		};
 		var model = Billboard.Make( r, g, b );
