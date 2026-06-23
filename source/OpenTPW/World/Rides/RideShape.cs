@@ -47,6 +47,41 @@ public sealed class RideShape
 		TrackOut = trackOut;
 	}
 
+	/// <summary>
+	/// This footprint rotated by <paramref name="turns"/> 90° clockwise steps (0–3). Odd turns swap
+	/// width/height; cells, entrance, exit and track connectors all move with it. Used by the build tool
+	/// to place a ride at an orientation (T-041). A point (x,y) maps 90° CW to (Height-1-y, x).
+	/// </summary>
+	public RideShape Rotated( int turns )
+	{
+		turns = ((turns % 4) + 4) % 4;
+		if ( turns == 0 )
+			return this;
+
+		int nw = turns % 2 == 0 ? Width : Height;
+		int nh = turns % 2 == 0 ? Height : Width;
+
+		(int X, int Y) Rot( int x, int y ) => turns switch
+		{
+			1 => (Height - 1 - y, x),
+			2 => (Width - 1 - x, Height - 1 - y),
+			3 => (y, Width - 1 - x),
+			_ => (x, y),
+		};
+		(int, int)? RotN( (int X, int Y)? p ) => p is { } q ? Rot( q.X, q.Y ) : null;
+
+		var cells = new bool[nw, nh];
+		for ( int y = 0; y < Height; y++ )
+			for ( int x = 0; x < Width; x++ )
+				if ( Cells[x, y] )
+				{
+					var (nx, ny) = Rot( x, y );
+					cells[nx, ny] = true;
+				}
+
+		return new RideShape( nw, nh, cells, RotN( Entrance ), RotN( Exit ), RotN( TrackIn ), RotN( TrackOut ) );
+	}
+
 	/// <summary>The default 4×4 footprint, used when a ride ships no parseable shape.</summary>
 	public static RideShape Default { get; } = Rect( 4, 4 );
 

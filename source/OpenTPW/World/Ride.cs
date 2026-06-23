@@ -165,12 +165,16 @@ public class Ride : Entity
 	/// assets like coaster track textures (T-045).</summary>
 	public string Archive { get; }
 
-	public Ride( string rideArchive, Vector3 position )
+	/// <summary>Placement orientation in 90° clockwise steps (0–3) — rotates the footprint + mesh (T-041).</summary>
+	public int Rotation { get; }
+
+	public Ride( string rideArchive, Vector3 position, int rotation = 0 )
 	{
 		Position = position;
 		Archive = rideArchive;
+		Rotation = ((rotation % 4) + 4) % 4;
 		var rideName = Path.GetFileNameWithoutExtension( rideArchive );
-		Shape = RideShape.Load( rideArchive, rideName );
+		Shape = RideShape.Load( rideArchive, rideName ).Rotated( Rotation );
 
 		// Script (the VFS resolves the path into the .wad; matching is case-insensitive — T-014).
 		VM = new RideVM( FileSystem.OpenRead( $"{rideArchive}/{rideName}.rse" ) );
@@ -425,12 +429,27 @@ public class Ride : Entity
 			var model = new Model( [.. vertices], mesh.Indices, material );
 			Matrix4x4.Decompose( mesh.TransformMatrix, out var scl, out var rot, out var pos );
 
+			// Placement rotation (T-041): spin the whole ride about its footprint centre (= Position) by
+			// the orientation yaw — rotate each part's local offset and compose the yaw onto its rotation.
+			// 90° CW per step (negative about world +Z, which is up here). RegisterBody captures this as the
+			// rest pose, so the engine's animation composes on top of the placed orientation.
+			var localOffset = new Vector3( pos.X, pos.Z, pos.Y );
+			var partRot = new Quaternion( rot.X, rot.Z, rot.Y, -rot.W );
+			if ( Rotation != 0 )
+			{
+				// Rotate the horizontal offset (XY; Z is up) by -Rotation·90°, exact per quarter-turn.
+				(float c, float s) = Rotation switch { 1 => (0f, -1f), 2 => (-1f, 0f), 3 => (0f, 1f), _ => (1f, 0f) };
+				localOffset = new Vector3( localOffset.X * c - localOffset.Y * s, localOffset.X * s + localOffset.Y * c, localOffset.Z );
+				var yaw = Quaternion.CreateFromAxisAngle( System.Numerics.Vector3.UnitZ, -Rotation * MathF.PI / 2f );
+				partRot = yaw * partRot;
+			}
+
 			parts.Add( new ModelEntity
 			{
 				Model = model,
 				Scale = new Vector3( scl.X, scl.Z, scl.Y ),
-				Rotation = new Quaternion( rot.X, rot.Z, rot.Y, -rot.W ),
-				Position = new Vector3( pos.X, pos.Z, pos.Y ) + Position,
+				Rotation = partRot,
+				Position = localOffset + Position,
 			} );
 		}
 		return parts;

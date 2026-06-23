@@ -2,9 +2,10 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine / UI
-- **Status**: ⚠️ Core done — catalog + footprint preview (green/red) + place-on-click with cost
-  charging + queue registration are in; `SetupDevPark` is now an empty park the player fills. Rotation
-  and sell/demolish remain (deferred — see below).
+- **Status**: ✅ Done — clickable catalog + footprint preview (green/red) + place-on-click with cost
+  charging + queue registration, a clickable manage UI, **sell/demolish** (rides + shops, with refund),
+  and **rotation** (R, 90° steps). `SetupDevPark` is an empty park the player fills. Only nice-to-haves
+  remain (drag-rotate handle, shop price controls).
 - **Parent**: [T-038](T-038-park-management-ui.md). **Needs**: [T-040](T-040-build-mode-foundation.md).
   **Couples with**: [T-036](T-036-peep-pathfinding.md) (paths/queues).
 
@@ -58,10 +59,24 @@
 - Note: peeps already en route to a sold ride hold its `RideQueue` and finish/re-route gracefully (the
   queue object lives until they drop it).
 
+## Done (rotation)
+
+- **Place a ride at an orientation** (R while placing, 90° CW per press; the dev catalog uses number/click
+  selection then R to rotate). `RideShape.Rotated(turns)` rotates the footprint, cells, entrance/exit and
+  track connectors (a point maps 90° CW to `(Height-1-y, x)`; odd turns swap W/H). The `Ride` ctor takes a
+  rotation, stores the **rotated `Shape`**, and spins its **mesh** about the footprint centre (rotate each
+  part's local offset + compose the yaw, captured by `RegisterBody` as the rest pose so animation composes
+  on top). Placement threads the orientation through `BuildMode` → `commit` → `CommitPlacement` →
+  `SpawnRideAt`: the preview footprint + grid reservation + tile dims all use the rotated W/H, and the
+  entrance/exit markers + queue path follow the rotated entrance automatically. Shops are square and staff
+  have no footprint, so they ignore rotation. The placement readout shows `ROTATE (R): N deg`.
+  Unit-tested (`RideShapeTests.Rotated*`); verified in-game via `OPENTPW_AUTOPLACE`: `rotate-test: totem
+  placed rot1, footprint 4x3` (upright 3×4), scene renders cleanly, no exceptions.
+
 ## Remaining (follow-up)
 
-- **Rotation** (`ACTION_SET_RIDE_ROTATION`): needs rotating the ride's mesh parts about the placement
-  centre + rotating the footprint/entrance — deferred.
+- None blocking — T-041 covers catalog/preview/place/manage/sell/rotate. (Nice-to-haves: a real
+  drag-to-rotate handle, and shop price controls.)
 
 ## Context
 

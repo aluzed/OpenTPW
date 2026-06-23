@@ -76,7 +76,7 @@ public class Level
 		parkQueues = new List<RideQueue>();
 		var catalog = BuildCatalog();
 		_ = new BuildMode( grid, terrain, catalog,
-			( item, tx, ty ) => CommitPlacement( item, grid, terrain, tx, ty ),
+			( item, tx, ty, rot ) => CommitPlacement( item, grid, terrain, tx, ty, rot ),
 			ride => DemolishRide( ride, grid ),
 			shop => DemolishShop( shop, grid ) );
 
@@ -94,6 +94,13 @@ public class Level
 				+ $"hand={CommitPlacement( Item( "handyman" ), grid, terrain, cx + 2, cy + 2 )} "
 				+ $"rsch={CommitPlacement( Item( "researcher" ), grid, terrain, cx + 4, cy + 2 )} "
 				+ $"guard={CommitPlacement( Item( "guard" ), grid, terrain, cx, cy )}" ); // guard patrols the centre (T-039 vandalism deterrence)
+
+			// Rotation (T-041): place a totem rotated 90° and confirm its footprint dims swapped (3x4 -> 4x3).
+			if ( CommitPlacement( Item( "totem" ), grid, terrain, cx - 12, cy - 6, rotation: 1 ) )
+			{
+				var rot = Entity.All.OfType<Ride>().Last();
+				Log.Info( $"[build] rotate-test: totem placed rot{rot.Rotation}, footprint {rot.TileW}x{rot.TileH} (upright is 3x4)" );
+			}
 
 			// Lay a coaster track that loops around the station back to its '<' entry connector, so the
 			// CoasterTrack closes into a circuit and its train (slice 3) runs a continuous loop.
@@ -219,8 +226,9 @@ public class Level
 		catch { return 2000f; }
 	}
 
-	// Commit a placement at tile (tx,ty): validate + (for rides/shops) reserve the grid, spawn, charge.
-	private static bool CommitPlacement( BuildCatalogItem item, PlacementGrid grid, ParkTerrain terrain, int tx, int ty )
+	// Commit a placement at tile (tx,ty) with an orientation (rotation in 90° CW steps): validate +
+	// (for rides/shops) reserve the grid, spawn, charge. A rotated ride footprint swaps W/H on odd turns.
+	private static bool CommitPlacement( BuildCatalogItem item, PlacementGrid grid, ParkTerrain terrain, int tx, int ty, int rotation = 0 )
 	{
 		var fin = ParkFinances.Current;
 		if ( fin != null && !fin.CanAfford( item.Cost ) )
@@ -237,16 +245,20 @@ public class Level
 			return true;
 		}
 
-		if ( !grid.CanPlace( tx, ty, item.Width, item.Height ) || !grid.TryPlace( tx, ty, item.Width, item.Height ) )
+		// A rotated ride footprint swaps width/height on odd quarter-turns; shops/staff are unaffected.
+		int rw = item.RidePath != null && rotation % 2 == 1 ? item.Height : item.Width;
+		int rh = item.RidePath != null && rotation % 2 == 1 ? item.Width : item.Height;
+
+		if ( !grid.CanPlace( tx, ty, rw, rh ) || !grid.TryPlace( tx, ty, rw, rh ) )
 			return false;
 
 		bool ok = item.RidePath == null
 			? SpawnShopAt( terrain, grid, tx, ty, item.Name == "drink" ? ShopKind.Drink : ShopKind.Food, item )
-			: SpawnRideAt( item.RidePath, grid, terrain, tx, ty, item.Cost );
+			: SpawnRideAt( item.RidePath, grid, terrain, tx, ty, item.Cost, rotation );
 
 		if ( !ok )
 		{
-			grid.Clear( tx, ty, item.Width, item.Height );
+			grid.Clear( tx, ty, rw, rh );
 			return false;
 		}
 		fin?.PayBuild( item.Cost );
@@ -271,13 +283,14 @@ public class Level
 
 	// Spawns a ride on its (already reserved) footprint: model, entrance/exit markers, queue path, and
 	// registers its RideQueue so peeps can ride it. Starts idle (occupancy drives the animation).
-	private static bool SpawnRideAt( string path, PlacementGrid grid, ParkTerrain terrain, int tx, int ty, float cost )
+	private static bool SpawnRideAt( string path, PlacementGrid grid, ParkTerrain terrain, int tx, int ty, float cost, int rotation = 0 )
 	{
 		try
 		{
-			var w = grid.TileToWorld( tx, ty, RideShape.Load( path, Path.GetFileName( path ) ).Width,
-				RideShape.Load( path, Path.GetFileName( path ) ).Height );
-			var ride = new Ride( path, w.WithZ( terrain.SampleHeight( w.X, w.Y ) ) );
+			// The ride rotates its own footprint internally; use the rotated dims for the centre + grid.
+			var shape = RideShape.Load( path, Path.GetFileName( path ) ).Rotated( rotation );
+			var w = grid.TileToWorld( tx, ty, shape.Width, shape.Height );
+			var ride = new Ride( path, w.WithZ( terrain.SampleHeight( w.X, w.Y ) ), rotation );
 			ride.SetActive( false );
 			ride.BuildCost = cost; // remembered for the sell refund (T-041)
 			ride.TileX = tx; ride.TileY = ty; ride.TileW = ride.Shape.Width; ride.TileH = ride.Shape.Height;

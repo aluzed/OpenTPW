@@ -26,7 +26,7 @@ public sealed class BuildMode : Entity
 
 	private readonly PlacementGrid grid;
 	private readonly ParkTerrain terrain;
-	private readonly Func<BuildCatalogItem, int, int, bool> commit;
+	private readonly Func<BuildCatalogItem, int, int, int, bool> commit;
 	private readonly Action<Ride> demolish;
 	private readonly Action<Shop> demolishShop;
 	private readonly ModelEntity highlight;
@@ -71,7 +71,7 @@ public sealed class BuildMode : Entity
 	}
 
 	public BuildMode( PlacementGrid grid, ParkTerrain terrain, IReadOnlyList<BuildCatalogItem> catalog,
-		Func<BuildCatalogItem, int, int, bool> commit, Action<Ride> demolish, Action<Shop> demolishShop )
+		Func<BuildCatalogItem, int, int, int, bool> commit, Action<Ride> demolish, Action<Shop> demolishShop )
 	{
 		this.grid = grid;
 		this.terrain = terrain;
@@ -156,6 +156,10 @@ public sealed class BuildMode : Entity
 		if ( Hit( Key.Escape ) || Hit( Key.Number0 ) )
 			Selected = -1;
 
+		// R rotates the ride being placed (90° CW per press); only meaningful for a ride placement tool.
+		if ( Hit( Key.R ) && Selected >= 0 && Catalog[Selected].RidePath != null )
+			Rotation = (Rotation + 1) % 4;
+
 		var fin = ParkFinances.Current;
 		if ( fin != null )
 		{
@@ -163,7 +167,8 @@ public sealed class BuildMode : Entity
 			if ( Hit( Key.BracketLeft ) ) fin.EntryFee = MathF.Max( 0f, fin.EntryFee - 1f );
 			if ( Hit( Key.BracketRight ) ) fin.EntryFee += 1f;
 			// Selected ride: ticket price (, .), research next upgrade (R), apply it (U) — T-042 / T-044.
-			if ( SelectedRide is { } sel )
+			// Only in the Default tool (Selected < 0); while placing (Selected ≥ 0), R rotates instead.
+			if ( SelectedRide is { } sel && Selected < 0 )
 			{
 				if ( Hit( Key.Comma ) ) sel.TicketPrice = MathF.Max( 1f, sel.TicketPrice - 1f );
 				if ( Hit( Key.Period ) ) sel.TicketPrice += 1f;
@@ -239,19 +244,30 @@ public sealed class BuildMode : Entity
 			return;
 		}
 
+		// A rotated ride footprint swaps width/height on odd quarter-turns (T-041). Only rides rotate;
+		// shops are square and staff have no footprint.
+		var (ew, eh) = RotatedFootprint( item );
+
 		// Staff don't reserve a cell (they walk anywhere) — only need to be on-grid; rides/shops must fit.
-		bool canPlace = item.Staff != null ? grid.InBounds( tx, ty ) : grid.CanPlace( tx, ty, item.Width, item.Height );
+		bool canPlace = item.Staff != null ? grid.InBounds( tx, ty ) : grid.CanPlace( tx, ty, ew, eh );
 		bool affordable = ParkFinances.Current?.CanAfford( item.Cost ) ?? true;
 		bool ok = canPlace && affordable;
 
 		mat.Set( "Color", ok ? green : red );
-		highlight.Scale = new Vector3( item.Width * grid.TileSize / 2f, item.Height * grid.TileSize / 2f, 1f );
-		var c = grid.TileToWorld( tx, ty, item.Width, item.Height );
+		highlight.Scale = new Vector3( ew * grid.TileSize / 2f, eh * grid.TileSize / 2f, 1f );
+		var c = grid.TileToWorld( tx, ty, ew, eh );
 		highlight.Position = c.WithZ( terrain.SampleHeight( c.X, c.Y ) + 0.3f );
 
-		if ( Input.MouseLeftPressed && ok && commit( item, tx, ty ) )
-			Log.Info( $"[build] placed {item.Name} at ({tx},{ty}) for ${item.Cost:0}" );
+		if ( Input.MouseLeftPressed && ok && commit( item, tx, ty, Rotation ) )
+			Log.Info( $"[build] placed {item.Name} at ({tx},{ty}) rot {Rotation} for ${item.Cost:0}" );
 	}
+
+	/// <summary>The current placement rotation in 90° clockwise steps (0–3), for the manage UI hint.</summary>
+	public int Rotation { get; private set; }
+
+	// The item's footprint under the current rotation (rides swap W/H on odd turns; others are unchanged).
+	private (int W, int H) RotatedFootprint( BuildCatalogItem item )
+		=> item.RidePath != null && Rotation % 2 == 1 ? (item.Height, item.Width) : (item.Width, item.Height);
 
 	// Cursor → world ray (from the camera basis + vertical FOV) intersected with the park ground.
 	private bool TryPickGround( out Vector3 hit )

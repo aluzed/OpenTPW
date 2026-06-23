@@ -73,7 +73,12 @@ internal sealed class ParkStatsPanel : Panel
 			// The catalog itself is the clickable BuildPanel (right side); here just a hint + the
 			// selected item, so the two panels don't duplicate the whole list.
 			if ( build.Selected >= 0 && build.Selected < build.Catalog.Count )
-				lines.Add( $"PLACING: {build.Catalog[build.Selected].Name} (click a tile, Esc cancel)" );
+			{
+				var placing = build.Catalog[build.Selected];
+				lines.Add( $"PLACING: {placing.Name} (click a tile, Esc cancel)" );
+				if ( placing.RidePath != null )
+					lines.Add( $"  ROTATE (R): {build.Rotation * 90} deg" );
+			}
 			else
 				lines.Add( "BUILD: pick an item on the right -->" );
 		}
