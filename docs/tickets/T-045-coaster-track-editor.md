@@ -144,10 +144,11 @@
 
 ## Remaining (nice-to-have)
 
-- Curved-piece meshes authored from the decoded `.hmp` templates (the swept cross-section is now from
-  authored data, but the per-tile footprint/height `.hmp` grid is still only recon'd, see above). The
-  `.fNx/.fNy` profile normals are parsed-but-unused (the track shader is unlit) — wire them in if the
-  track ever moves to a lit shader.
+- Curved-piece meshes authored from the `.hmp` templates — the `.hmp` format is now **fully decoded**
+  (`HmpFile`, per-tile 5×5 height grids + footprint; see [T-052](T-052-coaster-track-polish.md)); building
+  curved track meshes from those height grids + verifying needs a working renderer. The `.fNx/.fNy`
+  profile normals are parsed-but-unused (the track shader is unlit) — wire them in if the track ever moves
+  to a lit shader.
 - Per-segment **rotation** (`ACTION_COASTER_ROTATE`) — limited value for a grid-aligned tile track, so
   deferred.
 

@@ -81,7 +81,7 @@ All format/VM decoding and the core gameplay loop are done. Open work falls into
 | [T-049](T-049-management-ui-depth.md) | 🟡 Feature | ☐ To do | Management UI depth: clickable **finance graph** + per-ride price, staff **fire/patrol-zones**, **per-ride upgrade/research panel** (systems already core-done). (Tails of T-042/043/044) |
 | [T-050](T-050-peep-simulation-depth.md) | 🟡 Feature | ☐ To do | Peep depth: **ride ratings & thoughts** feeding park rating, **water-aware** pathfinding, **real gate node** entry/exit. (Tails of T-039/036) |
 | [T-051](T-051-audio-polish.md) | 🟡 Feature | ☐ To do | Audio polish: **ambient loops** + a settings-screen **volume UI** (music/SFX/speech), persisted. (Tail of T-031) |
-| [T-052](T-052-coaster-track-polish.md) | 🟢 Low | ☐ To do | Coaster nice-to-haves: decode **`.hmp`** per-piece template → curved track pieces, and per-segment rotation. (Tail of T-045) |
+| [T-052](T-052-coaster-track-polish.md) | 🟢 Low | ⚠️ Partial | **`.hmp` decoded** — general footprint/height template (cols×rows, per-tile 5×5 code sub-grids, code grid + footprint grid; magic `0x0005AB1E`), used game-wide (coaster/queue/fence/sideshow/upgrade). New `HmpFile` parser, unit-tested + verified on real files. Remaining: author curved pieces + segment rotation (need the renderer) |
 
 Priority legend: 🔴 blocking · 🟠 important · 🟡 desirable/feature · ⚪ technical debt/polish.
 Status legend: ✅ done · ⚠️ partial · ☐ to do · 🗂️ split into focused tickets · ⏸️ deferred.
