@@ -3,6 +3,7 @@ using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Linq;
+using System.Text;
 
 namespace OpenTPW.Tests;
 
@@ -28,18 +29,67 @@ public class ModelFileTests
 		Assert.ThrowsExactly<InvalidDataException>( () => new ModelFile( stream ) );
 	}
 
-	// The original loader gates on the version fields at offsets 4/8 (current = 0xDD/0xCB).
-	// Legacy/static variants like GARROW.MD2 carry 0x18/0x17 and must be rejected (T-015).
+	// The original loader gates on the version fields at offsets 4/8 (current = 0xDD/0xCB). A genuinely
+	// unsupported version (not the current one and not the legacy static 0x18/0x17) is rejected.
 	[TestMethod]
-	public void RejectsLegacyVersion()
+	public void RejectsUnknownVersion()
 	{
 		var data = new byte[0x80];
 		BinaryPrimitives.WriteUInt32LittleEndian( data.AsSpan( 0, 4 ), 0x1CD15D46 ); // magic
-		BinaryPrimitives.WriteUInt32LittleEndian( data.AsSpan( 4, 4 ), 0x18 );       // legacy version
-		BinaryPrimitives.WriteUInt32LittleEndian( data.AsSpan( 8, 4 ), 0x17 );       // legacy subVersion
+		BinaryPrimitives.WriteUInt32LittleEndian( data.AsSpan( 4, 4 ), 0x99 );       // unknown version
+		BinaryPrimitives.WriteUInt32LittleEndian( data.AsSpan( 8, 4 ), 0x99 );
 
 		using var stream = new MemoryStream( data );
 		Assert.ThrowsExactly<InvalidDataException>( () => new ModelFile( stream ) );
+	}
+
+	// The legacy static variant (GARROW.MD2 / RARROW.MD2, version 0x18/0x17) is a 2-byte-packed layout
+	// (T-015): header ptr @0x72 -> mesh table {u32 count, 12B pad, descriptors}; each descriptor
+	// {u16 numVerts, u16 numFaces, u32 vertPtr, u32 facePtr, float}; verts = 32B (pos,normal,uv);
+	// faces = 24B with the 3 indices at +2/+4/+6. This builds a minimal one and checks it decodes.
+	[TestMethod]
+	public void DecodesLegacyStaticVariant()
+	{
+		const int meshTbl = 0x80, descOff = meshTbl + 16, vertPtr = 0xA0, facePtr = 0x100, end = 0x118;
+		var d = new byte[end];
+		void U32( int o, uint v ) => BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( o, 4 ), v );
+		void U16( int o, ushort v ) => BinaryPrimitives.WriteUInt16LittleEndian( d.AsSpan( o, 2 ), v );
+		void F32( int o, float v ) => BinaryPrimitives.WriteSingleLittleEndian( d.AsSpan( o, 4 ), v );
+
+		U32( 0, 0x1CD15D46 ); U32( 4, 0x18 ); U32( 8, 0x17 );
+		Encoding.ASCII.GetBytes( "arrow\0" ).CopyTo( d, 0x18 );
+		U32( 0x72, meshTbl );             // header -> mesh table
+		U32( meshTbl, 1 );                // mesh count
+		U16( descOff, 3 );                // numVerts
+		U16( descOff + 2, 1 );            // numFaces
+		U32( descOff + 4, vertPtr );
+		U32( descOff + 8, facePtr );
+		F32( descOff + 12, 1f );          // scale
+
+		// 3 vertices: pos / normal / uv.
+		var pos = new[] { (0f, 0f, 0f), (1f, 0f, 0f), (0f, 1f, 0f) };
+		for ( int i = 0; i < 3; i++ )
+		{
+			int o = vertPtr + i * 32;
+			F32( o, pos[i].Item1 ); F32( o + 4, pos[i].Item2 ); F32( o + 8, pos[i].Item3 );
+			F32( o + 12, 0f ); F32( o + 16, 0f ); F32( o + 20, 1f ); // normal
+			F32( o + 24, i == 1 ? 1f : 0f ); F32( o + 28, i == 2 ? 1f : 0f ); // uv
+		}
+		// 1 face: flag, then indices 0,1,2.
+		U16( facePtr, 12 ); U16( facePtr + 2, 0 ); U16( facePtr + 4, 1 ); U16( facePtr + 6, 2 );
+
+		var model = new ModelFile( new MemoryStream( d ) );
+		Assert.AreEqual( 1, model.Meshes.Count );
+		var mesh = model.Meshes[0];
+		Assert.AreEqual( "arrow", mesh.Name );
+		Assert.AreEqual( 3, mesh.Vertices.Length );
+		CollectionAssert.AreEqual( new uint[] { 0, 1, 2 }, mesh.Indices );
+		Assert.AreEqual( 1f, mesh.Vertices[1].Position.X, 1e-4f );
+		Assert.AreEqual( 0f, mesh.Vertices[1].Position.Y, 1e-4f );
+		Assert.AreEqual( 1f, mesh.Vertices[2].Position.Y, 1e-4f );
+		Assert.AreEqual( 1f, mesh.TexCoords[1].X, 1e-4f );
+		Assert.AreEqual( 0f, mesh.TexCoords[1].Y, 1e-4f );
+		Assert.IsTrue( mesh.Indices.All( i => i < mesh.Vertices.Length ) );
 	}
 
 	[TestMethod]

@@ -2,10 +2,10 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Reverse engineering
-- **Status**: ⚠️ **Partial.** The real discriminator is now **confirmed via Ghidra** (the
-  no-CD `tp.exe` loader `FUN_0046d6d0`): it's the **version** fields at offsets 4/8, not
-  frameCount. `ModelFile` now gates on them exactly as the original does — rejecting the
-  legacy/static variant cleanly. **Decoding** that legacy layout still remains.
+- **Status**: ✅ **Done.** The discriminator was confirmed via Ghidra (loader `FUN_0046d6d0`): the
+  **version** fields at offsets 4/8. The legacy/static variant (`GARROW.MD2`/`RARROW.MD2` = `0x18`/`0x17`)
+  is now **decoded** — its 2-byte-packed header + 32-byte vertices + 24-byte faces are parsed by
+  `ModelFile.ReadLegacyStatic`, verified against both real files (sane geometry + texture binding).
 - **Split from**: [T-012](T-012-partial-formats.md) (which is now closed as a record of the
   animated-`.MD2` work).
 
@@ -44,20 +44,27 @@ relocated header offset slots are `piVar8[0x13..0x1e]` (file 0x4c..0x78), `[0x1f
 
 ## Done
 
-- `ModelFile` now reads the version fields at 4/8 and rejects any non-`(0xDD,0xCB)` file with
-  a clear message — matching the original loader exactly. Covered by
-  `ModelFileTests.RejectsLegacyVersion` (the GARROW `0x18`/`0x17` values).
+- `ModelFile` reads the version fields at 4/8: `(0xDD,0xCB)` → the animated path; `(0x18,0x17)` → the
+  new legacy `ReadLegacyStatic` path; anything else → a clear `InvalidDataException`
+  (`ModelFileTests.RejectsUnknownVersion`).
+- **Legacy/static layout decoded** (`GARROW.MD2`/`RARROW.MD2`). The shipped loader gates this version
+  behind special flags; the file itself is the same family as the animated `.MD2` but **2-byte packed**
+  (its offsets read clean only at +2 misalignment). Decoded structure:
+  - header pointers (packed): `0x5a` → texture path, `0x66` → vertex block, `0x6a` → face block,
+    `0x72` → **mesh table**;
+  - mesh table: `u32 meshCount`, a 16-byte prologue, then a 16-byte descriptor per mesh
+    `{u16 numVerts, u16 numFaces, u32 vertPtr, u32 facePtr, float scale}`;
+  - **vertices**: `numVerts × 32 B` = 8 floats (position xyz, normal xyz, uv);
+  - **faces**: `numFaces × 24 B`; the three triangle indices are the `u16`s at byte offsets +2/+4/+6
+    (offset 0 is a per-face flag).
+- Verified against the real `GARROW.MD2` and `RARROW.MD2` (14 verts of finite arrow geometry + 24
+  triangles, all indices in range, the `texture` binding from the embedded path) and a synthetic sample
+  (`ModelFileTests.DecodesLegacyStaticVariant`).
 
-## Remaining work
+## Acceptance criteria — met
 
-1. Trace the loader's legacy path (`flags & 1`, version `0x18`) to map the static-variant
-   header (mesh-table / vertex / face / UV offsets).
-2. Parse it and reuse the mesh-decode path; keep PAUSED/BANKRUPT/CONGRATS working.
-
-## Acceptance criteria
-
-- `garrow.MD2` / `rarrow.MD2` parse to meshes with in-range triangle indices and finite
-  positions (extend `ModelFileTests` with a static-variant sample).
+- `garrow.MD2` / `rarrow.MD2` parse to meshes with in-range triangle indices and finite positions
+  (both pass `ParsesRealModelSample`; a synthetic legacy file is unit-tested).
 
 ## Reverse-engineering aid
 

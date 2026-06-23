@@ -34,7 +34,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-012](T-012-partial-formats.md) | 🟡 Feature | 🗂️ Split | Umbrella (closed): `.MD2` animated ✅, `.MAP` BANK names ✅; remainders → T-015/016/017 |
 | [T-013](T-013-ci-pipeline.md) | 🟠 Medium | ✅ Done | Add CI (build + test on Linux) |
 | [T-014](T-014-case-insensitive-assets.md) | 🟠 Medium | ✅ Done | Case-insensitive asset path resolution (Linux) |
-| [T-015](T-015-md2-static-variant.md) | 🟡 Feature | ⚠️ Partial | `.MD2` version gate (0xDD/0xCB) Ghidra-confirmed; legacy decode remains |
+| [T-015](T-015-md2-static-variant.md) | 🟡 Feature | ✅ Done | `.MD2` version gate (0xDD/0xCB) Ghidra-confirmed; **legacy static variant (GARROW/RARROW = 0x18/0x17) decoded** — 2-byte-packed header, 32B verts (pos/normal/uv), 24B faces (indices @+2/+4/+6); verified against both real files + a synthetic sample |
 | [T-016](T-016-map-entry-records.md) | 🟡 Feature | ✅ Decoded | `.MAP`: variant + BANK names + SFX category header + **SFX per-sound 20-byte records** decoded; BANK records RE'd as serialized pointers (not data); only the SFX mixing-curve blob stays raw |
 | [T-017](T-017-tpws-saves.md) | 🟡 Feature | ⚠️ Partial | `.TPWS`: container Ghidra-corrected (leading bytes = **version 500**, not magic; full header layout) + read + **write/round-trip**; inner `SAD_*` module stream stays opaque, real sample still unavailable |
 | [T-018](T-018-mtr-material-semantics.md) | 🟡 Feature | ✅ Done | `.MTR` not runtime-used (Ghidra); `.MD2` carries texture binding (decoded + tested) |

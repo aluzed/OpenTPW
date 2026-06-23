@@ -11,10 +11,12 @@ public partial class ModelFile : BaseFormat
 	public List<Mesh> Meshes { get; private set; } = null!;
 
 	// The .MD2 format version this parser supports (header fields at offsets 4 and 8). The
-	// original loader accepts only these values; legacy variants (e.g. GARROW.MD2 = 0x18/0x17)
-	// use a different header and are rejected. See docs/tickets/T-015.
+	// original loader accepts only these values; the legacy static variant (GARROW.MD2 / RARROW.MD2 =
+	// 0x18/0x17) has its own packed header, decoded by ReadLegacyStatic. See docs/tickets/T-015.
 	private const uint SupportedVersion = 0xDD;
 	private const uint SupportedSubVersion = 0xCB;
+	private const uint LegacyVersion = 0x18;
+	private const uint LegacySubVersion = 0x17;
 
 	public ModelFile( Stream stream )
 	{
@@ -106,11 +108,19 @@ public partial class ModelFile : BaseFormat
 			// Match the game and reject any non-current version with a clear message. See T-015.
 			var version = reader.ReadUInt32();      // offset 4 (observed 0xDD on all shipping models)
 			var subVersion = reader.ReadUInt32();   // offset 8 (observed 0xCB)
+
+			// The static UI arrows (GARROW.MD2 / RARROW.MD2) carry 0x18 / 0x17 and use a packed legacy
+			// header — decode them separately (T-015). Anything else is genuinely unsupported.
+			if ( version == LegacyVersion && subVersion == LegacySubVersion )
+			{
+				ReadLegacyStatic( reader, fileLength );
+				return;
+			}
 			if ( version != SupportedVersion || subVersion != SupportedSubVersion )
 				throw new InvalidDataException(
 					$"MD2: unsupported version (0x{version:X}, 0x{subVersion:X}); this parser " +
-					$"handles the current format (0x{SupportedVersion:X}, 0x{SupportedSubVersion:X}). " +
-					"Legacy/static variants such as GARROW.MD2 (0x18, 0x17) are not supported. See T-015." );
+					$"handles the current format (0x{SupportedVersion:X}, 0x{SupportedSubVersion:X}) " +
+					$"and the legacy static variant (0x{LegacyVersion:X}, 0x{LegacySubVersion:X}). See T-015." );
 
 			reader.BaseStream.Seek( 0x50, SeekOrigin.Begin );
 			uint off2 = reader.ReadUInt32();
@@ -367,6 +377,134 @@ public partial class ModelFile : BaseFormat
 
 				CalculateNormals( mesh );
 			}
+		}
+	}
+
+	/// <summary>
+	/// Decodes the legacy static <c>.MD2</c> variant — version (0x18, 0x17), the UI placement arrows
+	/// <c>GARROW.MD2</c> / <c>RARROW.MD2</c>. RE'd from the file (the shipped loader gates this version
+	/// behind special flags; the layout is the same family as the animated variant but **2-byte packed**):
+	/// <list type="bullet">
+	/// <item>header pointer at 0x72 → the <b>mesh table</b>: <c>u32 meshCount</c>, then a 16-byte prologue,
+	///   then one 16-byte descriptor per mesh — <c>{u16 numVerts, u16 numFaces, u32 vertPtr, u32 facePtr,
+	///   float scale}</c>;</item>
+	/// <item><b>vertices</b> (<c>vertPtr</c>): <c>numVerts × 32 B</c> = 8 floats (position xyz, normal xyz,
+	///   uv);</item>
+	/// <item><b>faces</b> (<c>facePtr</c>): <c>numFaces × 24 B</c>; the three triangle indices are the
+	///   <c>u16</c>s at byte offsets +2/+4/+6 (offset 0 is a per-face flag).</item>
+	/// </list>
+	/// Verified against GARROW/RARROW: 14 vertices (finite arrow geometry) + 24 triangles with all indices
+	/// in range. See docs/tickets/T-015.
+	/// </summary>
+	private void ReadLegacyStatic( BinaryReader reader, long fileLength )
+	{
+		void Require( long offset, string what )
+		{
+			if ( offset < 0 || offset > fileLength )
+				throw new InvalidDataException(
+					$"MD2 (legacy): {what} offset 0x{offset:X} is out of range (file is {fileLength} bytes)." );
+		}
+
+		uint ReadU32At( long off )
+		{
+			reader.BaseStream.Seek( off, SeekOrigin.Begin );
+			return reader.ReadUInt32();
+		}
+
+		// Model name (null-terminated, from 0x18) — reused as the mesh name.
+		reader.BaseStream.Seek( 0x18, SeekOrigin.Begin );
+		var nameBuilder = new StringBuilder();
+		for ( char ch; (ch = reader.ReadChar()) != '\0' && nameBuilder.Length < 64; )
+			nameBuilder.Append( ch );
+		var modelName = nameBuilder.ToString();
+
+		// Texture path (header offset 0x5a → e.g. "D:\THEMEPK2\jungle\texture"); use its leaf as the
+		// material/texture name so the mesh carries an authentic binding from the file.
+		string textureName = "";
+		uint texPathPtr = ReadU32At( 0x5a );
+		if ( texPathPtr > 0 && texPathPtr < fileLength )
+		{
+			reader.BaseStream.Seek( texPathPtr, SeekOrigin.Begin );
+			var sb = new StringBuilder();
+			for ( char ch; sb.Length < 128 && reader.BaseStream.Position < fileLength && (ch = reader.ReadChar()) != '\0'; )
+				sb.Append( ch );
+			var raw = sb.ToString();
+			var slash = raw.LastIndexOfAny( new[] { '\\', '/' } );
+			textureName = slash >= 0 ? raw[(slash + 1)..] : raw;
+		}
+
+		// Mesh table pointer (this packed layout keeps it at header offset 0x72).
+		uint meshTablePtr = ReadU32At( 0x72 );
+		Require( meshTablePtr, "mesh table" );
+		uint meshCount = ReadU32At( meshTablePtr );
+		if ( meshCount == 0 || meshCount > 256 )
+			throw new InvalidDataException( $"MD2 (legacy): implausible mesh count {meshCount}." );
+
+		Meshes = new List<Mesh>( (int)meshCount );
+
+		const int descriptorStride = 16;
+		const int vertexStride = 32; // pos(3) + normal(3) + uv(2), all floats
+		const int faceStride = 24;   // flag(u16) + 3 indices(u16) + per-face data
+
+		for ( int m = 0; m < meshCount; m++ )
+		{
+			long desc = meshTablePtr + 16 + (long)m * descriptorStride;
+			Require( desc + descriptorStride, "mesh descriptor" );
+			reader.BaseStream.Seek( desc, SeekOrigin.Begin );
+			ushort numVerts = reader.ReadUInt16();
+			ushort numFaces = reader.ReadUInt16();
+			uint vertPtr = reader.ReadUInt32();
+			uint facePtr = reader.ReadUInt32();
+
+			Require( vertPtr + (long)numVerts * vertexStride, "legacy vertex block" );
+			Require( facePtr + (long)numFaces * faceStride, "legacy face block" );
+
+			var vertices = new Vertex[numVerts];
+			var normals = new Vector3[numVerts];
+			var texCoords = new Vector2[numVerts];
+			for ( int i = 0; i < numVerts; i++ )
+			{
+				reader.BaseStream.Seek( vertPtr + (long)i * vertexStride, SeekOrigin.Begin );
+				var pos = new Vector3( reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle() );
+				var nrm = new Vector3( reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle() );
+				var uv = new Vector2( reader.ReadSingle(), reader.ReadSingle() );
+				vertices[i] = new Vertex { Position = pos, TextureIndex = 0 };
+				normals[i] = nrm;
+				texCoords[i] = uv;
+			}
+
+			var indices = new List<uint>( numFaces * 3 );
+			for ( int i = 0; i < numFaces; i++ )
+			{
+				reader.BaseStream.Seek( facePtr + (long)i * faceStride, SeekOrigin.Begin );
+				_ = reader.ReadUInt16(); // per-face flag/type
+				ushort a = reader.ReadUInt16();
+				ushort b = reader.ReadUInt16();
+				ushort c = reader.ReadUInt16();
+				if ( a < numVerts && b < numVerts && c < numVerts )
+				{
+					indices.Add( a );
+					indices.Add( b );
+					indices.Add( c );
+				}
+			}
+
+			var materials = string.IsNullOrEmpty( textureName )
+				? Array.Empty<MaterialData>()
+				: new[] { new MaterialData { Name = textureName, StartIndex = 0, EndIndex = (ushort)Math.Max( 0, numVerts - 1 ) } };
+
+			Meshes.Add( new Mesh
+			{
+				Name = modelName,
+				Vertices = vertices,
+				Indices = indices.ToArray(),
+				TexCoords = texCoords,
+				Normals = normals,
+				VertexCount = numVerts,
+				FaceCount = numFaces,
+				VertCnt = (uint)materials.Length,
+				Materials = materials,
+			} );
 		}
 	}
 
