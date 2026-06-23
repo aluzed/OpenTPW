@@ -82,6 +82,17 @@ is what makes a ride *do* anything, and it backs the remaining VM opcodes (T-007
 4. ⚠️ **Walk/limbo** — `LIMBO`/`WALKON`/… are implemented as VM-side state (T-007): limbo is a per-VM
    timed queue, walk a slot scheduler (board/alight lifecycle). The **visual** peep glide along walk-node
    world positions still needs the ride's walk-node geometry (not decoded) — peep system is up ([T-034](T-034-peeps.md)).
+4a. ⚠️ **Car rides (visible wagon motion)** — tour rides / go-karts / water rides / bumpers (their scripts
+   use the `TOUR`/`BUMP` opcodes) now show a **moving car** (`World/Rides/RideVehicle.cs`): a generic wagon
+   that loops a path around the footprint carrying the ride's riders (occupancy-driven, like the coaster's
+   `CoasterTrain`). `Ride.IsCarRide` (script uses `TOUR`/`BUMP`) drives the spawn; torn down with the ride.
+   Verified in-game: `car-test: tourride isCarRide=True vehicle=True`, no exceptions. *Stand-in path:* the
+   loop is generated (an ellipse in the footprint), not the ride's authored track — the real car path
+   (tour nodes / track geometry) isn't decoded, and the `TOUR`/`BUMP` opcodes that drive the authentic
+   car-object engine are multiplexed commands (variable operands) over a car class we don't model, so they
+   stay no-ops (now silenced — the ride runs via the boarding bridge + this vehicle). The coaster's own
+   cars remain the player-laid-track `CoasterTrain` (T-045). **TOUR/BUMP** (the last 2 VM opcodes) +
+   3D-positioned `EVENT` sound are the remaining engine frontier.
 5. ⚠️ **Scream / coaster** — the **scream family** (`STARTSCREAM`/`STOPSCREAM`/`SINGLESCREAM`/
    `SCREAMLEVEL`) is **done and audible in-game**: routed through `IRideEngine`, `RideEngine` plays a
    real peep scream at the script's level (`Audio.PlaySfx` gained a per-effect volume), and a sustained

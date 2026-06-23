@@ -104,6 +104,14 @@ public class Level
 				Log.Info( $"[build] rotate-test: totem placed rot{rot.Rotation}, footprint {rot.TileW}x{rot.TileH} (upright is 3x4)" );
 			}
 
+			// Car rides (T-032): place a tour ride + go-karts and confirm each gets a moving RideVehicle.
+			foreach ( var (carName, ctx, cty) in new[] { ("tourride", cx - 12, cy + 2), ("gokarts", cx - 12, cy + 8) } )
+				if ( CommitPlacement( Item( carName ), grid, terrain, ctx, cty ) )
+				{
+					var car = Entity.All.OfType<Ride>().Last();
+					Log.Info( $"[build] car-test: {carName} isCarRide={car.IsCarRide} vehicle={(car.Vehicle != null)}" );
+				}
+
 			// Lay a coaster track that loops around the station back to its '<' entry connector, so the
 			// CoasterTrack closes into a circuit and its train (slice 3) runs a continuous loop.
 			var coaster = Entity.All.OfType<Ride>().FirstOrDefault( r => r.Shape.HasTrack );
@@ -203,7 +211,7 @@ public class Level
 	private static List<BuildCatalogItem> BuildCatalog()
 	{
 		var list = new List<BuildCatalogItem>();
-		foreach ( var path in new[] { "levels/jungle/rides/totem", "levels/jungle/rides/monkey", "levels/jungle/rides/wateride", "levels/jungle/rides/coaster1" } )
+		foreach ( var path in new[] { "levels/jungle/rides/totem", "levels/jungle/rides/monkey", "levels/jungle/rides/wateride", "levels/jungle/rides/coaster1", "levels/jungle/rides/gokarts", "levels/jungle/rides/tourride" } )
 		{
 			var name = Path.GetFileName( path );
 			var shape = RideShape.Load( path, name );
@@ -308,6 +316,11 @@ public class Level
 				exit = exit.WithZ( terrain.SampleHeight( exit.X, exit.Y ) );
 				parkQueues.Add( new RideQueue( ride, waypoints, exit, ride.RideDuration ) );
 			}
+
+			// Car rides (tour/go-karts/water/bumper — scripts use TOUR/BUMP) get a visible moving wagon (T-032).
+			if ( ride.IsCarRide )
+				ride.Vehicle = new RideVehicle( ride, grid.TileSize, terrain );
+
 			return true;
 		}
 		catch ( Exception e ) { Log.Warning( $"[build] ride '{path}' failed: {e.Message}" ); return false; }

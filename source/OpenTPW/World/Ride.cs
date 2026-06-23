@@ -162,6 +162,13 @@ public class Ride : Entity
 	/// down with the ride on sell/demolish.</summary>
 	public CoasterTrack? Track { get; internal set; }
 
+	/// <summary>A generic moving car for "car" rides (set by the placement code) — torn down with the ride.</summary>
+	public RideVehicle? Vehicle { get; internal set; }
+
+	/// <summary>True if this is a car ride — its script drives cars via the <c>TOUR</c>/<c>BUMP</c> opcodes
+	/// (tour rides, go-karts, water rides, bumpers). Such a ride gets a visible <see cref="RideVehicle"/>.</summary>
+	public bool IsCarRide => VM != null && VM.Instructions.Any( i => i.opcode is Opcode.TOUR or Opcode.BUMP );
+
 	/// <summary>What the player paid to build this ride — used to compute the sell refund (T-041).</summary>
 	public float BuildCost { get; set; }
 
@@ -184,6 +191,7 @@ public class Ride : Entity
 			VM.IsRunning = false;
 		engine.Despawn();
 		Track?.Despawn();           // coaster: pylons + ribbon + train (no-op if none)
+		Vehicle?.Despawn();         // car rides: the moving wagon (no-op if none)
 		foreach ( var e in OwnedEntities )
 			Entity.All.Remove( e );
 		OwnedEntities.Clear();
