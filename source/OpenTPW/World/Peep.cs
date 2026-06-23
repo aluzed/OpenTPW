@@ -1,5 +1,16 @@
 namespace OpenTPW;
 
+/// <summary>A peep's reaction to a ride it just rode (T-050) — surfaced as its current "thought".</summary>
+public enum RideThought
+{
+	GreatRide,    // exciting + fairly priced
+	GoodValue,    // cheap for what you get
+	TooExpensive, // overpriced vs its excitement
+	Unreliable,   // the ride felt rickety / had broken down
+	Mediocre,     // unremarkable
+	Rubbish,      // dull
+}
+
 /// <summary>
 /// A park visitor. Renders as an upright camera-facing billboard (a placeholder until the authentic
 /// peep sprites — <c>esprites.wad</c>'s <c>.TPC</c>/<c>.FPC</c>, a custom encoded image format — are
@@ -84,6 +95,10 @@ public sealed class Peep : ModelEntity
 	private bool leaving;
 	private Shop? shopTarget;
 	private float happiness = StartHappiness;
+
+	/// <summary>The peep's reaction to the last ride it rode (T-050), or null if it hasn't ridden yet.</summary>
+	public RideThought? LastThought { get; private set; }
+
 	private float energy = MaxEnergy;
 	private float hunger;
 	private float thirst;
@@ -149,7 +164,12 @@ public sealed class Peep : ModelEntity
 			rideTimer -= Time.Delta;
 			if ( rideTimer <= 0f )
 			{
-				happiness = Math.Min( 100f, happiness + route!.Ride.Excitement * RideRewardScale );
+				var (satisfaction, thought) = RateRide( route!.Ride.Excitement, route.Ride.TicketPrice, route.Ride.Reliability );
+				LastThought = thought;
+				route.Ride.RegisterRideExperience( satisfaction );
+				// Happiness change is driven by satisfaction (which already folds in value-for-money +
+				// reliability), centred on 50 so a great ride lifts the mood and a poor one sours it.
+				happiness = Math.Clamp( happiness + (satisfaction - 50f) * RideRewardScale, 0f, 100f );
 				riding = false;
 				route.Leave();
 				mount?.Unboard( this ); // climb off the coaster train (no-op for ordinary rides)
@@ -304,6 +324,32 @@ public sealed class Peep : ModelEntity
 
 	// True once a peep is tired out or fed up — time to head for the exit.
 	private bool WantsToLeave() => energy <= 0f || happiness <= LeaveHappiness;
+
+	/// <summary>
+	/// Rates a ride experience (T-050) → a satisfaction score 0..100 + the peep's thought. Pure so it can
+	/// be unit-tested. Satisfaction blends the ride's excitement with value-for-money (its price vs the
+	/// "fair" price ≈ excitement/10) and its reliability; the thought names the dominant factor.
+	/// </summary>
+	public static (float Satisfaction, RideThought Thought) RateRide( int excitement, float ticketPrice, float reliability )
+	{
+		float fairPrice = MathF.Max( 1f, excitement / 10f );
+		// +1 fair → +0 value; each unit cheaper adds, each unit dearer subtracts (scaled by fair price).
+		float valueRatio = ticketPrice / fairPrice;                 // 1 = fair, <1 cheap, >1 dear
+		float valueDelta = (1f - valueRatio) * 30f;                 // ±; cheap rides feel better
+		float reliabilityPenalty = (1f - Math.Clamp( reliability, 0f, 1f )) * 60f;
+
+		float satisfaction = Math.Clamp( excitement + valueDelta - reliabilityPenalty, 0f, 100f );
+
+		RideThought thought =
+			reliability < 0.5f ? RideThought.Unreliable :
+			valueRatio > 1.5f ? RideThought.TooExpensive :
+			valueRatio < 0.6f && satisfaction >= 50f ? RideThought.GoodValue :
+			satisfaction >= 70f ? RideThought.GreatRide :
+			satisfaction <= 30f ? RideThought.Rubbish :
+			RideThought.Mediocre;
+
+		return (satisfaction, thought);
+	}
 
 	private void BeginLeaving()
 	{
@@ -518,7 +564,9 @@ public sealed class Peep : ModelEntity
 		if ( candidates.Count == 0 )
 			candidates = queues.ToList();
 
-		int Weight( RideQueue q ) => Math.Max( 1, q.Ride.Excitement );
+		// Weight by the ride's live rating (its reputation), not raw excitement — a well-rated ride draws
+		// more peeps, a poorly-rated (overpriced/unreliable) one fewer (T-050).
+		int Weight( RideQueue q ) => Math.Max( 1, (int)q.Ride.Rating );
 		int roll = Random.Shared.Next( candidates.Sum( Weight ) );
 		route = candidates[^1];
 		foreach ( var q in candidates )

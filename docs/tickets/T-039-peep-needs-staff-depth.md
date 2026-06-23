@@ -43,8 +43,9 @@ Build clean, 74/0 tests.
 
 ## Remaining
 
-- **Peep thoughts / ride ratings** (item 3) — surface *why* a peep is (un)happy and a per-ride
-  popularity rating.
+- ~~**Peep thoughts / ride ratings** (item 3)~~ — **done in [T-050](T-050-peep-simulation-depth.md)**:
+  `Peep.RateRide` → satisfaction + `RideThought`, the running `Ride.Rating` reputation, and
+  rating-weighted ride choice.
 - **Ride breakdown + mechanics** (rest of item 4) — rides don't break down yet, so there's nothing for a
   mechanic to repair; needs a reliability/breakdown model first.
 

@@ -90,6 +90,23 @@ public class Ride : Entity
 	/// weighted by this, so more exciting rides build longer queues.</summary>
 	public int Excitement { get; private set; } = 50;
 
+	// Ride rating (T-050): a running average of how satisfied riders were (0..100), seeded from Excitement.
+	// Peeps weight their ride choice by this, and it feeds back into park rating via rider happiness. A
+	// well-priced, reliable, exciting ride climbs; an overpriced or unreliable one sinks.
+	private float ratingSum;
+	private int ratingCount;
+
+	/// <summary>Average rider satisfaction 0..100 (the ride's reputation); = <see cref="Excitement"/>
+	/// until anyone has ridden.</summary>
+	public float Rating => ratingCount == 0 ? Excitement : ratingSum / ratingCount;
+
+	/// <summary>Record one rider's satisfaction into the running rating (called when a peep finishes).</summary>
+	public void RegisterRideExperience( float satisfaction )
+	{
+		ratingSum += Math.Clamp( satisfaction, 0f, 100f );
+		ratingCount++;
+	}
+
 	/// <summary>The ride's base attraction value (<c>Info.AttractionValue</c>).</summary>
 	public int Attraction { get; private set; } = 25;
 
