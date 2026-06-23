@@ -73,4 +73,32 @@ public class PlacementGridTests
 		g.Clear( 2, 2, 3, 3 );
 		Assert.IsTrue( g.CanPlace( 4, 4, 2, 2 ), "freed after Clear" );
 	}
+
+	[TestMethod]
+	public void WaterBlocksWalkingAndPlacement()
+	{
+		var g = Grid();
+		g.MarkWater( 4, 4 );
+
+		Assert.IsTrue( g.IsWater( 4, 4 ) );
+		Assert.IsFalse( g.IsWalkable( 4, 4 ), "peeps can't stand on water" );
+		Assert.IsFalse( g.CanPlace( 4, 4, 1, 1 ), "can't build on water" );
+		Assert.IsFalse( g.CanPlace( 3, 3, 2, 2 ), "a footprint overlapping water is rejected" );
+		Assert.AreEqual( 1, g.WaterTileCount );
+		Assert.IsTrue( g.IsWalkable( 5, 5 ), "dry ground is fine" );
+	}
+
+	[TestMethod]
+	public void MarkWaterFromTerrainFlagsTilesAtOrBelowLevel()
+	{
+		var g = Grid();
+		// Sampler: tiles with world X below 40 are "low" (height 0), the rest are high (height 100).
+		int marked = g.MarkWaterFromTerrain( ( x, _ ) => x < 40f ? 0f : 100f, waterLevel: 1f );
+
+		Assert.IsTrue( marked > 0 );
+		Assert.AreEqual( marked, g.WaterTileCount );
+		// Tile (0,0) centre is at X=8 (<40) → water; tile (5,0) centre at X=88 (>40) → dry.
+		Assert.IsTrue( g.IsWater( 0, 0 ) );
+		Assert.IsFalse( g.IsWater( 5, 0 ) );
+	}
 }

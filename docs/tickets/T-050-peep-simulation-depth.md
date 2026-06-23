@@ -2,9 +2,8 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Gameplay / AI
-- **Status**: ⚠️ Partial — **ride ratings & thoughts done** (peeps rate rides on excitement / value-for-
-  money / reliability, which drives their mood + ride choice + each ride's reputation; unit-tested).
-  Water-aware pathfinding + the real gate node remain.
+- **Status**: ⚠️ Mostly done — **ride ratings & thoughts** + **water-aware pathfinding** done (both
+  unit-tested). Only the real gate node remains.
 - **Parents**: [T-039](T-039-peep-needs-staff-depth.md), [T-036](T-036-peep-pathfinding.md).
 - **Related**: [T-034](T-034-peeps.md).
 
@@ -27,10 +26,19 @@ remaining depth is the peeps' *opinions* and a couple of pathfinding refinements
   poorly-rated ones fewer — a feedback loop on pricing/reliability.
 - Covered by `PeepRatingTests` (7 cases incl. value-for-money monotonicity).
 
+## Done (water-aware pathfinding)
+
+- `PlacementGrid` gained a **water layer**: `MarkWater`/`IsWater`/`WaterTileCount` + the terrain-driven
+  `MarkWaterFromTerrain(sampleHeight, waterLevel)` (flags tiles whose terrain height ≤ the water level).
+  Water tiles are **impassable** (`IsWalkable` returns false even where a path is laid — no bridges yet)
+  and **unbuildable** (`CanPlace` rejects them). The peep A* therefore routes around lakes/moats.
+- Wired in the dev park: `Level` flags low terrain as water (level = `Min.Z + 8%` of the height range,
+  since the dev park has no explicit water plane) and logs the count.
+- Covered by `PlacementGridTests` (water blocks walk/placement; terrain marking) + `PathGraphTests`
+  (`RoutesAroundWater`, `WaterIsImpassableEvenUnderAPath`).
+
 ## Remaining
 
-2. **Water-aware pathfinding** (T-036 tail): the A* over `PlacementGrid` should treat water tiles as
-   impassable on the real level terrain (currently footprints block, water doesn't).
 3. **Real gate node** (T-036 tail): peeps enter/leave at the level's real park-gate node rather than a
    synthetic spawn edge.
 

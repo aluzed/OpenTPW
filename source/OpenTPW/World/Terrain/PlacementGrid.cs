@@ -22,6 +22,7 @@ public sealed class PlacementGrid
 
 	private readonly bool[,] occupied;
 	private readonly bool[,] path; // tiles laid as walkable path (occupied for placement, but peeps may cross)
+	private readonly bool[,] water; // tiles under water: peeps can't walk them, nothing can be built on them
 
 	public PlacementGrid( int width, int height, float tileSize, Vector3 origin )
 	{
@@ -31,6 +32,7 @@ public sealed class PlacementGrid
 		Origin = origin;
 		occupied = new bool[width, height];
 		path = new bool[width, height];
+		water = new bool[width, height];
 	}
 
 	/// <summary>A grid whose centre maps to <paramref name="worldCenter"/> (handy until real park siting exists).</summary>
@@ -64,7 +66,7 @@ public sealed class PlacementGrid
 
 		for ( int y = ty; y < ty + fh; y++ )
 			for ( int x = tx; x < tx + fw; x++ )
-				if ( occupied[x, y] )
+				if ( occupied[x, y] || water[x, y] ) // can't build on the water (T-050)
 					return false;
 		return true;
 	}
@@ -101,9 +103,55 @@ public sealed class PlacementGrid
 			path[tx, ty] = true;
 	}
 
-	/// <summary>Whether a peep may stand on tile (tx,ty): in bounds and either free ground or a laid path
-	/// (a ride/shop footprint blocks, a queue path does not). Used by the peep pathfinder (T-036).</summary>
-	public bool IsWalkable( int tx, int ty ) => InBounds( tx, ty ) && (!occupied[tx, ty] || path[tx, ty]);
+	/// <summary>Whether a peep may stand on tile (tx,ty): in bounds, not under water, and either free
+	/// ground or a laid path (a ride/shop footprint blocks, a queue path does not). Water is impassable
+	/// even where a path would otherwise cross (T-036/T-050).</summary>
+	public bool IsWalkable( int tx, int ty ) =>
+		InBounds( tx, ty ) && !water[tx, ty] && (!occupied[tx, ty] || path[tx, ty]);
+
+	/// <summary>Marks tile (tx,ty) as under water — impassable to peeps and unbuildable (T-050).</summary>
+	public void MarkWater( int tx, int ty )
+	{
+		if ( InBounds( tx, ty ) )
+			water[tx, ty] = true;
+	}
+
+	/// <summary>Whether tile (tx,ty) is under water.</summary>
+	public bool IsWater( int tx, int ty ) => InBounds( tx, ty ) && water[tx, ty];
+
+	/// <summary>Number of water tiles (diagnostics).</summary>
+	public int WaterTileCount
+	{
+		get
+		{
+			int n = 0;
+			for ( int y = 0; y < Height; y++ )
+				for ( int x = 0; x < Width; x++ )
+					if ( water[x, y] ) n++;
+			return n;
+		}
+	}
+
+	/// <summary>
+	/// Flags tiles whose terrain height (sampled at the tile centre) is at or below <paramref name="waterLevel"/>
+	/// as water — so peeps route around lakes/moats and nothing is built on them (T-050). <paramref name="sampleHeight"/>
+	/// is the terrain height sampler (world Z) for a world XY (e.g. <c>ParkTerrain.SampleHeight</c>).
+	/// </summary>
+	public int MarkWaterFromTerrain( Func<float, float, float> sampleHeight, float waterLevel )
+	{
+		int marked = 0;
+		for ( int y = 0; y < Height; y++ )
+			for ( int x = 0; x < Width; x++ )
+			{
+				var c = TileToWorld( x, y );
+				if ( sampleHeight( c.X, c.Y ) <= waterLevel )
+				{
+					water[x, y] = true;
+					marked++;
+				}
+			}
+		return marked;
+	}
 
 	/// <summary>
 	/// Builds a grid from a level's <c>Standard.sam</c> (<c>MapInfo.HeightfieldWidth</c>/<c>Height</c>),

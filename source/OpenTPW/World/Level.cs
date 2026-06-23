@@ -65,7 +65,14 @@ public class Level
 		var standard = new SettingsFile( "/levels/jungle/Standard.sam" );
 		var centre = terrain.Centroid;
 		var grid = PlacementGrid.FromLevelSettings( standard, tileSize: 16f, worldCenter: new Vector3( centre.X, centre.Y, 0 ) );
-		var pathGraph = new PathGraph( grid ); // peeps route around ride/shop footprints (T-036)
+
+		// Flag low terrain as water so peeps route around lakes/moats and nothing is built on them (T-050).
+		// Water level = a little above the terrain's lowest point (the dev park has no explicit water plane).
+		var waterLevel = terrain.Min.Z + (terrain.Max.Z - terrain.Min.Z) * 0.08f;
+		var waterTiles = grid.MarkWaterFromTerrain( terrain.SampleHeight, waterLevel );
+		Log.Info( $"[park] water tiles: {waterTiles}/{grid.Width * grid.Height} (level z={waterLevel:0.0})" );
+
+		var pathGraph = new PathGraph( grid ); // peeps route around ride/shop footprints + water (T-036/T-050)
 
 		// Player-controlled build/manage camera focused on the park centroid (T-040).
 		BuildCameraMode.Focus = new Vector3( centre.X, centre.Y, centre.Z );

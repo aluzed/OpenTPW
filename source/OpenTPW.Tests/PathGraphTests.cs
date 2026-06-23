@@ -44,6 +44,35 @@ public class PathGraphTests
 	}
 
 	[TestMethod]
+	public void RoutesAroundWater()
+	{
+		var grid = Grid();
+		// A lake spanning column x=3, rows 0..6 — only row 7 is dry to get past (T-050).
+		for ( int y = 0; y <= 6; y++ )
+			grid.MarkWater( 3, y );
+		var g = new PathGraph( grid );
+
+		var tiles = TilePath( g, grid, (0, 0), (6, 0) );
+		Assert.AreEqual( (6, 0), tiles[^1] );
+		Assert.IsFalse( tiles.Any( t => grid.IsWater( t.X, t.Y ) ), "a peep walked into the water" );
+		Assert.IsTrue( tiles.Any( t => t.Y == 7 ), "took the dry gap past the lake" );
+	}
+
+	[TestMethod]
+	public void WaterIsImpassableEvenUnderAPath()
+	{
+		var grid = Grid();
+		for ( int y = 0; y <= 6; y++ )
+			grid.MarkWater( 3, y );
+		grid.MarkPath( 3, 3 ); // a path laid over water must NOT make it walkable (no bridges yet)
+		var g = new PathGraph( grid );
+
+		var tiles = TilePath( g, grid, (0, 0), (6, 0) );
+		Assert.IsFalse( tiles.Contains( (3, 3) ), "water blocks even a laid path" );
+		Assert.IsTrue( tiles.Any( t => t.Y == 7 ), "still detours to the dry gap" );
+	}
+
+	[TestMethod]
 	public void WalksThroughAMarkedQueuePathGap()
 	{
 		var grid = Grid();
