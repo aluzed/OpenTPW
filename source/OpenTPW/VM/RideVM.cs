@@ -24,6 +24,10 @@ public partial class RideVM
 	// GameTime + value; GETTIMER returns the remaining time (never negative).
 	public int Timer { get; set; }
 
+	// TURBO flag (the original's struct +0xb8, a byte): the script's requested turbo level/state. Pure VM
+	// state — the motion/animation engine would read it to speed the ride up. See Handlers/Effects.cs.
+	public int Turbo { get; set; }
+
 	// VM hierarchy for the child/parent variable opcodes. The original finds the other VM by a
 	// handle (struct +0x0c child, +0x10 parent) in a global VM list; modelled here as direct
 	// references. SPAWNCHILD (engine, not yet implemented) will set these when it spawns a

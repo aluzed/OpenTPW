@@ -43,5 +43,12 @@ partial class OpcodeHandlers
 		[OpcodeHandler( Opcode.DIPMUSIC, "Briefly duck the background music." )]
 		public static void DipMusic( ref RideVM vm, Operand amount )
 			=> vm.Engine?.DipMusic( amount.Value );
+
+		[OpcodeHandler( Opcode.TURBO, "Set the ride's turbo flag (the motion engine reads it to speed up)." )]
+		public static void Turbo( ref RideVM vm, Operand value )
+			// RE'd (op_51): the operand's low byte is stored straight into the VM (struct +0xb8). Pure VM
+			// state; the ride motion/animation engine would consume it. (The sibling motion ops TOUR/BUMP
+			// need their own engine subsystems — tour-object / bumper-car physics — and remain.)
+			=> vm.Turbo = value.Value & 0xFF;
 	}
 }

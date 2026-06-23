@@ -527,6 +527,21 @@ public class RideScriptTests
 		Assert.IsTrue( vm.Flags.HasFlag( RideVM.VMFlags.Zero ) );
 	}
 
+	// TURBO stores the operand's low byte in the VM (struct +0xb8) — pure VM state. RE'd from op_51 (T-007).
+	[TestMethod]
+	public void TurboStoresFlag()
+	{
+		Log = new();
+		var vm = LoadTestVm();
+		Assert.AreEqual( 0, vm.Turbo );
+
+		OpcodeHandlers.Effects.Turbo( ref vm, Lit( vm, 3 ) );
+		Assert.AreEqual( 3, vm.Turbo );
+
+		OpcodeHandlers.Effects.Turbo( ref vm, Lit( vm, 0x142 ) ); // only the low byte is stored
+		Assert.AreEqual( 0x42, vm.Turbo );
+	}
+
 	private static RideVM LoadTestVm()
 	{
 		var path = Path.Combine( AppContext.BaseDirectory, "content", "testscripts", "Test.RSE" );

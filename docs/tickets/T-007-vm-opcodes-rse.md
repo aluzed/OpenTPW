@@ -2,12 +2,13 @@
 
 - **Priority**: 🟡 Feature (core of ride gameplay)
 - **Type**: Feature / reverse engineering
-- **Status**: ⚠️ **Partial — 103 / 106 opcodes.** The `.RSE` loader / disassembler is restored and
+- **Status**: ⚠️ **Partial — 104 / 106 opcodes.** The `.RSE` loader / disassembler is restored and
   working; `RideVM` parses + runs scripts. **Batch A (all 43 `pure`) complete**; Batch B is all but done —
   object spawn/lifecycle (incl. `ADDOBJ_EXT`), the animation + `WAIT*` family, sound, the rider-scream
   family, the **limbo**, **cross-VM**, **light**, **walk**, **particle effects** (decoded `.PLB`, T-019),
-  **head**, and `GETCUSTPTCLCODE` are all in and tested. **Remaining: 3 opcodes** — the motion ops
-  `TURBO`/`TOUR`/`BUMP` (need the ride motion/physics engine).
+  **head**, `GETCUSTPTCLCODE`, and `TURBO` are all in and tested. **Remaining: 2 opcodes** — `TOUR` and
+  `BUMP`, each a multiplexed command over its own engine subsystem (guided-tour object / bumper-car
+  physics) that doesn't exist yet.
 
 ## Findings
 
@@ -175,9 +176,18 @@ runtime). Classification: **43 `pure`** (VM-state only — implementable now) an
     Implemented faithfully (`dest = 0`, Zero flag set); `arg` ignored. Coverage **102 → 103 / 106**.
     Covered by `RideScriptTests.GetCustomParticleCodeAlwaysReturnsZero`.
 
-**Remaining: 3 opcodes** — the motion ops `TURBO`/`TOUR`/`BUMP`. These control ride/car motion and need
-the ride motion/physics engine to build + verify; reverse each from its executor case (`op_<n>` in
-`FUN_00551cb0`) when that subsystem comes online.
+21. ✅ **TURBO** (op 51) — RE'd: the operand's low byte is stored straight into the VM (struct `+0xb8`).
+    Pure VM state (the motion/animation engine would read it to speed the ride up), so implemented +
+    tested directly (`RideVM.Turbo`, `Handlers/Effects.cs`). Coverage **103 → 104 / 106**. Covered by
+    `RideScriptTests.TurboStoresFlag`.
+
+**Remaining: 2 opcodes** — `TOUR` (op 53) and `BUMP` (op 54). Both are **multiplexed commands** (a
+subcommand switch, like `COAST`) over an engine subsystem that doesn't exist yet:
+- `TOUR` drives a **guided-tour object** (`vm+0x9c`): create/destroy + ~16 get/set subcommands
+  (`FUN_0055a620`/`d3d0`/`d610`/…), positioned at tour node 99.
+- `BUMP` drives the **bumper-car system** (`FUN_004cd300` → `FUN_0054xxxx`/`00544xxx`): per-car
+  add/query/start/stop subcommands.
+Both need their engine subsystem (and node geometry) to build + verify — the genuine engine frontier.
 
 > Note: the instruction doc describes `CMP` as a *bitwise-AND* comparison, but the current
 > `Math.Compare` does equality/less-than. Left as-is for now (changing it could shift branch

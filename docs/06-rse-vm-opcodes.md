@@ -6,7 +6,7 @@ dispatched by the executor `FUN_00551cb0` (opcode word tagged `0x80`, bounds `< 
 table at `0x5567d8`). The **Operands** column is authoritative (the reflection dispatcher must
 match it). **Kind**: `pure` = VM-state only (done); `engine` = needs the ride engine.
 
-Status: **103 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus a growing set of
+Status: **104 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus a growing set of
 Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sound, the animation +
 `WAIT*` family, and now the **rider scream family** `STARTSCREAM`/`STOPSCREAM`/`SINGLESCREAM`/
 `SCREAMLEVEL`). See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md) / [T-032](tickets/T-032-ride-engine.md).
@@ -64,7 +64,7 @@ Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sou
 | 48 | `MULT` | 3 | ✅ | pure |
 | 49 | `DIV` | 3 | ✅ | pure |
 | 50 | `MOD` | 3 | ✅ | pure |
-| 51 | `TURBO` | 1 | ☐ | engine |
+| 51 | `TURBO` | 1 | ✅ | engine | store the turbo flag in the VM (struct +0xb8); pure VM state, motion engine would read it |
 | 52 | `END` | 0 | ✅ | pure |
 | 53 | `TOUR` | 2 | ☐ | engine |
 | 54 | `BUMP` | 2 | ☐ | engine |
