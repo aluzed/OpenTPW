@@ -197,12 +197,16 @@ public class Level
 			}
 		}
 
-		// Spawn a crowd; with no rides yet they wander until the player builds one (then they queue).
+		// Spawn a crowd at the park's real entrance gate (T-050): peeps enter and leave through the gate
+		// (FixedItemInfo.EntranceA/B in Standard.sam) rather than a synthetic spawn ring.
 		LoadProgress.Report( "Spawning visitors...", 0.95f );
+		var (gateTx, gateTy) = ReadEntranceTile( standard );
+		var gate = grid.PointToWorld( gateTx, gateTy );
+		Log.Info( $"[park] entrance gate at tile ({gateTx:0.0},{gateTy:0.0})" );
 		for ( int i = 0; i < 30; i++ )
 		{
-			var a = i / 30f * MathF.PI * 2f;
-			var spawn = new Vector3( centre.X + MathF.Cos( a ) * 120f, centre.Y + MathF.Sin( a ) * 120f, 0 );
+			// Fan the queue back from the gate (just outside it) so arrivals don't all stack on one tile.
+			var spawn = gate + new Vector3( (i % 6 - 2.5f) * 10f, -(i / 6) * 14f - 10f, 0 );
 			_ = new Peep( terrain, parkQueues, spawn, i, pathGraph );
 		}
 		Log.Info( $"[park] build mode ready ({catalog.Count} catalog items), {parkQueues.Count} queues" );
@@ -234,6 +238,28 @@ public class Level
 		list.Add( new BuildCatalogItem( "researcher", null, StaffRole.Researcher, 1, 1, 1500f ) );
 		return list;
 	}
+
+	/// <summary>
+	/// The park's entrance gate, in heightfield tile coordinates (T-050). TPW levels declare a fixed
+	/// 2-tile entrance (<c>FixedItemInfo.EntranceA/B PosX/Y</c> in <c>Standard.sam</c>); this returns the
+	/// centre of that span (+0.5 to land on the tile centre). Falls back to the heightfield centre if the
+	/// keys are absent. Pure, so it can be unit-tested.
+	/// </summary>
+	public static (float TileX, float TileY) ReadEntranceTile( SettingsFile s )
+	{
+		if ( TryFloat( s, "FixedItemInfo.EntranceAPosX", out var ax ) && TryFloat( s, "FixedItemInfo.EntranceAPosY", out var ay ) )
+		{
+			float bx = TryFloat( s, "FixedItemInfo.EntranceBPosX", out var v1 ) ? v1 : ax;
+			float by = TryFloat( s, "FixedItemInfo.EntranceBPosY", out var v2 ) ? v2 : ay;
+			return ((ax + bx) / 2f + 0.5f, (ay + by) / 2f + 0.5f);
+		}
+		float w = TryFloat( s, "MapInfo.HeightfieldWidth", out var ww ) ? ww : 95f;
+		float h = TryFloat( s, "MapInfo.HeightfieldHeight", out var hh ) ? hh : 84f;
+		return (w / 2f, h / 2f);
+	}
+
+	private static bool TryFloat( SettingsFile s, string key, out float value ) =>
+		float.TryParse( s[key], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out value );
 
 	private static float ReadRideCost( string path, string name )
 	{

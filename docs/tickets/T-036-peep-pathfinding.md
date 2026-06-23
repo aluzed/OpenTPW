@@ -34,8 +34,9 @@ done; what remained was real cross-park routing.
 - ~~**Water-avoidance**~~ — **done in [T-050](T-050-peep-simulation-depth.md)**: `PlacementGrid` has a
   water layer (impassable + unbuildable) populated from the terrain height (`MarkWaterFromTerrain`), so
   the A* routes around water.
-- **Gate / entry & exit nodes**: visitors still arrive/leave on a spawn ring rather than through a real
-  park gate; wire the gate once the real level layout is loaded.
+- ~~**Gate / entry & exit nodes**~~ — **done in [T-050](T-050-peep-simulation-depth.md)**: peeps spawn at
+  and leave through the level's real entrance gate (`Level.ReadEntranceTile` from `FixedItemInfo.Entrance*`),
+  not a spawn ring.
 
 ## Acceptance criteria
 

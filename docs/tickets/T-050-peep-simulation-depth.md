@@ -2,8 +2,8 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Gameplay / AI
-- **Status**: ⚠️ Mostly done — **ride ratings & thoughts** + **water-aware pathfinding** done (both
-  unit-tested). Only the real gate node remains.
+- **Status**: ✅ Done — **ride ratings & thoughts**, **water-aware pathfinding**, and the **real entrance
+  gate** are all in and unit-tested.
 - **Parents**: [T-039](T-039-peep-needs-staff-depth.md), [T-036](T-036-peep-pathfinding.md).
 - **Related**: [T-034](T-034-peeps.md).
 
@@ -37,10 +37,14 @@ remaining depth is the peeps' *opinions* and a couple of pathfinding refinements
 - Covered by `PlacementGridTests` (water blocks walk/placement; terrain marking) + `PathGraphTests`
   (`RoutesAroundWater`, `WaterIsImpassableEvenUnderAPath`).
 
-## Remaining
+## Done (real entrance gate)
 
-3. **Real gate node** (T-036 tail): peeps enter/leave at the level's real park-gate node rather than a
-   synthetic spawn edge.
+- `Level.ReadEntranceTile(Standard.sam)` (pure, unit-tested) returns the park's entrance in heightfield
+  tile coords — the centre of the fixed 2-tile gate span (`FixedItemInfo.EntranceA/B PosX/Y`; jungle =
+  47-48,17 → tile (48.0, 17.5)), falling back to the heightfield centre if absent.
+- The dev park now spawns the crowd fanned just outside that gate (via `grid.PointToWorld`) instead of a
+  synthetic ring. Each peep's `home` = the gate, so they **leave through the gate** and re-enter there
+  when recycled. Covered by `LevelGateTests`.
 
 ## Acceptance criteria
 
