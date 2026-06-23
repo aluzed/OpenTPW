@@ -2,9 +2,8 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine
-- **Status**: ⚠️ Core done — the three acceptance criteria are met (thirst + drink stalls, vandalism that
-  guards measurably reduce, a balanced long-run economy). Thoughts/ratings, toilets and ride
-  breakdown/repair remain (below).
+- **Status**: ⚠️ Core done (+toilets) — thirst + drink stalls, **bladder + toilets**, vandalism that
+  guards measurably reduce, a balanced long-run economy. Thoughts/ratings and ride breakdown/repair remain.
 - **Related**: [T-034](T-034-peeps.md) (needs, economy, staff — core done).
 
 ## Context
@@ -29,6 +28,13 @@ each staff role and need has a fuller loop.
 4. **Staff behaviour (partial)** — guards patrol toward unhappy peeps (above); other roles unchanged.
 5. **Balance pass** — tuned thirst/hunger rates, the drink price, the vandalism window/rate and the
    patrol radius for a stable long run.
+6. **Toilets + bladder need** — peeps build a `bladder` need (and a drink fills it further); when it
+   passes its threshold they detour to the nearest **toilet** (a new `ShopKind.Toilet` — a *free* facility,
+   no income) and relieve it. The need detour generalised to "most-urgent over-threshold need that has a
+   stall" (`Peep.NeedDetour`, covering food/drink/toilet). A desperate peep (full bladder, no reachable
+   toilet) loses happiness fast. New "toilet" catalog item (placeable + sellable via the build UI like any
+   stall). Verified via `OPENTPW_AUTOPLACE`: `toilet=49` visits accumulate (`Peep.ToiletVisits`), no
+   exceptions, economy stable.
 
 Verified via `OPENTPW_AUTOPLACE` + `OPENTPW_ECON_DEBUG` (≈150 s): money held steady and net-positive
 (≈10.0k → 10.5k), drink+food revenue grew, and with one patrolling guard **vandalism=41 / deterred=21**
@@ -37,14 +43,10 @@ Build clean, 74/0 tests.
 
 ## Remaining
 
-- **Toilets / bathroom need** — a third need + stall type (symmetric with the thirst/drink loop).
 - **Peep thoughts / ride ratings** (item 3) — surface *why* a peep is (un)happy and a per-ride
   popularity rating.
 - **Ride breakdown + mechanics** (rest of item 4) — rides don't break down yet, so there's nothing for a
   mechanic to repair; needs a reliability/breakdown model first.
-- **Build UI note**: the dev number-key catalog only addresses items 1–9; with the added "drink" stall
-  the 10th entry (researcher) is no longer keyboard-selectable (autoplace still places it). A real build
-  UI is the T-038 umbrella.
 
 ## Acceptance criteria
 

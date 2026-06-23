@@ -7,6 +7,8 @@ public enum ShopKind
 	Food,
 	/// <summary>A drink stall: satisfies thirst.</summary>
 	Drink,
+	/// <summary>A toilet: relieves the bladder (a free facility — no income).</summary>
+	Toilet,
 }
 
 /// <summary>
@@ -25,8 +27,8 @@ public sealed class Shop : ModelEntity
 	/// <summary>What this stall sells (which need it satisfies).</summary>
 	public ShopKind Kind { get; }
 
-	/// <summary>Display name (for the manage UI), e.g. "Food Stall".</summary>
-	public string Name => Kind == ShopKind.Drink ? "Drink Stall" : "Food Stall";
+	/// <summary>Display name (for the manage UI).</summary>
+	public string Name => Kind switch { ShopKind.Drink => "Drink Stall", ShopKind.Toilet => "Toilet", _ => "Food Stall" };
 
 	/// <summary>Grid footprint (set when placed) — used to select it by clicking a covered tile, and to
 	/// free its cells on sell/demolish (T-041).</summary>
@@ -84,7 +86,12 @@ public sealed class Shop : ModelEntity
 	{
 		if ( sharedModels.TryGetValue( kind, out var m ) )
 			return m;
-		var model = kind == ShopKind.Drink ? Billboard.Make( 50, 130, 220 ) : Billboard.Make( 40, 170, 70 );
+		var model = kind switch
+		{
+			ShopKind.Drink => Billboard.Make( 50, 130, 220 ),   // blue
+			ShopKind.Toilet => Billboard.Make( 210, 210, 220 ), // pale grey/white
+			_ => Billboard.Make( 40, 170, 70 ),                 // green food
+		};
 		sharedModels[kind] = model;
 		return model;
 	}

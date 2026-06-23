@@ -90,6 +90,7 @@ public class Level
 				+ $"coaster={CommitPlacement( Item( "coaster1" ), grid, terrain, cx - 6, cy + 4 )} "
 				+ $"shop={CommitPlacement( Item( "shop" ), grid, terrain, cx + 6, cy + 4 )} "
 				+ $"drink={CommitPlacement( Item( "drink" ), grid, terrain, cx + 6, cy + 1 )} "
+				+ $"toilet={CommitPlacement( Item( "toilet" ), grid, terrain, cx + 8, cy + 4 )} "
 				+ $"ent={CommitPlacement( Item( "entertainer" ), grid, terrain, cx, cy + 2 )} "
 				+ $"hand={CommitPlacement( Item( "handyman" ), grid, terrain, cx + 2, cy + 2 )} "
 				+ $"rsch={CommitPlacement( Item( "researcher" ), grid, terrain, cx + 4, cy + 2 )} "
@@ -207,8 +208,9 @@ public class Level
 			var shape = RideShape.Load( path, name );
 			list.Add( new BuildCatalogItem( name, path, null, shape.Width, shape.Height, ReadRideCost( path, name ) ) );
 		}
-		list.Add( new BuildCatalogItem( "shop", null, null, 2, 2, 500f ) );  // food stall (satisfies hunger)
-		list.Add( new BuildCatalogItem( "drink", null, null, 2, 2, 450f ) ); // drink stall (satisfies thirst, T-039)
+		list.Add( new BuildCatalogItem( "shop", null, null, 2, 2, 500f ) );   // food stall (satisfies hunger)
+		list.Add( new BuildCatalogItem( "drink", null, null, 2, 2, 450f ) );  // drink stall (satisfies thirst, T-039)
+		list.Add( new BuildCatalogItem( "toilet", null, null, 2, 2, 400f ) ); // toilet (relieves bladder, free to use, T-039)
 		list.Add( new BuildCatalogItem( "entertainer", null, StaffRole.Entertainer, 1, 1, 800f ) );
 		list.Add( new BuildCatalogItem( "handyman", null, StaffRole.Handyman, 1, 1, 600f ) );
 		list.Add( new BuildCatalogItem( "guard", null, StaffRole.Guard, 1, 1, 1000f ) );
@@ -253,7 +255,7 @@ public class Level
 			return false;
 
 		bool ok = item.RidePath == null
-			? SpawnShopAt( terrain, grid, tx, ty, item.Name == "drink" ? ShopKind.Drink : ShopKind.Food, item )
+			? SpawnShopAt( terrain, grid, tx, ty, ShopKindOf( item.Name ), item )
 			: SpawnRideAt( item.RidePath, grid, terrain, tx, ty, item.Cost, rotation );
 
 		if ( !ok )
@@ -308,6 +310,14 @@ public class Level
 		}
 		catch ( Exception e ) { Log.Warning( $"[build] ride '{path}' failed: {e.Message}" ); return false; }
 	}
+
+	// The shop kind for a catalog item name.
+	private static ShopKind ShopKindOf( string name ) => name switch
+	{
+		"drink" => ShopKind.Drink,
+		"toilet" => ShopKind.Toilet,
+		_ => ShopKind.Food,
+	};
 
 	private static bool SpawnShopAt( ParkTerrain terrain, PlacementGrid grid, int tx, int ty, ShopKind kind, BuildCatalogItem item )
 	{
@@ -450,7 +460,7 @@ public class Level
 		{
 			nextEconLog = Time.Now + 5f;
 			Log.Info( $"[econ] money={f.Money:0}  ride+={f.RideRevenue:0}  entry+={f.EntryRevenue:0}  shop+={f.FoodRevenue:0}  upkeep-={f.UpkeepPaid:0}  wages-={f.WagesPaid:0}"
-				+ $"  vandalism={Peep.VandalismActs} deterred={Peep.VandalismDeterred}" );
+				+ $"  vandalism={Peep.VandalismActs} deterred={Peep.VandalismDeterred} toilet={Peep.ToiletVisits}" );
 		}
 	}
 

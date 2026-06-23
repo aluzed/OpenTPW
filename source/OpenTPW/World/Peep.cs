@@ -24,6 +24,10 @@ public sealed class Peep : ModelEntity
 	private const float HungerThreshold = 55f;        // detour to a food stall at this point
 	private const float ThirstPerSec = 2.6f;          // thirst builds a little faster than hunger (0..100)
 	private const float ThirstThreshold = 50f;        // detour to a drink stall at this point
+	private const float BladderPerSec = 1.8f;         // bladder fills slowly while in the park (0..100)
+	private const float BladderThreshold = 60f;        // detour to a toilet at this point
+	private const float DrinkBladderBump = 35f;        // a drink fills the bladder noticeably (T-039)
+	private const float BurstPenaltyPerSec = 3f;       // happiness lost while desperate with no toilet reachable
 	private const float VandalHappiness = 28f;        // a peep this unhappy may vandalise (well above LeaveHappiness, so there's a window to act before giving up)
 	private const float VandalChancePerSec = 0.14f;   // ~1 act every ~7 s while unhappy and unwatched
 	private const float WalkFps = 8f;                // walk-cycle frames per second
@@ -32,6 +36,10 @@ public sealed class Peep : ModelEntity
 	/// stopped — so a guard's effect on vandalism is measurable.</summary>
 	public static int VandalismActs { get; private set; }
 	public static int VandalismDeterred { get; private set; }
+
+	/// <summary>Park-wide count of toilet visits (T-039) — toilets earn no income, so this is the only
+	/// signal they're used.</summary>
+	public static int ToiletVisits { get; private set; }
 
 	// A small palette of clothing colours so the crowd reads as varied people.
 	private static readonly (byte R, byte G, byte B)[] Palette =
@@ -66,6 +74,7 @@ public sealed class Peep : ModelEntity
 	private float energy = MaxEnergy;
 	private float hunger;
 	private float thirst;
+	private float bladder;
 
 	// Sprite animation state (real sprite path only).
 	private readonly float spriteHeight;
@@ -153,17 +162,28 @@ public sealed class Peep : ModelEntity
 			return;
 		}
 
-		// Detouring to a stall: walk there (routing around rides), buy (park income), satisfy the matching
-		// need (food → hunger, drink → thirst), then resume riding.
+		// Detouring to a stall: walk there (routing around rides), use it, satisfy the matching need
+		// (food → hunger, drink → thirst but fills the bladder, toilet → bladder, free), then resume riding.
 		if ( shopTarget != null )
 		{
 			if ( MoveTo( shopTarget.Position ) )
 			{
-				ParkFinances.Current?.TakeFoodSale( shopTarget.Price );
-				if ( shopTarget.Kind == ShopKind.Drink )
-					thirst = 0f;
-				else
-					hunger = 0f;
+				switch ( shopTarget.Kind )
+				{
+					case ShopKind.Drink:
+						ParkFinances.Current?.TakeFoodSale( shopTarget.Price );
+						thirst = 0f;
+						bladder = MathF.Min( 100f, bladder + DrinkBladderBump );
+						break;
+					case ShopKind.Toilet:
+						bladder = 0f; // toilets are free facilities — no income
+						ToiletVisits++;
+						break;
+					default:
+						ParkFinances.Current?.TakeFoodSale( shopTarget.Price );
+						hunger = 0f;
+						break;
+				}
 				shopTarget = null;
 				ResetPath();
 				PickRoute();
@@ -211,28 +231,26 @@ public sealed class Peep : ModelEntity
 			return;
 		}
 
-		// Getting peckish / parched: leave the ride line and head for the matching stall. Thirst is checked
-		// first when it's the more pressing need, so a hot, thirsty peep buys a drink before a snack.
+		// Needs build over time; when one passes its threshold the peep leaves the ride line and detours to
+		// the matching stall (food→hunger, drink→thirst, toilet→bladder), most-urgent first.
 		hunger += HungerPerSec * Time.Delta;
 		thirst += ThirstPerSec * Time.Delta;
-		bool wantsDrink = thirst >= ThirstThreshold;
-		bool wantsFood = hunger >= HungerThreshold;
-		if ( wantsDrink || wantsFood )
+		bladder += BladderPerSec * Time.Delta;
+		if ( bladder > 100f )
+			bladder = 100f;
+
+		if ( NeedDetour() is { } target )
 		{
-			// Prefer whichever need is the more urgent (relative to its threshold), if that stall exists.
-			bool drinkFirst = wantsDrink && (!wantsFood || thirst / ThirstThreshold >= hunger / HungerThreshold);
-			var target = drinkFirst
-				? (Shop.Nearest( ShopKind.Drink, Position ) ?? Shop.Nearest( ShopKind.Food, Position ))
-				: (Shop.Nearest( ShopKind.Food, Position ) ?? Shop.Nearest( ShopKind.Drink, Position ));
-			if ( target != null )
-			{
-				route?.Dequeue( this );
-				route = null;
-				ResetPath();
-				shopTarget = target;
-				return;
-			}
+			route?.Dequeue( this );
+			route = null;
+			ResetPath();
+			shopTarget = target;
+			return;
 		}
+
+		// Desperate (bladder full) with no toilet to reach: the mood sours fast (build a toilet!).
+		if ( bladder >= 100f && Shop.Nearest( ShopKind.Toilet, Position ) == null )
+			happiness = Math.Max( 0f, happiness - BurstPenaltyPerSec * Time.Delta );
 
 		// Stand at my place in line (front = the entrance, each place back steps one waypoint out), and
 		// walk toward it — as those ahead board, the line shifts forward and my target advances.
@@ -293,6 +311,7 @@ public sealed class Peep : ModelEntity
 		energy = MaxEnergy;
 		hunger = 0f;
 		thirst = 0f;
+		bladder = 0f;
 		lastRoute = null;
 		ParkFinances.Current?.TakeEntryFee(); // a fresh visitor pays the gate
 		PickRoute();
@@ -409,6 +428,32 @@ public sealed class Peep : ModelEntity
 	{
 		Position = seat;
 		FaceCamera();
+	}
+
+	// Pick the stall to detour to for the most urgent over-threshold need that actually has a stall — by
+	// urgency (need ÷ its threshold) descending — or null if no need is pressing / no matching stall exists.
+	private Shop? NeedDetour()
+	{
+		Span<(float Urgency, ShopKind Kind)> needs =
+		[
+			(bladder / BladderThreshold, ShopKind.Toilet),
+			(thirst / ThirstThreshold, ShopKind.Drink),
+			(hunger / HungerThreshold, ShopKind.Food),
+		];
+
+		Shop? best = null;
+		float bestUrgency = 1f; // must be over threshold (urgency ≥ 1) to bother
+		foreach ( var (urgency, kind) in needs )
+		{
+			if ( urgency < bestUrgency )
+				continue;
+			if ( Shop.Nearest( kind, Position ) is { } stall )
+			{
+				best = stall;
+				bestUrgency = urgency;
+			}
+		}
+		return best;
 	}
 
 	// Act of vandalism: scatter a couple of pieces of litter around the peep (a mess a handyman must then
