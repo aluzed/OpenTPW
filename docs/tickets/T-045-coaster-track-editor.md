@@ -9,8 +9,10 @@
   board the train** (they ride it in view from their queue, replacing the seat-marker stand-ins) with the
   **rider scream** while occupied, the track is rendered as a **rail+sleeper profile** (a continuous bed
   carrying two raised running rails + cross-ties) on height-aware pylons, and **`STACKUP/DOWN` elevation
-  editing** (`PageUp`/`PageDown`) raises/lowers the head segment to build hills. Only nice-to-haves remain
-  (see below): exact rail spacing from the decoded `.hmp`, and per-segment rotation.
+  editing** (`PageUp`/`PageDown`) raises/lowers the head segment to build hills, and the track surface is
+  swept from the **authored cross-section profile** decoded from `coaster.sam` (the real channel/rail
+  silhouette) rather than a procedural approximation. Only nice-to-haves remain (see below): curved-piece
+  meshes from the decoded `.hmp`, and per-segment rotation.
 - **Parent**: [T-038](T-038-park-management-ui.md). **Needs**: [T-041](T-041-ride-shop-placement.md).
   **Related**: [T-032](T-032-ride-engine.md), [T-033](T-033-ride-animation-keyframes.md).
 
@@ -120,11 +122,32 @@
   binds it to `PageUp`/`PageDown`. Verified via `OPENTPW_AUTOPLACE` (raises a mid-track hill while laying
   the auto ring): `autotrack segments=9 closed=True`, no exceptions, 71/0 tests.
 
+## Done (slice 3b — authored cross-section profile)
+
+- **Decoded track geometry**: `coaster.sam` (inside `coaster1.wad`) holds the track's 2D cross-section as
+  plain settings text — `asCrossSectionPoints1[i].fX/fY/fU/fNx/fNy`, the real silhouette the original
+  sweeps along the centre-line. coaster1's is a 7-point **water channel**: outer lips at (±4, 2.5), inner
+  rims at (±3, 2.0), floor at (0, −1.5), with two duplicated points for the texture-scroll U range
+  (`#duplicate points for texture scroll`), textured `trak_sec3.tga`. (Confirmed by extracting the
+  refpack'd member through `WadArchive` and parsing it with `SettingsFile`.)
+- **Extruded track surface**: `CoasterTrack.LoadCrossSection` reads those points (via
+  `ParseCrossSection`, unit-tested), and `RebuildRibbon` now **sweeps the profile** along the smoothed
+  centre-line when ≥2 points are present — each profile point placed at `pos[i] + perp[i]·(X·scale) +
+  up·(Y·scale)`, UVs `(point.U, lengthAlong)`, consecutive cross-sections × profile edges stitched into a
+  quad strip — so the built track is the **authored channel/rail shape**, not a hand-tuned approximation.
+  The profile is fit to ~0.6 tile wide (native ±4 → `ts·0.30`). The procedural bed+rails+ties path is kept
+  as a fallback when no `coaster.sam` profile is available.
+- Verified via `OPENTPW_AUTOPLACE`: `loaded 7 cross-section point(s) from
+  levels/jungle/rides/coaster1/coaster.sam`, `autotrack segments=9 closed=True`, the swept track ribbon
+  renders (the blue water-channel surface) with no exceptions. Build clean, 95/0 tests (new
+  `CoasterTrackTests`).
+
 ## Remaining (nice-to-have)
 
-- Exact rail gauge / cross-tie spacing + curved-piece meshes authored from the decoded `.hmp` templates
-  (the profile is currently a sensible procedural approximation, not `.hmp`-driven — the `.hmp` format is
-  only recon'd, see above).
+- Curved-piece meshes authored from the decoded `.hmp` templates (the swept cross-section is now from
+  authored data, but the per-tile footprint/height `.hmp` grid is still only recon'd, see above). The
+  `.fNx/.fNy` profile normals are parsed-but-unused (the track shader is unlit) — wire them in if the
+  track ever moves to a lit shader.
 - Per-segment **rotation** (`ACTION_COASTER_ROTATE`) — limited value for a grid-aligned tile track, so
   deferred.
 

@@ -21,6 +21,7 @@ public sealed class CoasterTrack
 	private readonly List<ModelEntity> pylons = new(); // one support per laid segment
 	private readonly CoasterTrain train;
 	private readonly (int X, int Y)? trackInTile; // the station's '<' entry connector, where the loop closes
+	private readonly List<(float X, float Y, float U)> crossSection; // authored track profile (coaster.sam)
 	private ModelEntity? ribbon;                  // the smooth track surface (regenerated on every change)
 
 	public (int X, int Y) Head => tiles[^1];
@@ -61,6 +62,10 @@ public sealed class CoasterTrack
 			if ( inTile != tiles[0] )
 				trackInTile = inTile;
 		}
+
+		// The authored track cross-section profile (extruded along the centre-line for authentic rail
+		// geometry; falls back to a procedural bed+rails if absent). Decoded from coaster.sam.
+		crossSection = LoadCrossSection( coaster.Archive );
 
 		// The train hides itself until at least one segment is laid (path has < 2 points).
 		train = new CoasterTrain( this, grid.TileSize, coaster.Archive );
@@ -198,6 +203,45 @@ public sealed class CoasterTrack
 	private const float TieHalfLength = 0.22f; // ×TileSize: cross-tie reach along travel
 	private const int TieEvery = 4;            // a cross-tie every N spline points (~2 ties / tile at sub=8)
 
+	// The authored track cross-section: the 2D profile (X across, Y up, U texcoord) the original sweeps
+	// along the track centre-line, read from coaster.sam's asCrossSectionPoints1[*] (plain settings text).
+	// This is the real rail/channel silhouette (e.g. ±4 wide, rails at ±3, dipping to centre −1.5).
+	private static List<(float X, float Y, float U)> LoadCrossSection( string archive )
+	{
+		try
+		{
+			using var s = FileSystem.OpenRead( $"{archive}/coaster.sam" );
+			if ( s == null )
+				return new();
+			var pts = ParseCrossSection( new SettingsFile( s ) );
+			Log.Info( $"[coaster] loaded {pts.Count} cross-section point(s) from {archive}/coaster.sam" );
+			return pts;
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( $"[coaster] cross-section load failed: {e.Message}" );
+			return new();
+		}
+	}
+
+	// Pure parse of asCrossSectionPoints1[*] (fX/fY/fU) from a loaded settings file — split out so it can
+	// be unit-tested without the VFS. Stops at the first missing index.
+	internal static List<(float X, float Y, float U)> ParseCrossSection( SettingsFile settings )
+	{
+		var pts = new List<(float, float, float)>();
+		for ( int i = 0; ; i++ )
+		{
+			var xs = settings[$"asCrossSectionPoints1[{i}].fX"];
+			if ( string.IsNullOrEmpty( xs ) )
+				break;
+			pts.Add( (Flt( xs ), Flt( settings[$"asCrossSectionPoints1[{i}].fY"] ), Flt( settings[$"asCrossSectionPoints1[{i}].fU"] )) );
+		}
+		return pts;
+	}
+
+	private static float Flt( string? s ) =>
+		float.TryParse( s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v ) ? v : 0f;
+
 	private void RebuildRibbon()
 	{
 		var pts = SmoothedPath();
@@ -224,49 +268,80 @@ public sealed class CoasterTrack
 			tan[i] = dir;
 		}
 
-		var verts = new List<Vertex>( pts.Count * 6 + pts.Count / TieEvery * 4 );
+		var verts = new List<Vertex>();
 		var idx = new List<uint>();
 
-		// A strip centred `offset` from the centre-line, `halfWidth` wide, raised `lift` — used for the
-		// continuous track bed (offset 0) and for the two running rails (offset ±gauge, lifted onto the bed).
-		void AddStrip( float offset, float halfWidth, float lift )
+		if ( crossSection.Count >= 2 )
 		{
-			uint baseIdx = (uint)verts.Count;
+			// Sweep the authored cross-section (coaster.sam) along the centre-line: each profile point is
+			// placed at perp·X + up·Y in the track frame, and consecutive profile edges × length segments
+			// are stitched into quads → the real rail/channel surface.
+			float maxAbsX = 0f;
+			foreach ( var p in crossSection )
+				maxAbsX = MathF.Max( maxAbsX, MathF.Abs( p.X ) );
+			float scale = maxAbsX > 1e-3f ? ts * 0.30f / maxAbsX : 1f; // fit the profile to ~0.6 tile wide
+			int m = crossSection.Count;
+
 			float cum = 0f;
 			for ( int i = 0; i < pts.Count; i++ )
 			{
 				if ( i > 0 ) cum += pts[i].Distance( pts[i - 1] );
-				float v = cum / ts;
-				var c = pos[i] + perp[i] * offset + Vector3.Up * lift;
-				verts.Add( new Vertex { Position = c + perp[i] * halfWidth, Normal = Vector3.Up, TexCoords = new Vector2( 0f, v ) } );
-				verts.Add( new Vertex { Position = c - perp[i] * halfWidth, Normal = Vector3.Up, TexCoords = new Vector2( 1f, v ) } );
+				float vTex = cum / ts;
+				foreach ( var p in crossSection )
+				{
+					var world = pos[i] + perp[i] * (p.X * scale) + Vector3.Up * (p.Y * scale);
+					verts.Add( new Vertex { Position = world, Normal = Vector3.Up, TexCoords = new Vector2( p.U, vTex ) } );
+				}
 			}
 			for ( int i = 0; i < pts.Count - 1; i++ )
-			{
-				uint a = baseIdx + (uint)(2 * i), b = a + 1, c = a + 2, d = a + 3;
-				idx.Add( a ); idx.Add( b ); idx.Add( c );
-				idx.Add( b ); idx.Add( d ); idx.Add( c );
-			}
+				for ( int j = 0; j < m - 1; j++ )
+				{
+					uint a = (uint)(i * m + j), b = a + 1, c = (uint)((i + 1) * m + j), d = c + 1;
+					idx.Add( a ); idx.Add( b ); idx.Add( c );
+					idx.Add( b ); idx.Add( d ); idx.Add( c );
+				}
 		}
-		float tieReach = gauge + railHalf * 2f;
-		AddStrip( 0f, tieReach, 0f );      // continuous track bed (reads as solid from a distance)
-		AddStrip( -gauge, railHalf, rise ); // left running rail, lifted onto the bed
-		AddStrip( +gauge, railHalf, rise ); // right running rail
-
-		// Cross-ties: a short quad spanning the bed every few points (the "sleepers"), just above the bed.
-		float tieLift = rise * 0.5f;
-		for ( int i = 0; i < pts.Count; i += TieEvery )
+		else
 		{
-			var step = tan[i] * tieLen;
-			var l = pos[i] + perp[i] * (-tieReach) + Vector3.Up * tieLift;
-			var r = pos[i] + perp[i] * tieReach + Vector3.Up * tieLift;
-			uint bi = (uint)verts.Count;
-			verts.Add( new Vertex { Position = l - step, Normal = Vector3.Up, TexCoords = new Vector2( 0f, 0f ) } );
-			verts.Add( new Vertex { Position = r - step, Normal = Vector3.Up, TexCoords = new Vector2( 1f, 0f ) } );
-			verts.Add( new Vertex { Position = l + step, Normal = Vector3.Up, TexCoords = new Vector2( 0f, 1f ) } );
-			verts.Add( new Vertex { Position = r + step, Normal = Vector3.Up, TexCoords = new Vector2( 1f, 1f ) } );
-			idx.Add( bi ); idx.Add( bi + 1 ); idx.Add( bi + 2 );
-			idx.Add( bi + 1 ); idx.Add( bi + 3 ); idx.Add( bi + 2 );
+			// Fallback (no authored profile): a procedural bed + two raised rails + periodic cross-ties.
+			void AddStrip( float offset, float halfWidth, float lift )
+			{
+				uint baseIdx = (uint)verts.Count;
+				float cum = 0f;
+				for ( int i = 0; i < pts.Count; i++ )
+				{
+					if ( i > 0 ) cum += pts[i].Distance( pts[i - 1] );
+					float v = cum / ts;
+					var c = pos[i] + perp[i] * offset + Vector3.Up * lift;
+					verts.Add( new Vertex { Position = c + perp[i] * halfWidth, Normal = Vector3.Up, TexCoords = new Vector2( 0f, v ) } );
+					verts.Add( new Vertex { Position = c - perp[i] * halfWidth, Normal = Vector3.Up, TexCoords = new Vector2( 1f, v ) } );
+				}
+				for ( int i = 0; i < pts.Count - 1; i++ )
+				{
+					uint a = baseIdx + (uint)(2 * i), b = a + 1, c = a + 2, d = a + 3;
+					idx.Add( a ); idx.Add( b ); idx.Add( c );
+					idx.Add( b ); idx.Add( d ); idx.Add( c );
+				}
+			}
+			float tieReach = gauge + railHalf * 2f;
+			AddStrip( 0f, tieReach, 0f );
+			AddStrip( -gauge, railHalf, rise );
+			AddStrip( +gauge, railHalf, rise );
+
+			float tieLift = rise * 0.5f;
+			for ( int i = 0; i < pts.Count; i += TieEvery )
+			{
+				var step = tan[i] * tieLen;
+				var l = pos[i] + perp[i] * (-tieReach) + Vector3.Up * tieLift;
+				var r = pos[i] + perp[i] * tieReach + Vector3.Up * tieLift;
+				uint bi = (uint)verts.Count;
+				verts.Add( new Vertex { Position = l - step, Normal = Vector3.Up, TexCoords = new Vector2( 0f, 0f ) } );
+				verts.Add( new Vertex { Position = r - step, Normal = Vector3.Up, TexCoords = new Vector2( 1f, 0f ) } );
+				verts.Add( new Vertex { Position = l + step, Normal = Vector3.Up, TexCoords = new Vector2( 0f, 1f ) } );
+				verts.Add( new Vertex { Position = r + step, Normal = Vector3.Up, TexCoords = new Vector2( 1f, 1f ) } );
+				idx.Add( bi ); idx.Add( bi + 1 ); idx.Add( bi + 2 );
+				idx.Add( bi + 1 ); idx.Add( bi + 3 ); idx.Add( bi + 2 );
+			}
 		}
 
 		var model = new Model( verts.ToArray(), idx.ToArray(), ribbonMat );
