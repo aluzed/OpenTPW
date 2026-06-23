@@ -48,14 +48,30 @@ RE'd the node graph from the MD2 loader + the runtime resolver `FUN_0044b220` / 
   node binds to a **bone transform** and the position is that matrix's translation row (`FUN_00556b90`
   reads `transform+0x30/0x34/0x38`, direction at `+0x20/0x24/0x28`).
 
+## Done (node types labelled) + key finding on positions
+
+- **Node-type selectors RE'd** (each subsystem calls `FUN_0044b220(model, selector, id)`; a node matches
+  when `TypeMask & selector != 0`): **0x80 = object/head attach** (`FUN_005587f0` head-mount + the
+  TOUR/BUMP car helpers), **0x800 = walk node** (`FUN_00557ab0`; the coaster's `0x811` queue nodes),
+  **0x100 = bumper/kart car** (`FUN_0054a040`); other bits (0x400/0x1000/0x20000/0x400000) belong to
+  peep/scenery/other subsystems. Exposed as `Node.IsObject/IsWalk/IsCar`, `Node.Matches(selector)`,
+  `ModelFile.NodesMatching(selector)` + `ModelFile.NodeSelector` constants (unit-tested). Confirmed: Bird's
+  nine `0xB1` nodes (ids 1-9) are object/head attach points (its riders), the coaster's `0x811` are walk.
+- **Key finding — node positions are NOT static file data.** In every shipped model the node entries'
+  transform pointers (`+0xc/+0x10`) are **null**, there is **no bone table** (`ptr@0x98 = ptr@0xac = 0`,
+  `count@0x40 = 0`), and Bird has **1 mesh but 11 nodes** — so positions can't come from the file or the
+  meshes. `FUN_00556b90` reads a node's position from a **bone transform bound at runtime** (translation at
+  matrix +0x30); that binding is produced by the **skeletal animation + the ride's motion VM**
+  (TOUR/BUMP/COAST move the car/seat nodes each frame). So node world positions are **simulation output**,
+  not a decode — they fold into T-032's "authored car-physics subsystem" + the T-033 skeleton, not this
+  file format.
+
 ## Remaining
 
-1. **Decode the bone/skeleton transforms** and the node→bone binding so each node yields a world position
-   (the file's per-frame/bone data — overlaps the T-033 keyframe work). This unblocks everything below.
-2. Label the `TypeMask` bits precisely (trace each opcode's selector: WALKON / ADDHEAD / TOUR/BUMP/COAST /
-   EVENT) so node *kind* is named, not just a raw mask.
-3. Apply: drive `RideVehicle` / the coaster train along the authored car/track nodes; place WALKON peeps
-   and ADDHEAD heads at their nodes; feed positions to T-047. (Visual — needs the renderer.)
+1. **Node world positions** require the ride **motion/skeleton simulation** (T-032 car-physics + T-033
+   bone transforms), since they're not stored statically — re-scoped out of the "file decode" framing.
+2. Apply (once positions exist + a working renderer): drive `RideVehicle`/the coaster train along the car
+   nodes; place WALKON peeps & ADDHEAD heads at their nodes; feed positions to T-047.
 
 ## Acceptance criteria
 

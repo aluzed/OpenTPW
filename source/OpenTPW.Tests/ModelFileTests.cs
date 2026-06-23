@@ -122,6 +122,15 @@ public class ModelFileTests
 		Assert.AreEqual( 0x811u, nodes[1].TypeMask );
 		Assert.AreEqual( 2, nodes[1].NodeId );
 
+		// Type classification (RE'd selectors): 0x80 object/head, 0x800 walk, 0x100 car.
+		Assert.IsTrue( nodes[0].IsObject, "0xB1 carries the 0x80 object/head bit" );
+		Assert.IsFalse( nodes[0].IsWalk );
+		Assert.IsTrue( nodes[1].IsWalk, "0x811 carries the 0x800 walk bit" );
+		Assert.IsFalse( nodes[1].IsObject );
+		// A coaster car/track node (0x111) carries the 0x100 car bit.
+		var carNode = new ModelFile.Node { TypeMask = 0x111 };
+		Assert.IsTrue( carNode.IsCar );
+
 		// Absent / implausible table → empty (not a throw).
 		Assert.AreEqual( 0, ModelFile.ParseNodeTable( new byte[0x80] ).Count );
 	}

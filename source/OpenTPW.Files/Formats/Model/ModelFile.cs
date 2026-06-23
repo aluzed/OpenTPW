@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using System.Text;
 
@@ -21,6 +22,22 @@ public partial class ModelFile : BaseFormat
 	/// </summary>
 	public List<Node> Nodes { get; } = new();
 
+	/// <summary>
+	/// The node-type selectors the engine queries with (RE'd: each subsystem calls the resolver
+	/// <c>FUN_0044b220(model, selector, id)</c> and a node matches when <c>TypeMask &amp; selector != 0</c>).
+	/// A node may carry several bits. Only the well-identified bits are named here; others are left raw.
+	/// </summary>
+	public static class NodeSelector
+	{
+		/// <summary>Object/head attach point — the head-mount setup <c>FUN_005587f0</c> + the TOUR/BUMP car
+		/// helpers all query 0x80 (e.g. a tour ride's per-seat nodes).</summary>
+		public const uint Object = 0x80;
+		/// <summary>Bumper/kart car node (<c>FUN_0054a040</c>).</summary>
+		public const uint Car = 0x100;
+		/// <summary>Walk node (<c>FUN_00557ab0</c>; e.g. a coaster's queue/walk nodes).</summary>
+		public const uint Walk = 0x800;
+	}
+
 	public readonly struct Node
 	{
 		/// <summary>Bitfield of node types/subsystems that may address this node (matched against the
@@ -30,7 +47,21 @@ public partial class ModelFile : BaseFormat
 		public int NodeId { get; init; }
 		/// <summary>The node entry's third word (0 on every shipped sample seen).</summary>
 		public uint Extra { get; init; }
+
+		/// <summary>True if this node is addressable by the given selector — mirrors the engine resolver
+		/// (<c>TypeMask &amp; selector != 0</c>).</summary>
+		public bool Matches( uint selector ) => (TypeMask & selector) != 0;
+
+		/// <summary>Object/head attach node (selector 0x80).</summary>
+		public bool IsObject => Matches( NodeSelector.Object );
+		/// <summary>Bumper/kart car node (selector 0x100).</summary>
+		public bool IsCar => Matches( NodeSelector.Car );
+		/// <summary>Walk node (selector 0x800).</summary>
+		public bool IsWalk => Matches( NodeSelector.Walk );
 	}
+
+	/// <summary>Nodes addressable by the given selector (mirrors the engine resolver's match test).</summary>
+	public IEnumerable<Node> NodesMatching( uint selector ) => Nodes.Where( n => n.Matches( selector ) );
 
 	// The .MD2 format version this parser supports (header fields at offsets 4 and 8). The
 	// original loader accepts only these values; the legacy static variant (GARROW.MD2 / RARROW.MD2 =
