@@ -2,12 +2,12 @@
 
 - **Priority**: 🟡 Feature (core of ride gameplay)
 - **Type**: Feature / reverse engineering
-- **Status**: ⚠️ **Partial — 102 / 106 opcodes.** The `.RSE` loader / disassembler is restored and
+- **Status**: ⚠️ **Partial — 103 / 106 opcodes.** The `.RSE` loader / disassembler is restored and
   working; `RideVM` parses + runs scripts. **Batch A (all 43 `pure`) complete**; Batch B is all but done —
-  object spawn/lifecycle (incl. the extended `ADDOBJ_EXT`), the animation + `WAIT*` family, sound, the
-  rider-scream family, the **limbo**, **cross-VM**, **light**, **walk**, **particle effects** (decoded
-  `.PLB`, T-019), and **head** families are all in and tested. **Remaining: 4 opcodes** — `GETCUSTPTCLCODE`
-  (its `op_94` lost the code computation in the decompile) and the motion ops `TURBO`/`TOUR`/`BUMP`.
+  object spawn/lifecycle (incl. `ADDOBJ_EXT`), the animation + `WAIT*` family, sound, the rider-scream
+  family, the **limbo**, **cross-VM**, **light**, **walk**, **particle effects** (decoded `.PLB`, T-019),
+  **head**, and `GETCUSTPTCLCODE` are all in and tested. **Remaining: 3 opcodes** — the motion ops
+  `TURBO`/`TOUR`/`BUMP` (need the ride motion/physics engine).
 
 ## Findings
 
@@ -167,12 +167,17 @@ runtime). Classification: **43 `pure`** (VM-state only — implementable now) an
     (`RideEngineTests.AddObjExtRegistersAndSpawnsParticleForParticleTypes`); verified in-game via the
     `OPENTPW_AUTOPLACE` drive — type-4 code-11 logs `particle effect 11 (Fire)`, proxy renders, no exceptions.
 
-**Remaining: 4 opcodes**, all needing engine subsystems / further RE:
-- **`GETCUSTPTCLCODE`** — its executor case `op_94` lost the code computation in the decompile, so its
-  contract is unclear (guessing risk).
-- **Motion** (`TURBO`/`TOUR`/`BUMP`) — ride-motion control (needs the ride motion/physics engine).
+20. ✅ **GETCUSTPTCLCODE** (op 94) — the decompiler had lost the result (`unaff_EDI`), so I disassembled
+    `op_94` at the instruction level: it reads + evaluates operand 2 but **discards** the value
+    (`MOV EAX,ESI` overwrites it), then writes **EDI** to dest + the result register. EDI is zeroed once in
+    the executor prologue (`XOR EDI,EDI` @ `0x551cc1`) and is callee-saved across the eval call — so the
+    opcode **always returns 0**. The "custom particle code" lookup is a stub (0 = none) in this build.
+    Implemented faithfully (`dest = 0`, Zero flag set); `arg` ignored. Coverage **102 → 103 / 106**.
+    Covered by `RideScriptTests.GetCustomParticleCodeAlwaysReturnsZero`.
 
-Reverse each from its executor case (`op_<n>` in `FUN_00551cb0`) when its subsystem comes online.
+**Remaining: 3 opcodes** — the motion ops `TURBO`/`TOUR`/`BUMP`. These control ride/car motion and need
+the ride motion/physics engine to build + verify; reverse each from its executor case (`op_<n>` in
+`FUN_00551cb0`) when that subsystem comes online.
 
 > Note: the instruction doc describes `CMP` as a *bitwise-AND* comparison, but the current
 > `Math.Compare` does equality/less-than. Left as-is for now (changing it could shift branch

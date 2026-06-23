@@ -512,6 +512,21 @@ public class RideScriptTests
 		finally { RideVM.RandomIndex = prev; }
 	}
 
+	// GETCUSTPTCLCODE: RE'd at instruction level (op_94) — it discards its operand and always writes 0
+	// (the result is EDI, zeroed in the executor prologue). A stub returning 0 in the shipped build. T-007.
+	[TestMethod]
+	public void GetCustomParticleCodeAlwaysReturnsZero()
+	{
+		Log = new();
+		var vm = LoadTestVm();
+		var dest = new Operand( vm, Operand.Type.Variable, 0, 0 );
+		dest.Value = 999; // pre-set to prove it's overwritten regardless of the arg
+
+		OpcodeHandlers.Particles.GetCustomParticleCode( ref vm, dest, Lit( vm, 42 ) );
+		Assert.AreEqual( 0, dest.Value );
+		Assert.IsTrue( vm.Flags.HasFlag( RideVM.VMFlags.Zero ) );
+	}
+
 	private static RideVM LoadTestVm()
 	{
 		var path = Path.Combine( AppContext.BaseDirectory, "content", "testscripts", "Test.RSE" );

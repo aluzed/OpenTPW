@@ -23,5 +23,18 @@ partial class OpcodeHandlers
 		[OpcodeHandler( Opcode.SPARK, "Emit sparks at the ride." )]
 		public static void Spark( ref RideVM vm, Operand _, Operand __, Operand ___, Operand ____ )
 			=> vm.Engine?.SpawnParticleEffect( EffectSparks );
+
+		[OpcodeHandler( Opcode.GETCUSTPTCLCODE, "Get a custom particle code into dest — always 0 in the shipped build." )]
+		public static void GetCustomParticleCode( ref RideVM vm, Operand dest, Operand arg )
+		{
+			// RE'd at instruction level (op_94): the second operand is read + evaluated but the value is
+			// discarded (MOV EAX,ESI overwrites it). The result written to dest + the result register is
+			// EDI, which the executor prologue zeroes (`XOR EDI,EDI` @ 0x551cc1) and never reassigns (EDI is
+			// preserved across the eval call) — so this opcode always yields 0. The "custom particle code"
+			// lookup is effectively a stub (0 = none) in this build of tp.exe; arg is ignored.
+			_ = arg;
+			dest.Value = 0;
+			vm.Flags = RideVM.VMFlags.Zero; // result register = 0
+		}
 	}
 }

@@ -26,7 +26,7 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 | [T-004](T-004-system-drawing-modkit.md) | 🟠 Medium | ✅ Mostly | `System.Drawing.Common` is Windows-only in the ModKit |
 | [T-005](T-005-vulnerable-dependencies.md) | 🟠 Medium | ✅ Done | Vulnerable dependencies (direct + transitive) |
 | [T-006](T-006-gamepath-config.md) | 🟡 Low | ✅ Done | Windows default `GamePath` + no portable override |
-| [T-007](T-007-vm-opcodes-rse.md) | 🟡 Feature | ⚠️ Partial | Ride VM: **102/106** — Batch A (43 pure) complete + nearly all Batch B (objects incl. ADDOBJ_EXT/anim/`WAIT*`/sound/scream, limbo/cross-VM/walk/head pure-VM families, + the **light** & **particle** (.PLB-driven) subsystems); 4 left (GETCUSTPTCLCODE, motion TURBO/TOUR/BUMP) |
+| [T-007](T-007-vm-opcodes-rse.md) | 🟡 Feature | ⚠️ Partial | Ride VM: **103/106** — Batch A (43 pure) complete + nearly all Batch B (objects incl. ADDOBJ_EXT/anim/`WAIT*`/sound/scream, limbo/cross-VM/walk/head pure-VM families, + the **light** & **particle** (.PLB-driven) subsystems); only the 3 motion ops (TURBO/TOUR/BUMP) remain |
 | [T-008](T-008-unimplemented-formats.md) | 🟡 Feature | 🗂️ Split | Umbrella (closed): `.BF4` ✅, `.TQI/.TGQ` ✅; remainders → T-018/019/020/021/022 |
 | [T-009](T-009-build-warnings.md) | ⚪ Debt | ✅ Done | build warnings (105 → 0: nullable, Dispose, dead code) |
 | [T-010](T-010-add-sub-flags.md) | 🟠 Medium | ✅ Done | ADD/SUB don't set arithmetic flags (branch correctness) |
