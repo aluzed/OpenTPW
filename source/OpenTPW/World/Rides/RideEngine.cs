@@ -301,24 +301,59 @@ public sealed class RideEngine : IRideEngine
 	private readonly Dictionary<int, float> lastEventAt = new();
 	private const float EventDebounce = 0.5f; // ride loops re-fire EVENT each tick — don't restart too fast
 
-	// Ride event dispatch. EVENT(type, target, code): types 1 & 2 are **dedicated positioned sounds**
-	// (RE'd: dispatch FUN_005573d0 routes them to the sound funcs FUN_00521e60 / FUN_00521930), so we
-	// play sound `code` — a global sound id resolved through the verified RideSoundBank (real ride
-	// sounds, no more approximate clips). Types 3-9 use the generic effect spawn (sound OR particle) and
-	// can't be safely played as sound yet (e.g. type-3 codes 76-78 are sfUi/build clips, not ride
-	// sounds), so they're deferred. 3D positioning is also a follow-up. See T-037.
+	// Ride event dispatch. EVENT(type, target, code) — RE'd end to end (handler FUN_00552615 → dispatch
+	// FUN_005573d0): the type selects the effect kind. Types **1 & 2 are positioned SOUNDS** (sound funcs
+	// FUN_00521e60 / FUN_00521930) — `code` is a global sound id resolved through the verified
+	// RideSoundBank. Types **3-10 are PARTICLE effects** (FUN_0051bfc0(0, pool, code, pos), the same
+	// spawner as REPAIREFFECT/SPARK) — each type picks one of 7 effect pools (DAT_00803a20..3c) and `code`
+	// indexes within it; we render them through the decoded .PLB proxy (T-019). (The earlier "type 3+ are
+	// wrong sounds" note was a misread — `code` there is a particle index, never a sound id.) Both kinds
+	// are debounced so a per-tick ride loop doesn't restart the clip / spam proxies. Per-type effect-pool
+	// → exact .PLB-library mapping and 3D positioning (FUN_00556b90) remain follow-ups. See T-037.
+	/// <summary>The effect kind an EVENT type selects (RE'd from the dispatch FUN_005573d0): types 1-2 are
+	/// positioned sounds, 3-10 are particle effects, anything else is "RSSE: Unknown object type".</summary>
+	public enum EventKind { Unknown, Sound, Particle }
+
+	public static EventKind ClassifyEvent( int type ) => type switch
+	{
+		1 or 2 => EventKind.Sound,
+		>= 3 and <= 10 => EventKind.Particle,
+		_ => EventKind.Unknown
+	};
+
 	public void Event( int type, int p1, int p2 )
 	{
-		if ( type is not (1 or 2) )
-			return;
-		var track = SoundRegistry?.Resolve( p2 );
+		switch ( ClassifyEvent( type ) )
+		{
+			case EventKind.Sound:
+				PlayEventSound( type, p2 );
+				break;
+			case EventKind.Particle:
+				if ( !EventDebounced( $"fx{type}:{p2}" ) )
+					SpawnParticleEffect( p2 );
+				break;
+		}
+	}
+
+	private void PlayEventSound( int type, int code )
+	{
+		var track = SoundRegistry?.Resolve( code );
 		if ( track == null )
 			return;
-		if ( Time.Now - lastEventAt.GetValueOrDefault( p2, float.NegativeInfinity ) < EventDebounce )
+		if ( EventDebounced( $"snd:{code}" ) )
 			return;
-		lastEventAt[p2] = Time.Now;
 		Audio.PlaySfx( $"ev_{track.Name}", track.SoundData );
-		Log.Trace( $"[ride] EVENT t{type} code={p2} -> {track.Name}" );
+		Log.Trace( $"[ride] EVENT t{type} code={code} -> {track.Name}" );
+	}
+
+	// True if this event key fired within the debounce window (and refreshes it when it hasn't).
+	private bool EventDebounced( string key )
+	{
+		var k = key.GetHashCode();
+		if ( Time.Now - lastEventAt.GetValueOrDefault( k, float.NegativeInfinity ) < EventDebounce )
+			return true;
+		lastEventAt[k] = Time.Now;
+		return false;
 	}
 
 	// The ride sound registry (global sound ids → samples), built once from the rides BANK catalog.
@@ -374,6 +409,13 @@ public sealed class RideEngine : IRideEngine
 	public void SpawnParticleEffect( int effectCode )
 	{
 		var (name, r, g, b) = ResolveEffectColour( effectCode );
+		if ( name == "?" )
+		{
+			// Code outside the decoded Tp2.plb (e.g. a per-ride custom/other-pool effect we don't have) —
+			// don't render a meaningless white proxy; just record it. See T-037 (per-type pool mapping).
+			Log.Trace( $"[ride] particle effect {effectCode} (unresolved)" );
+			return;
+		}
 		try
 		{
 			var mat = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader",

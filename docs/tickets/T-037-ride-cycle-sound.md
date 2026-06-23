@@ -2,8 +2,10 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine / reverse engineering
-- **Status**: ⚠️ Wrong-sound bugs fixed; correct per-cue SFX pending the EVENT/EventMap binding. The
-  duration half is done (ride duration comes from the running-animation length). See "Done" / "Remaining".
+- **Status**: ⚠️ Mostly done — wrong-sound bugs fixed; the **global sound registry** is decoded and
+  `EVENT` is wired end to end (types 1-2 = real positioned sounds, types 3-10 = authentic `.PLB` particle
+  effects). Ride duration comes from the running-animation length. Remaining: per-pool `.PLB` mapping,
+  `COAST`/`BUMP`/`ADDOBJ` residue, and 3D positioning. See "Done" / "Remaining".
 - **Related**: [T-034](T-034-peeps.md), [T-016](T-016-map-entry-records.md), [T-031](T-031-game-audio.md).
 
 ## Context
@@ -63,17 +65,35 @@ The full chain that plays a ride's *intended* sound, decoded end to end:
 - **`EVENT` plays the ride's real sounds.** Types **1 & 2** are dedicated positioned sounds (RE'd:
   dispatch `FUN_005573d0` → `FUN_00521e60` / `FUN_00521930`); the engine resolves their `code` through
   the registry and plays it (e.g. a coaster's `nl_creak` track creak), debounced so a looped event
-  doesn't restart the clip every tick. **Types 3-9** use the generic effect spawn (sound *or* particle)
-  and resolve unreliably (type-3 codes 76-78 are `sfUi`/build clips, not ride sounds), so they're
-  deferred rather than risk wrong sounds. Verified in-game: only correct sounds (creaks), 0
+  doesn't restart the clip every tick. Verified in-game: `EVENT t2 code=22 -> nl_creak_5.mp2`, 0
   `Backfire`/`Crunch`/`bomb`/`goldticket`.
+
+## Done (EVENT types 3-10 = particle effects)
+
+- **The whole EVENT type switch decoded** (`FUN_005573d0`): types **1-2 are sounds**, types **3-10 are
+  particle effects** — each calls the particle spawner `FUN_0051bfc0(0, pool, code, pos)` (the same
+  spawner as `REPAIREFFECT`/`SPARK`/`ADDOBJ_EXT`), where the type picks one of **7 effect pools**
+  (`DAT_00803a20..3c`) and `code` (the EVENT `p2`) indexes within it; type 10 is a custom-effect handle.
+  This corrected an earlier misread: the type-3 codes 76-78 the old note called "wrong sounds" are in
+  fact the **`Destroy2`/`Destroy3`/`Destroy4` particle effects** — `code` there is a particle index, never
+  a sound id.
+- **Wired through the decoded `.PLB` proxy** (T-019): `RideEngine.Event` now classifies the type
+  (`ClassifyEvent` — Sound / Particle / Unknown) and routes types 3-10 to `SpawnParticleEffect(code)`,
+  debounced per `(type,code)`. A code outside the decoded `Tp2.plb` (a per-ride/other-pool effect we
+  don't have, e.g. 219/220) is skipped rather than drawn as a meaningless white proxy.
+- Verified in-game (`OPENTPW_AUTOPLACE`): real jungle rides fire EVENT **type 3** + types 1/2 only; the
+  type-3 effects render their authentic cues — `Fire`/`Sparks`/`Destroy2-4`/`LaserFWexplode`/`FirePuff` —
+  with no exceptions and no wrong-sound clips. Unit-tested by `RideEngineTests.EventTypeClassification`.
 
 ## Remaining work
 
-- **`EVENT` types 3-9 + `EventMap`/`COAST`/`BUMP` + `ADDOBJ` sounds**: wire these through the registry
-  once each opcode's sound semantics are RE'd (the type-3+ pools, and which `COAST`/`BUMP` subcommand
-  plays which `VAR_EVT` slot). The id→file half is now solved; this is the per-trigger half.
-- **3D positioning** (`FUN_00556b90`) and the particle pools are further stages of the effects engine.
+- **Per-type effect-pool → exact `.PLB`-library mapping**: the 7 pools (`DAT_00803a20..3c`) are distinct
+  effect sets; we currently index them all into `Tp2.plb` (correct for the common type-3 codes, but
+  out-of-range codes like 219/220 belong to another pool/library not yet decoded).
+- **`COAST`/`BUMP` + `ADDOBJ` sounds**: the car-object opcodes' internal sound triggers (their scripts
+  mostly drive audio via `EVENT`, so this is a smaller residue).
+- **3D positioning** (`FUN_00556b90`) — effects currently fire at the ride origin; per-node placement
+  needs the ride's particle/sound-node geometry (the same gap as walk/head nodes).
 
 ## Acceptance criteria
 

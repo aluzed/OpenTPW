@@ -200,6 +200,19 @@ public class RideEngineTests
 	}
 
 	[TestMethod]
+	public void EventTypeClassification()
+	{
+		// RE'd from the EVENT dispatch (FUN_005573d0): types 1-2 are positioned sounds, 3-10 are particle
+		// effects, the rest are "unknown object type". This is the core of the T-037 EVENT decode.
+		Assert.AreEqual( RideEngine.EventKind.Sound, RideEngine.ClassifyEvent( 1 ) );
+		Assert.AreEqual( RideEngine.EventKind.Sound, RideEngine.ClassifyEvent( 2 ) );
+		foreach ( var t in new[] { 3, 4, 5, 6, 7, 8, 9, 10 } )
+			Assert.AreEqual( RideEngine.EventKind.Particle, RideEngine.ClassifyEvent( t ), $"type {t}" );
+		Assert.AreEqual( RideEngine.EventKind.Unknown, RideEngine.ClassifyEvent( 0 ) );
+		Assert.AreEqual( RideEngine.EventKind.Unknown, RideEngine.ClassifyEvent( 11 ) );
+	}
+
+	[TestMethod]
 	public void EffectOpcodesRouteToEngine()
 	{
 		var vm = NewVm();
