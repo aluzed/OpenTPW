@@ -173,6 +173,25 @@ public sealed class RideEngine : IRideEngine
 			Entity.All.Remove( entity );
 	}
 
+	/// <summary>Tear down everything this engine spawned — the ride body + all script objects, plus the
+	/// light and particle-effect proxies — when the ride is sold/demolished (T-041).</summary>
+	public void Despawn()
+	{
+		foreach ( var obj in objects.Values )
+			foreach ( var (entity, _, _, _) in obj.Parts )
+				Entity.All.Remove( entity );
+		objects.Clear();
+
+		foreach ( var light in lights.Values )
+			if ( light.Proxy != null )
+				Entity.All.Remove( light.Proxy );
+		lights.Clear();
+
+		foreach ( var (entity, _) in particleProxies )
+			Entity.All.Remove( entity );
+		particleProxies.Clear();
+	}
+
 	public void SetObjectParam( int id, int param, int value )
 	{
 		if ( objects.TryGetValue( id, out var obj ) )

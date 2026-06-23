@@ -75,7 +75,9 @@ public class Level
 		// left-click places it, charging its cost). Rides register their queue so peeps can use them.
 		parkQueues = new List<RideQueue>();
 		var catalog = BuildCatalog();
-		_ = new BuildMode( grid, terrain, catalog, ( item, tx, ty ) => CommitPlacement( item, grid, terrain, tx, ty ) );
+		_ = new BuildMode( grid, terrain, catalog,
+			( item, tx, ty ) => CommitPlacement( item, grid, terrain, tx, ty ),
+			ride => DemolishRide( ride, grid ) );
 
 		// Diagnostic: deterministically exercise the placement pipeline (the same path a click commits).
 		if ( Environment.GetEnvironmentVariable( "OPENTPW_AUTOPLACE" ) != null )
@@ -145,6 +147,20 @@ public class Level
 				// ADDOBJ_EXT with a particle type (4) + effect code 11 (Fire) — proves the extended object
 				// spawn routes particle types through the .PLB system (T-007).
 				v.CallOpcodeHandler( Opcode.ADDOBJ_EXT, Lit( 4 ), Lit( 0 ), Lit( 11 ), Lit( 100 ), Lit( 0 ) );
+			}
+
+			// Exercise sell/demolish (T-041): tear down the shop and confirm the refund + entity cleanup.
+			var toSell = Entity.All.OfType<Ride>().LastOrDefault();
+			if ( toSell != null )
+			{
+				int ridesBefore = Entity.All.Count( e => e is Ride );
+				int queuesBefore = parkQueues.Count;
+				float moneyBefore = ParkFinances.Current?.Money ?? 0f;
+				DemolishRide( toSell, grid );
+				int ridesAfter = Entity.All.Count( e => e is Ride );
+				float refund = ParkFinances.Current?.Money - moneyBefore ?? 0f;
+				Log.Info( $"[build] sell-test {toSell.Name}: rides {ridesBefore}->{ridesAfter}, "
+					+ $"queues {queuesBefore}->{parkQueues.Count}, refund {refund:0}" );
 			}
 		}
 
@@ -217,7 +233,7 @@ public class Level
 
 		bool ok = item.RidePath == null
 			? SpawnShopAt( terrain, grid, tx, ty, item.Name == "drink" ? ShopKind.Drink : ShopKind.Food )
-			: SpawnRideAt( item.RidePath, grid, terrain, tx, ty );
+			: SpawnRideAt( item.RidePath, grid, terrain, tx, ty, item.Cost );
 
 		if ( !ok )
 		{
@@ -228,9 +244,25 @@ public class Level
 		return true;
 	}
 
+	// Sell/demolish a placed ride (T-041): drop its queue so peeps stop targeting it, free its footprint +
+	// queue-path grid cells, refund part of the build cost, and tear down all its entities. The grid lives
+	// in SetupDevPark, so this is wired as the BuildMode demolish callback.
+	private static void DemolishRide( Ride ride, PlacementGrid grid )
+	{
+		parkQueues.RemoveAll( q => q.Ride == ride );
+		grid.Clear( ride.TileX, ride.TileY, ride.TileW, ride.TileH );
+		foreach ( var (cx, cy) in ride.QueuePathCells )
+			grid.Clear( cx, cy, 1, 1 );
+
+		var refund = ride.BuildCost * Ride.SellRefundFraction;
+		ParkFinances.Current?.RefundBuild( refund );
+		ride.Despawn();
+		Log.Info( $"[build] sold {ride.Name} for ${refund:0} (built ${ride.BuildCost:0})" );
+	}
+
 	// Spawns a ride on its (already reserved) footprint: model, entrance/exit markers, queue path, and
 	// registers its RideQueue so peeps can ride it. Starts idle (occupancy drives the animation).
-	private static bool SpawnRideAt( string path, PlacementGrid grid, ParkTerrain terrain, int tx, int ty )
+	private static bool SpawnRideAt( string path, PlacementGrid grid, ParkTerrain terrain, int tx, int ty, float cost )
 	{
 		try
 		{
@@ -238,6 +270,7 @@ public class Level
 				RideShape.Load( path, Path.GetFileName( path ) ).Height );
 			var ride = new Ride( path, w.WithZ( terrain.SampleHeight( w.X, w.Y ) ) );
 			ride.SetActive( false );
+			ride.BuildCost = cost; // remembered for the sell refund (T-041)
 			ride.TileX = tx; ride.TileY = ty; ride.TileW = ride.Shape.Width; ride.TileH = ride.Shape.Height;
 			PlaceEntranceExitMarkers( ride, grid, terrain, tx, ty );
 			var waypoints = SpawnQueuePath( ride, grid, terrain, tx, ty );
@@ -269,12 +302,12 @@ public class Level
 		if ( ride.Shape.Entrance is { } e )
 		{
 			var p = grid.PointToWorld( tx + e.X + ride.EntryStandPos.X, ty + e.Y + ride.EntryStandPos.Y );
-			SpawnMarker( p.WithZ( terrain.SampleHeight( p.X, p.Y ) + 2f ), 40, 220, 60 );
+			ride.OwnedEntities.Add( SpawnMarker( p.WithZ( terrain.SampleHeight( p.X, p.Y ) + 2f ), 40, 220, 60 ) );
 		}
 		if ( ride.Shape.Exit is { } x )
 		{
 			var p = grid.PointToWorld( tx + x.X + ride.ExitAppearPos.X, ty + x.Y + ride.ExitAppearPos.Y );
-			SpawnMarker( p.WithZ( terrain.SampleHeight( p.X, p.Y ) + 2f ), 230, 40, 40 );
+			ride.OwnedEntities.Add( SpawnMarker( p.WithZ( terrain.SampleHeight( p.X, p.Y ) + 2f ), 230, 40, 40 ) );
 		}
 	}
 
@@ -309,15 +342,16 @@ public class Level
 			if ( !grid.TryPlace( cx, cy, 1, 1 ) )
 				break; // ran off the grid or hit another object
 			grid.MarkPath( cx, cy ); // reserved against placement, but peeps may walk it (T-036)
+			ride.QueuePathCells.Add( (cx, cy) ); // freed on sell/demolish (T-041)
 
 			var w = OnGround( grid.TileToWorld( cx, cy ) );
 			laid.Add( w );
-			_ = new ModelEntity
+			ride.OwnedEntities.Add( new ModelEntity
 			{
 				Model = Primitives.Plane.GenerateModel( material ),
 				Position = w.WithZ( w.Z + 0.15f ),
 				Scale = new Vector3( grid.TileSize / 2f ),
-			};
+			} );
 		}
 
 		// Walk order: outer end → inner tiles → the entrance stand point.
@@ -336,11 +370,11 @@ public class Level
 		return Texture.Missing;
 	}
 
-	private static void SpawnMarker( Vector3 position, byte r, byte g, byte b )
+	private static ModelEntity SpawnMarker( Vector3 position, byte r, byte g, byte b )
 	{
 		var material = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader" );
 		material.Set( "Color", new Texture( [r, g, b, 255], 1, 1 ) );
-		_ = new ModelEntity { Model = Primitives.Cube.GenerateModel( material ), Position = position, Scale = new Vector3( 4f ) };
+		return new ModelEntity { Model = Primitives.Cube.GenerateModel( material ), Position = position, Scale = new Vector3( 4f ) };
 	}
 
 	private void SetupHud()

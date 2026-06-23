@@ -40,12 +40,26 @@
   monkey + shop placed, money debited by exactly their costs (3250+2000+500), 2 queues registered,
   peeps queue/ride/eat. Interactive select+preview+click dispatch verified via T-040.
 
+## Done (sell / demolish)
+
+- **Sell/demolish a ride** — select it (Default-tool click) then the **SELL** button (`ManagePanel`, shows
+  the refund) or **Delete**. `Ride.Despawn()` tears down everything it owns: engine objects + light/particle
+  proxies (`RideEngine.Despawn`), entrance/exit markers + queue-path quads (`Ride.OwnedEntities`), and the
+  coaster track/train (`Ride.Track.Despawn` — pylons, ribbon, cars). `Level.DemolishRide` drops its
+  `RideQueue` from the park list (peeps stop targeting it), frees its footprint **and** queue-path grid
+  cells, and **refunds** `Ride.SellRefundFraction` (50%) of the build cost. `BuildMode.SellSelected`
+  clears the selection (and any active track-laying ref). Verified via `OPENTPW_AUTOPLACE`: demolishing
+  the **coaster** (track + train + queue) gave `rides 3→2, queues 3→2, refund 5000` (of 10000), no
+  exceptions.
+- Note: peeps already en route to a sold ride hold its `RideQueue` and finish/re-route gracefully (the
+  queue object lives until they drop it); shops aren't sellable yet (they aren't selectable — follow-up).
+
 ## Remaining (follow-up)
 
 - **Rotation** (`ACTION_SET_RIDE_ROTATION`): needs rotating the ride's mesh parts about the placement
   centre + rotating the footprint/entrance — deferred.
-- **Sell / demolish**: needs ride teardown (despawn parts, remove queue, clear cells, refund) — a
-  tile→object map + `Ride` teardown, deferred.
+- **Shop sell**: shops aren't selectable yet (the Default tool only picks rides) — wire shop selection
+  then route it through the same teardown.
 
 ## Context
 

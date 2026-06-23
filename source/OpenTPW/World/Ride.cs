@@ -119,6 +119,38 @@ public class Ride : Entity
 	/// <see cref="CoasterTrack"/>). A boarding peep rides it in view instead of being hidden (T-045 3b).</summary>
 	public CoasterTrain? Train { get; internal set; }
 
+	/// <summary>The coaster track laid for this ride, if any (set by <see cref="CoasterTrack"/>) — torn
+	/// down with the ride on sell/demolish.</summary>
+	public CoasterTrack? Track { get; internal set; }
+
+	/// <summary>What the player paid to build this ride — used to compute the sell refund (T-041).</summary>
+	public float BuildCost { get; set; }
+
+	/// <summary>Fraction of <see cref="BuildCost"/> refunded when the ride is sold/demolished.</summary>
+	public const float SellRefundFraction = 0.5f;
+
+	/// <summary>Extra entities this ride spawned outside the engine (entrance/exit markers, queue-path
+	/// quads) so they can be removed on sell/demolish. Populated by the placement code.</summary>
+	public List<ModelEntity> OwnedEntities { get; } = new();
+
+	/// <summary>The grid cells this ride's queue path reserved — freed on sell/demolish (T-041).</summary>
+	public List<(int X, int Y)> QueuePathCells { get; } = new();
+
+	/// <summary>Tear the ride out of the world: stop its VM, despawn its engine objects + light/particle
+	/// proxies, its markers + queue quads, its coaster track/train, and unregister it. Grid cells, the
+	/// <see cref="RideQueue"/> and the refund are handled by the caller (it owns the grid + queue list).</summary>
+	public void Despawn()
+	{
+		if ( VM != null )
+			VM.IsRunning = false;
+		engine.Despawn();
+		Track?.Despawn();           // coaster: pylons + ribbon + train (no-op if none)
+		foreach ( var e in OwnedEntities )
+			Entity.All.Remove( e );
+		OwnedEntities.Clear();
+		Entity.All.Remove( this );
+	}
+
 	/// <summary>Run (true) or idle (false) the ride's animation — driven by occupancy (see RideQueue / Peep).</summary>
 	public void SetActive( bool active ) => engine.SetActive( active );
 

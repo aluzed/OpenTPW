@@ -65,6 +65,7 @@ public sealed class CoasterTrack
 		// The train hides itself until at least one segment is laid (path has < 2 points).
 		train = new CoasterTrain( this, grid.TileSize, coaster.Archive );
 		coaster.Train = train; // peeps boarding this coaster ride the train in view (T-045 3b)
+		coaster.Track = this;  // so selling the coaster tears the track down too (T-041)
 	}
 
 	/// <summary>The track centre-line as elevated world points (one per laid tile) — the raw control path.</summary>

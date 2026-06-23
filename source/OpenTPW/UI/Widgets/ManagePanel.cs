@@ -32,7 +32,7 @@ internal sealed class ManagePanel : HudPanel
 			Current = null;
 	}
 
-	private static Rectangle PanelBounds() => new( 12f, 14f, 408f, 76f );
+	private static Rectangle PanelBounds() => new( 12f, 14f, 460f, 76f );
 
 	public bool ContainsMouse()
 		=> BuildMode.Current != null && ParkFinances.Current != null && Contains( PanelBounds(), MouseBase() );
@@ -64,6 +64,9 @@ internal sealed class ManagePanel : HudPanel
 			list.Add( new Btn( new Rectangle( 84f, RideY, 88f, BtnH ), $"PRICE+ {ride.TicketPrice:0}", true,
 				() => ride.TicketPrice += 1f ) );
 			list.Add( ResearchButton( fin, ride ) );
+			list.Add( new Btn( new Rectangle( 350f, RideY, 116f, BtnH ),
+				$"SELL ${ride.BuildCost * Ride.SellRefundFraction:0}", true,
+				() => BuildMode.Current?.SellSelected(), Warned: true ) );
 		}
 		return list;
 	}

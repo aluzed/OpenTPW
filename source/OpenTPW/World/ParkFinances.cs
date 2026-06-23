@@ -40,6 +40,13 @@ public sealed class ParkFinances
 		BuildSpent += amount;
 	}
 
+	/// <summary>Refund part of a build cost when a ride/shop is sold (credits the balance back).</summary>
+	public void RefundBuild( float amount )
+	{
+		Money += amount;
+		BuildSpent -= amount;
+	}
+
 	// ── Loans (T-042) ───────────────────────────────────────────────────────────────────────────
 	/// <summary>A bank loan offer: principal in, repaid (with APR) over 12 monthly instalments.</summary>
 	public sealed class Loan

@@ -27,6 +27,7 @@ public sealed class BuildMode : Entity
 	private readonly PlacementGrid grid;
 	private readonly ParkTerrain terrain;
 	private readonly Func<BuildCatalogItem, int, int, bool> commit;
+	private readonly Action<Ride> demolish;
 	private readonly ModelEntity highlight;
 	private readonly Material<ObjectUniformBuffer> mat;
 	private readonly Texture yellow = new( [255, 235, 40, 110], 1, 1 );
@@ -47,12 +48,25 @@ public sealed class BuildMode : Entity
 
 	public (int X, int Y)? HoveredTile { get; private set; }
 
+	/// <summary>Sell/demolish the selected ride: refunds part of its cost and tears it out of the park
+	/// (T-041). No-op if no ride is selected. Exposed for the manage UI + the Delete shortcut.</summary>
+	public void SellSelected()
+	{
+		if ( SelectedRide is not { } ride )
+			return;
+		if ( track?.Coaster == ride )
+			track = null; // the coaster's track is owned by the ride; Ride.Despawn tears it down
+		demolish( ride );
+		SelectedRide = null;
+	}
+
 	public BuildMode( PlacementGrid grid, ParkTerrain terrain, IReadOnlyList<BuildCatalogItem> catalog,
-		Func<BuildCatalogItem, int, int, bool> commit )
+		Func<BuildCatalogItem, int, int, bool> commit, Action<Ride> demolish )
 	{
 		this.grid = grid;
 		this.terrain = terrain;
 		this.commit = commit;
+		this.demolish = demolish;
 		Catalog = catalog;
 		Current = this;
 
@@ -153,6 +167,7 @@ public sealed class BuildMode : Entity
 					fin.PayBuild( sel.NextUpgradeCost );
 					sel.ApplyUpgrade();
 				}
+				if ( Hit( Key.Delete ) ) SellSelected(); // sell/demolish the selected ride (T-041)
 			}
 			// Loans: take / repay the small loan.
 			if ( Hit( Key.L ) ) fin.TakeLoan( 0 );
