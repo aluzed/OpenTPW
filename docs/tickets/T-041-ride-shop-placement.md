@@ -11,7 +11,14 @@
 ## Done
 
 - **Catalog** (`BuildCatalogItem`): the jungle rides (footprint from `RideShape`, **cost read from the
-  `.sam`** `Upgrades[0].CostOfUpgrade`) + a food shop; shown in the HUD palette (number keys pick).
+  `.sam`** `Upgrades[0].CostOfUpgrade`) + a food shop.
+- **Clickable catalog UI** (`UI/Widgets/BuildPanel.cs`, T-038): a right-side column of buttons, one per
+  catalog item, that **selects on click** — so every item is mouse-reachable (the old number-key list
+  capped at 1–9; the added drink stall had pushed `researcher` past key 9). The selected item is
+  highlighted green, items the park can't afford are dimmed red, and clicking the selected item toggles it
+  off. `BuildMode` consults `BuildPanel.ContainsMouse()` so a click on the panel doesn't also act on the
+  tile behind it. Number keys still work. `ParkStatsPanel` no longer duplicates the list (shows a
+  "PLACING: …" hint instead). Verified in-game: all 10 items render + are selectable; no exceptions.
 - **Footprint preview**: the selected item's `Width×Height` quad follows the cursor, **green** when
   `grid.CanPlace` & affordable, **red** otherwise.
 - **Commit** (`CommitPlacement` → `SpawnRideAt`/`SpawnShopAt`): validates + `TryPlace`, spawns the

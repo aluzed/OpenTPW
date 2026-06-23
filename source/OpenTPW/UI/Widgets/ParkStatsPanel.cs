@@ -70,14 +70,12 @@ internal sealed class ParkStatsPanel : Panel
 					lines.Add( "  (max upgrade level)" );
 			}
 
-			lines.Add( "" );
-			lines.Add( "BUILD (1-N pick, click place, 0/Esc cancel):" );
-			for ( int i = 0; i < build.Catalog.Count; i++ )
-			{
-				var it = build.Catalog[i];
-				string mark = build.Selected == i ? ">" : " ";
-				lines.Add( $"{mark}[{i + 1}] {it.Name} ${it.Cost:0}" );
-			}
+			// The catalog itself is the clickable BuildPanel (right side); here just a hint + the
+			// selected item, so the two panels don't duplicate the whole list.
+			if ( build.Selected >= 0 && build.Selected < build.Catalog.Count )
+				lines.Add( $"PLACING: {build.Catalog[build.Selected].Name} (click a tile, Esc cancel)" );
+			else
+				lines.Add( "BUILD: pick an item on the right -->" );
 		}
 
 		for ( int i = 0; i < lines.Count; i++ )

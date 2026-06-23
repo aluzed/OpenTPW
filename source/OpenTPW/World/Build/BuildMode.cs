@@ -40,6 +40,11 @@ public sealed class BuildMode : Entity
 	/// <summary>Index of the selected catalog item, or -1 when no placement tool is active.</summary>
 	public int Selected { get; private set; } = -1;
 
+	/// <summary>Select catalog item <paramref name="index"/> (or clear with any out-of-range value, e.g. -1).
+	/// Clicking the already-selected item toggles it off. Used by the clickable build UI (T-038).</summary>
+	public void SelectIndex( int index )
+		=> Selected = (index >= 0 && index < Catalog.Count && index != Selected) ? index : -1;
+
 	public (int X, int Y)? HoveredTile { get; private set; }
 
 	public BuildMode( PlacementGrid grid, ParkTerrain terrain, IReadOnlyList<BuildCatalogItem> catalog,
@@ -60,6 +65,14 @@ public sealed class BuildMode : Entity
 	protected override void OnUpdate()
 	{
 		HandleSelectionKeys();
+
+		// While the cursor is over the build UI, don't interact with the world (the panel owns the click —
+		// otherwise selecting a catalog button would also place/select on the tile behind it). T-038.
+		if ( BuildPanel.Current?.ContainsMouse() == true )
+		{
+			highlight.Position = Offscreen;
+			return;
+		}
 
 		if ( !TryPickGround( out var hit ) )
 		{
