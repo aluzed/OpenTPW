@@ -10,6 +10,28 @@ public partial class ModelFile : BaseFormat
 {
 	public List<Mesh> Meshes { get; private set; } = null!;
 
+	/// <summary>
+	/// The model's node graph (T-048): named attachment points the ride VM addresses by type + id —
+	/// walk nodes (WALKON), head nodes (ADDHEAD), car/track nodes (TOUR/BUMP/COAST) and sound/particle
+	/// nodes (EVENT). RE'd from the loader + the runtime resolver <c>FUN_0044b220</c>: count = <c>u16</c>
+	/// at header 0x48, table = <c>u32</c> file offset at header 0x7c, 0x14 bytes/node. The VM resolves a
+	/// node by <c>(TypeMask &amp; selector) != 0 &amp;&amp; NodeId == requested</c>. <see cref="Node.TypeMask"/>
+	/// is a bitfield of which subsystems may use the node. (The per-node transform pointers are null in the
+	/// file — node world positions bind to bone transforms at runtime, a follow-up; see docs/tickets/T-048.)
+	/// </summary>
+	public List<Node> Nodes { get; } = new();
+
+	public readonly struct Node
+	{
+		/// <summary>Bitfield of node types/subsystems that may address this node (matched against the
+		/// resolver's selector). E.g. coaster track nodes carry the high car/track bits.</summary>
+		public uint TypeMask { get; init; }
+		/// <summary>The node's id within its type (the VM's node argument).</summary>
+		public int NodeId { get; init; }
+		/// <summary>The node entry's third word (0 on every shipped sample seen).</summary>
+		public uint Extra { get; init; }
+	}
+
 	// The .MD2 format version this parser supports (header fields at offsets 4 and 8). The
 	// original loader accepts only these values; the legacy static variant (GARROW.MD2 / RARROW.MD2 =
 	// 0x18/0x17) has its own packed header, decoded by ReadLegacyStatic. See docs/tickets/T-015.
@@ -377,7 +399,53 @@ public partial class ModelFile : BaseFormat
 
 				CalculateNormals( mesh );
 			}
+
+			ReadNodeTable( reader, fileLength );
 		}
+	}
+
+	// Reads the node graph from the full file bytes (parsing delegates to the testable ParseNodeTable).
+	private void ReadNodeTable( BinaryReader reader, long fileLength )
+	{
+		Nodes.Clear();
+		reader.BaseStream.Seek( 0, SeekOrigin.Begin );
+		var data = new byte[fileLength];
+		var read = 0;
+		while ( read < data.Length )
+		{
+			int n = reader.BaseStream.Read( data, read, data.Length - read );
+			if ( n <= 0 ) break;
+			read += n;
+		}
+		Nodes.AddRange( ParseNodeTable( data ) );
+	}
+
+	/// <summary>
+	/// Parses the node table from a full <c>.MD2</c> byte buffer (T-048): count = <c>u16</c> at 0x48,
+	/// table file offset = <c>u32</c> at 0x7c, 0x14 bytes/node <c>{u32 typeMask, u32 nodeId, u32 extra,
+	/// u32 ptrA, u32 ptrB}</c>. <c>ptrA/ptrB</c> are file-relative (relocated at runtime) and null in
+	/// shipped models, so only type+id+extra are taken. Returns an empty list if absent/implausible.
+	/// </summary>
+	public static List<Node> ParseNodeTable( byte[] data )
+	{
+		var nodes = new List<Node>();
+		if ( data.Length < 0x80 )
+			return nodes;
+
+		int U16( int o ) => data[o] | data[o + 1] << 8;
+		uint U32( int o ) => (uint)(data[o] | data[o + 1] << 8 | data[o + 2] << 16 | data[o + 3] << 24);
+
+		int count = U16( 0x48 );
+		uint tablePtr = U32( 0x7c );
+		if ( count <= 0 || count > 4096 || tablePtr == 0 || tablePtr + (long)count * 0x14 > data.Length )
+			return nodes;
+
+		for ( int i = 0; i < count; i++ )
+		{
+			int e = (int)tablePtr + i * 0x14;
+			nodes.Add( new Node { TypeMask = U32( e ), NodeId = (int)U32( e + 4 ), Extra = U32( e + 8 ) } );
+		}
+		return nodes;
 	}
 
 	/// <summary>

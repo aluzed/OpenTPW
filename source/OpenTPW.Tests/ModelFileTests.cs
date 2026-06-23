@@ -99,6 +99,33 @@ public class ModelFileTests
 		Assert.ThrowsExactly<InvalidDataException>( () => new ModelFile( stream ) );
 	}
 
+	// The node graph (T-048): count u16 @ 0x48, table file-offset u32 @ 0x7c, 0x14 bytes/node
+	// {u32 typeMask, u32 nodeId, u32 extra, ...}. Mirrors the real ride models (Bird.MD2 = 11 nodes, etc.).
+	[TestMethod]
+	public void ParsesNodeTable()
+	{
+		const int tableOff = 0x90;
+		var d = new byte[tableOff + 2 * 0x14];
+		void U16( int o, ushort v ) => BinaryPrimitives.WriteUInt16LittleEndian( d.AsSpan( o, 2 ), v );
+		void U32( int o, uint v ) => BinaryPrimitives.WriteUInt32LittleEndian( d.AsSpan( o, 4 ), v );
+
+		U16( 0x48, 2 );              // node count
+		U32( 0x7c, tableOff );       // node table file offset
+		// node 0: a walk-ish node (type 0xB1, id 9); node 1: a coaster car/track node (type 0x811, id 2)
+		U32( tableOff + 0, 0xB1 ); U32( tableOff + 4, 9 ); U32( tableOff + 8, 0 );
+		U32( tableOff + 0x14 + 0, 0x811 ); U32( tableOff + 0x14 + 4, 2 ); U32( tableOff + 0x14 + 8, 0 );
+
+		var nodes = ModelFile.ParseNodeTable( d );
+		Assert.AreEqual( 2, nodes.Count );
+		Assert.AreEqual( 0xB1u, nodes[0].TypeMask );
+		Assert.AreEqual( 9, nodes[0].NodeId );
+		Assert.AreEqual( 0x811u, nodes[1].TypeMask );
+		Assert.AreEqual( 2, nodes[1].NodeId );
+
+		// Absent / implausible table → empty (not a throw).
+		Assert.AreEqual( 0, ModelFile.ParseNodeTable( new byte[0x80] ).Count );
+	}
+
 	// Optional validation of the .MD2 parser against a real model. Set TPW_MODEL_SAMPLE.
 	[TestMethod]
 	public void ParsesRealModelSample()

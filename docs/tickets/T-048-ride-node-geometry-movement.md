@@ -2,7 +2,10 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine / reverse engineering
-- **Status**: ☐ To do
+- **Status**: ⚠️ Partial — the **node graph is decoded structurally** (type + id per node, exposed in
+  `ModelFile.Nodes`, unit-tested + confirmed on real ride models). Node **world positions** bind to bone
+  transforms at runtime (not stored in the node entry), which is the remaining decode; the visual
+  consumer work (car paths / WALKON / ADDHEAD placement) then follows and needs the renderer.
 - **Parent**: [T-032](T-032-ride-engine.md) (ride engine — this is the "node geometry" tail).
 - **Related**: [T-007](T-007-vm-opcodes-rse.md) (WALKON/ADDHEAD/TOUR/BUMP), [T-047](T-047-ride-event-3d-sound-particle-pools.md).
 
@@ -27,10 +30,38 @@ nodes) isn't decoded. Today:
    nodes.
 3. Feed the node positions to T-047's 3D effect placement.
 
+## Done (node table decoded — Ghidra + ModelFile)
+
+RE'd the node graph from the MD2 loader + the runtime resolver `FUN_0044b220` / the EVENT positioner
+`FUN_00556b90`:
+
+- **File layout**: node **count** = `u16` at header **0x48**, node **table** = `u32` file offset at
+  header **0x7c**, **0x14 bytes/node** = `{u32 typeMask, u32 nodeId, u32 extra, u32 ptrA(reloc @+0xc),
+  u32 ptrB(reloc @+0x10)}`. Decoded in `ModelFile.ParseNodeTable` → `ModelFile.Nodes` (unit-tested,
+  `ModelFileTests.ParsesNodeTable`).
+- **Resolution**: the VM finds a node by `(TypeMask & selector) != 0 && NodeId == requested`
+  (`FUN_0044b220`; `0x3da1f83` is the all-types mask). So `TypeMask` is a **bitfield of which subsystems
+  may address the node** and `selector` is the requesting opcode's node-type. Confirmed on real models:
+  `Bird.MD2` (tour ride) = 11 nodes — one `0x131`, nine `0xB1` (ids 1-9, the car/seat ring), one `0x1031`;
+  `gokarts` = 3; `coaster1` = 9 incl. four `0x811` + several `0x*400031` (the high car/track bits).
+- **Positions** are NOT in the node entry — `ptrA/ptrB` are **null in every shipped model**; at runtime the
+  node binds to a **bone transform** and the position is that matrix's translation row (`FUN_00556b90`
+  reads `transform+0x30/0x34/0x38`, direction at `+0x20/0x24/0x28`).
+
+## Remaining
+
+1. **Decode the bone/skeleton transforms** and the node→bone binding so each node yields a world position
+   (the file's per-frame/bone data — overlaps the T-033 keyframe work). This unblocks everything below.
+2. Label the `TypeMask` bits precisely (trace each opcode's selector: WALKON / ADDHEAD / TOUR/BUMP/COAST /
+   EVENT) so node *kind* is named, not just a raw mask.
+3. Apply: drive `RideVehicle` / the coaster train along the authored car/track nodes; place WALKON peeps
+   and ADDHEAD heads at their nodes; feed positions to T-047. (Visual — needs the renderer.)
+
 ## Acceptance criteria
 
 - A tour ride's car follows the ride's authored path; a walking peep (WALKON) glides between the ride's
-  real walk nodes; heads (ADDHEAD) appear at head nodes.
+  real walk nodes; heads (ADDHEAD) appear at head nodes. *(Foundational node-table decode done; the above
+  await the bone-transform decode + a working renderer to verify.)*
 
 ## Affected files
 
