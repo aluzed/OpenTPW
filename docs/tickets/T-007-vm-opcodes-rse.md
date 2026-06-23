@@ -2,12 +2,12 @@
 
 - **Priority**: 🟡 Feature (core of ride gameplay)
 - **Type**: Feature / reverse engineering
-- **Status**: ⚠️ **Partial — 101 / 106 opcodes.** The `.RSE` loader / disassembler is restored and
+- **Status**: ⚠️ **Partial — 102 / 106 opcodes.** The `.RSE` loader / disassembler is restored and
   working; `RideVM` parses + runs scripts. **Batch A (all 43 `pure`) complete**; Batch B is all but done —
-  object spawn/lifecycle, the animation + `WAIT*` family, sound, the rider-scream family, the **limbo**,
-  **cross-VM**, **light**, **walk**, **particle effects** (decoded `.PLB`, T-019), and now the **head**
-  families are all in and tested. **Remaining: 5 opcodes** — the object/particle ops
-  `ADDOBJ_EXT`/`GETCUSTPTCLCODE`, and the motion ops `TURBO`/`TOUR`/`BUMP`.
+  object spawn/lifecycle (incl. the extended `ADDOBJ_EXT`), the animation + `WAIT*` family, sound, the
+  rider-scream family, the **limbo**, **cross-VM**, **light**, **walk**, **particle effects** (decoded
+  `.PLB`, T-019), and **head** families are all in and tested. **Remaining: 4 opcodes** — `GETCUSTPTCLCODE`
+  (its `op_94` lost the code computation in the decompile) and the motion ops `TURBO`/`TOUR`/`BUMP`.
 
 ## Findings
 
@@ -156,9 +156,20 @@ runtime). Classification: **43 `pure`** (VM-state only — implementable now) an
     uses a fixed stand-in, and the visual head-mesh attachment at a head node needs head-node geometry
     that isn't decoded yet — same gap as walk.
 
-**Remaining: 5 opcodes**, all needing engine subsystems:
-- **Object/particle** (`ADDOBJ_EXT` — the 5-operand extended object spawn; `GETCUSTPTCLCODE` — its
-  executor case `op_94` lost the code computation in the decompile, so its contract is unclear).
+19. ✅ **ADDOBJ_EXT** (op 9) — the 5-operand extended `ADDOBJ`. RE'd: `op_9 == op_8 + one extra operand`,
+    both through `FUN_00557970` → `FUN_005573d0`, whose type switch reveals the real operand roles
+    **(type, node, code, volume, +extra)**: type 1-2 = positioned sounds (the `FUN_00521e60`/`930` EVENT
+    uses), type 3-10 = particle effects (the `FUN_0051bfc0` spawner). The handler registers the object like
+    `ADDOBJ` (same 4-arg `SpawnObject`, for KILLOBJ) and, for particle types 3-10, fires the effect via the
+    decoded `.PLB` (`SpawnParticleEffect(code)` — T-019). Sound types stay deferred (T-037 wrong-clip risk);
+    the 5th operand (`record[6]`) has no decoded runtime effect. **No shipped `.rse` uses ADDOBJ_EXT**
+    (0/123 — `ADDOBJ` has 393 uses, untouched). Coverage **101 → 102 / 106**. Routing unit-tested
+    (`RideEngineTests.AddObjExtRegistersAndSpawnsParticleForParticleTypes`); verified in-game via the
+    `OPENTPW_AUTOPLACE` drive — type-4 code-11 logs `particle effect 11 (Fire)`, proxy renders, no exceptions.
+
+**Remaining: 4 opcodes**, all needing engine subsystems / further RE:
+- **`GETCUSTPTCLCODE`** — its executor case `op_94` lost the code computation in the decompile, so its
+  contract is unclear (guessing risk).
 - **Motion** (`TURBO`/`TOUR`/`BUMP`) — ride-motion control (needs the ride motion/physics engine).
 
 Reverse each from its executor case (`op_<n>` in `FUN_00551cb0`) when its subsystem comes online.

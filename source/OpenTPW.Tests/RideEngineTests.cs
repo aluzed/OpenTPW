@@ -127,6 +127,26 @@ public class RideEngineTests
 		CollectionAssert.AreEqual( new[] { 51, 1 }, fake.ParticleEffects );
 	}
 
+	// ADDOBJ_EXT (the 5-operand extended ADDOBJ) registers the object like ADDOBJ, and for particle types
+	// (3-10) also fires the .PLB effect with the `code` operand. Sound types (1-2) only register. T-007.
+	[TestMethod]
+	public void AddObjExtRegistersAndSpawnsParticleForParticleTypes()
+	{
+		var vm = NewVm();
+		var fake = new FakeEngine();
+		vm.Engine = fake;
+
+		// Particle type 4: registers (type,node,code,volume) + spawns particle effect `code`.
+		vm.CallOpcodeHandler( Opcode.ADDOBJ_EXT, Lit( vm, 4 ), Lit( vm, 2 ), Lit( vm, 11 ), Lit( vm, 100 ), Lit( vm, 7 ) );
+		Assert.AreEqual( (4, 2, 11, 100), fake.Spawns[^1] );
+		CollectionAssert.AreEqual( new[] { 11 }, fake.ParticleEffects );
+
+		// Sound type 1: registers only (no particle; sound deferred like ADDOBJ).
+		vm.CallOpcodeHandler( Opcode.ADDOBJ_EXT, Lit( vm, 1 ), Lit( vm, 0 ), Lit( vm, 5 ), Lit( vm, 50 ), Lit( vm, 0 ) );
+		Assert.AreEqual( (1, 0, 5, 50), fake.Spawns[^1] );
+		CollectionAssert.AreEqual( new[] { 11 }, fake.ParticleEffects ); // unchanged — no particle for a sound type
+	}
+
 	[TestMethod]
 	public void WaitAnimSuspendsWhileAnimating()
 	{

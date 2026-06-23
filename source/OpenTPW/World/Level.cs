@@ -137,6 +137,9 @@ public class Level
 				// (T-019): no ride script uses them, so drive them here — proves the effect lookup + proxy.
 				v.CallOpcodeHandler( Opcode.REPAIREFFECT, Lit( 0 ) );
 				v.CallOpcodeHandler( Opcode.SPARK, Lit( 0 ), Lit( 0 ), Lit( 0 ), Lit( 0 ) );
+				// ADDOBJ_EXT with a particle type (4) + effect code 11 (Fire) — proves the extended object
+				// spawn routes particle types through the .PLB system (T-007).
+				v.CallOpcodeHandler( Opcode.ADDOBJ_EXT, Lit( 4 ), Lit( 0 ), Lit( 11 ), Lit( 100 ), Lit( 0 ) );
 			}
 		}
 

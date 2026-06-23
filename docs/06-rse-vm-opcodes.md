@@ -6,7 +6,7 @@ dispatched by the executor `FUN_00551cb0` (opcode word tagged `0x80`, bounds `< 
 table at `0x5567d8`). The **Operands** column is authoritative (the reflection dispatcher must
 match it). **Kind**: `pure` = VM-state only (done); `engine` = needs the ride engine.
 
-Status: **101 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus a growing set of
+Status: **102 / 106 implemented** — **Batch A (all 43 `pure`) complete**, plus a growing set of
 Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sound, the animation +
 `WAIT*` family, and now the **rider scream family** `STARTSCREAM`/`STOPSCREAM`/`SINGLESCREAM`/
 `SCREAMLEVEL`). See [tickets/T-007](tickets/T-007-vm-opcodes-rse.md) / [T-032](tickets/T-032-ride-engine.md).
@@ -22,7 +22,7 @@ Batch B engine opcodes routed through `IRideEngine` (object spawn/lifecycle, sou
 | 6 | `ENDSLICE` | 0 | ✅ | pure |
 | 7 | `GETTIME` | 1 | ✅ | pure |
 | 8 | `ADDOBJ` | 4 | ✅ | engine |
-| 9 | `ADDOBJ_EXT` | 5 | ☐ | engine |
+| 9 | `ADDOBJ_EXT` | 5 | ✅ | engine | extended ADDOBJ (type, node, code, volume, +extra): registers like ADDOBJ + spawns the .PLB particle for types 3-10 |
 | 10 | `KILLOBJ` | 1 | ☐ | engine |
 | 11 | `FADEOBJ` | 1 | ☐ | engine |
 | 12 | `SETOBJPARAM` | 3 | ☐ | engine |

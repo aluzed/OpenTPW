@@ -17,6 +17,22 @@ partial class OpcodeHandlers
 		public static void AddObj( ref RideVM vm, Operand type, Operand parameter, Operand id, Operand slot )
 			=> vm.Engine?.SpawnObject( type.Value, parameter.Value, id.Value, slot.Value );
 
+		[OpcodeHandler( Opcode.ADDOBJ_EXT, "Spawn a ride object — the 5-operand extended ADDOBJ." )]
+		public static void AddObjExt( ref RideVM vm, Operand type, Operand node, Operand code, Operand volume, Operand extra )
+		{
+			// RE'd (op_9 == op_8 + one extra operand → record[6]; both go through FUN_00557970 →
+			// FUN_005573d0). The real operand roles are (type, node, code, volume): FUN_005573d0's type
+			// switch routes type 1-2 to the positioned-sound funcs (the same FUN_00521e60/930 EVENT uses)
+			// and type 3-10 to the particle spawner (FUN_0051bfc0). We register the object like ADDOBJ —
+			// same 4-arg SpawnObject call, positionally (type, parameter, id, slot) — for KILLOBJ, then
+			// render the particle case via the decoded .PLB (T-019). Type 1-2 sound is deliberately deferred
+			// for ADDOBJ (T-037 wrong-clip risk), so we don't play it here either; the 5th operand
+			// (record[6]) has no decoded runtime effect. No shipped .rse uses ADDOBJ_EXT (0 of 123 scripts).
+			vm.Engine?.SpawnObject( type.Value, node.Value, code.Value, volume.Value );
+			if ( type.Value is >= 3 and <= 10 )
+				vm.Engine?.SpawnParticleEffect( code.Value );
+		}
+
 		[OpcodeHandler( Opcode.SPAWNSOUND, "Play (or set up) a sound named by a string operand." )]
 		public static void SpawnSound( ref RideVM vm, Operand sound )
 		{
