@@ -482,6 +482,36 @@ public class RideScriptTests
 		Assert.AreEqual( 1000, dest.Value, "STOP finalises the float value" );
 	}
 
+	// The head subsystem: ADDHEAD drops a value into a random free slot, DELHEAD clears all slots holding
+	// a value. A per-VM head-slot table (pure VM bookkeeping). RE'd from op_56/op_57 (T-007).
+	[TestMethod]
+	public void HeadOpcodes()
+	{
+		Log = new();
+		var vm = LoadTestVm();
+		var prev = RideVM.RandomIndex;
+		try
+		{
+			RideVM.RandomIndex = _ => 0; // deterministic: always take the first free slot
+
+			OpcodeHandlers.Heads.AddHead( ref vm, Lit( vm, 11 ) ); // → slot 0
+			OpcodeHandlers.Heads.AddHead( ref vm, Lit( vm, 22 ) ); // first free is now slot 1
+			Assert.AreEqual( 2, vm.HeadCount );
+			Assert.AreEqual( 11, vm.HeadSlots[0] );
+			Assert.AreEqual( 22, vm.HeadSlots[1] );
+
+			OpcodeHandlers.Heads.DelHead( ref vm, Lit( vm, 11 ) ); // frees slot 0
+			Assert.AreEqual( 1, vm.HeadCount );
+			Assert.AreEqual( 0, vm.HeadSlots[0] );
+
+			// Filling past capacity is a guarded no-op (no overflow).
+			for ( var i = 0; i < RideVM.DefaultHeadCapacity + 3; i++ )
+				OpcodeHandlers.Heads.AddHead( ref vm, Lit( vm, 99 ) );
+			Assert.AreEqual( RideVM.DefaultHeadCapacity, vm.HeadCount, "table fills to capacity, then stops" );
+		}
+		finally { RideVM.RandomIndex = prev; }
+	}
+
 	private static RideVM LoadTestVm()
 	{
 		var path = Path.Combine( AppContext.BaseDirectory, "content", "testscripts", "Test.RSE" );

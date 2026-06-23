@@ -2,12 +2,12 @@
 
 - **Priority**: 🟡 Feature (core of ride gameplay)
 - **Type**: Feature / reverse engineering
-- **Status**: ⚠️ **Partial — 99 / 106 opcodes.** The `.RSE` loader / disassembler is restored and
-  working; `RideVM` parses + runs scripts. **Batch A (all 43 `pure`) complete**; Batch B is nearly done —
+- **Status**: ⚠️ **Partial — 101 / 106 opcodes.** The `.RSE` loader / disassembler is restored and
+  working; `RideVM` parses + runs scripts. **Batch A (all 43 `pure`) complete**; Batch B is all but done —
   object spawn/lifecycle, the animation + `WAIT*` family, sound, the rider-scream family, the **limbo**,
-  **cross-VM**, **light**, **walk**, and now the **particle effects** (`REPAIREFFECT`/`SPARK`, driven by
-  the decoded `.PLB` from T-019) families are all in and tested. **Remaining: 7 opcodes** — heads (2),
-  the object/particle ops `ADDOBJ_EXT`/`GETCUSTPTCLCODE`, and the motion ops `TURBO`/`TOUR`/`BUMP`.
+  **cross-VM**, **light**, **walk**, **particle effects** (decoded `.PLB`, T-019), and now the **head**
+  families are all in and tested. **Remaining: 5 opcodes** — the object/particle ops
+  `ADDOBJ_EXT`/`GETCUSTPTCLCODE`, and the motion ops `TURBO`/`TOUR`/`BUMP`.
 
 ## Findings
 
@@ -146,15 +146,22 @@ runtime). Classification: **43 `pure`** (VM-state only — implementable now) an
     `.PLB` lookup + proxy verified in-game via the `OPENTPW_AUTOPLACE` drive — logs `particle effect 51
     (Repair)` / `1 (Sparks)`, proxies render, no exceptions.
 
-**Remaining: 7 opcodes**, all needing engine subsystems:
-- **Heads** (`ADDHEAD`/`DELHEAD`) — head-node attachments (ties into the walk-node geometry).
+18. ✅ **Head family** (`ADDHEAD` 56, `DELHEAD` 57) — reversed from op_56/op_57: a per-VM **head-slot
+    table** (the original's struct `+0x30` array, count `+0x4c` = the ride's head-node count, probed from
+    type-`0x80` objects at spawn — `FUN_005587f0`). `ADDHEAD value` drops the value into a **random free**
+    slot (and the original shows the head mesh at that node); `DELHEAD value` clears every slot holding it
+    (and hides them). Modelled as pure VM bookkeeping in `RideVM.Heads.cs` (+ `Handlers/Heads.cs`), using
+    the injectable `RandomIndex` for the slot pick. Coverage **99 → 101 / 106**. Covered by
+    `RideScriptTests.HeadOpcodes`. *Caveats (documented):* the table capacity (real = ride head-node count)
+    uses a fixed stand-in, and the visual head-mesh attachment at a head node needs head-node geometry
+    that isn't decoded yet — same gap as walk.
+
+**Remaining: 5 opcodes**, all needing engine subsystems:
 - **Object/particle** (`ADDOBJ_EXT` — the 5-operand extended object spawn; `GETCUSTPTCLCODE` — its
   executor case `op_94` lost the code computation in the decompile, so its contract is unclear).
-- **Motion** (`TURBO`/`TOUR`/`BUMP`).
+- **Motion** (`TURBO`/`TOUR`/`BUMP`) — ride-motion control (needs the ride motion/physics engine).
 
-These create/drive world entities, so (unlike the limbo / cross-VM / walk-slot bookkeeping, which is pure
-VM) they need ride-engine subsystems to build + verify. Reverse each from its executor case (`op_<n>` in
-`FUN_00551cb0`) when its subsystem comes online.
+Reverse each from its executor case (`op_<n>` in `FUN_00551cb0`) when its subsystem comes online.
 
 > Note: the instruction doc describes `CMP` as a *bitwise-AND* comparison, but the current
 > `Math.Compare` does equality/less-than. Left as-is for now (changing it could shift branch
