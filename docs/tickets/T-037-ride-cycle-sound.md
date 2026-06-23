@@ -68,7 +68,18 @@ The full chain that plays a ride's *intended* sound, decoded end to end:
   doesn't restart the clip every tick. Verified in-game: `EVENT t2 code=22 -> nl_creak_5.mp2`, 0
   `Backfire`/`Crunch`/`bomb`/`goldticket`.
 
-## Done (EVENT types 3-10 = particle effects)
+## ⚠️ Correction (see T-047): the 7 "pools" are SOUND CATEGORIES
+
+Later RE ([T-047](T-047-ride-event-3d-sound-particle-pools.md)) showed the "7 effect pools" below are
+actually **sound categories** (`DAT_00803a20`=cat_ambient, `a24`=cat_kids, `a28`=cat_rides, `a2c`=cat_ui,
+`a30`=cat_staff, `a38/a3c`=ambient/rides), registered through the **unified effect manager** `DAT_00802bcc`
+(handles both positional sound and particles). So EVENT **types 5-9 are positioned sounds by category**,
+and only **types 3-4** are particles — the "types 3-10 = particles" claim below is **wrong for 5-9**.
+The engine still routes all of 3-10 to particles; splitting it (sounds 5-9 / particles 3-4) needs in-game
+verification and is tracked in T-047 (blocked while the renderer is down). Out-of-range codes (219/220)
+are sentinels (the skip is correct — only one particle library, `Tp2.plb` 0..104, exists).
+
+## Done (EVENT type switch decoded — pool kinds corrected in T-047)
 
 - **The whole EVENT type switch decoded** (`FUN_005573d0`): types **1-2 are sounds**, types **3-10 are
   particle effects** — each calls the particle spawner `FUN_0051bfc0(0, pool, code, pos)` (the same
