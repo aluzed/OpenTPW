@@ -2,10 +2,12 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine / reverse engineering
-- **Status**: ⚠️ RE advanced (premise corrected) — the "7 particle pools / per-pool library" model is
-  **wrong**: there's a single particle library and the pools are **sound categories** in a unified
-  effect manager. EVENT effects are node-positioned (the T-048 path). The one actionable code change
-  (EVENT type routing) needs in-game verification, currently **blocked by the broken display/renderer**.
+- **Status**: ⚠️ Mostly done — the "7 particle pools / per-pool library" model was **wrong** (single
+  particle library; the pools are **sound categories** in a unified effect manager), and the EVENT type
+  routing is now **split per that corrected RE**: types 3-4 & 10 → particle, 5-9 → category sounds (each
+  its own `cat_*BANK.map`). Unit-tested. Real 3D node positioning (needs T-048's bone transforms) and the
+  `COAST`/`BUMP`/`ADDOBJ` sound residue remain; the visual/audio result is still **display-blocked** to
+  confirm end to end.
 - **Parent**: [T-037](T-037-ride-cycle-sound.md) (EVENT type switch decoded — this is the residue).
 - **Related**: [T-019](T-019-plb-parameter-fields.md), [T-032](T-032-ride-engine.md), [T-048](T-048-ride-node-geometry-movement.md).
 
@@ -34,22 +36,30 @@ the global sound registry), types 3-10 = particle effects each selecting one of 
   **node** via `FUN_00556a80`/`FUN_00556b90` (error "Bad particle node in %s") — exactly the node graph
   decoded in [T-048](T-048-ride-node-geometry-movement.md). EVENT's `target` operand is the node id.
 
-## Open question (needs in-game verification — blocked by the display)
+## Done (this pass — EVENT routing split)
 
-- **Are EVENT types 3-4 particles and 5-9 sounds?** The pools are unambiguously sound categories (so 5-9
-  look like sounds), yet `op_93` (a particle) also routes through `FUN_0051bfc0` — so the unified manager
-  dispatches sound-vs-particle by the handle type. My T-037 code routes **all** of EVENT 3-10 to
-  `SpawnParticleEffect`, which is likely **wrong for 5-9** (should play a category sound). I have **not**
-  changed it: the renderer is down this session so I can't confirm which types are which, and mis-routing
-  working audio is worse than the current state. Verify in-game, then split the EVENT handler:
-  types 3-4 → particle (`Tp2.plb`), types 5-9 → category sound, type 10 → custom.
+The premise was solid enough (the pools are unambiguously **sound categories**, and types 5-9 map cleanly
+onto them: 5→rides, 6→kids, 7→staff, 8→ambient, 9→ui) to act on without waiting for the display. The old
+`ClassifyEvent` routed **all** of EVENT 3-10 to `SpawnParticleEffect`, which mis-played the 5-9 category
+sounds as proxies; `RideEngine` now:
+
+- `ClassifyEvent`: types **1-2 & 5-9 → Sound**, **3-4 → Particle**, **10 → Particle** (the custom effect,
+  kept on the particle stand-in until its handler is RE'd), else Unknown.
+- new `EventSoundCategory(type)`: 1-2 & 5 → `rides`, 6 → `kids`, 7 → `staff`, 8 → `ambient`, 9 → `ui`.
+- `PlayEventSound` resolves `code` through that category's bank; the single `cat_ridesBANK.map` registry is
+  generalised to a per-category lazy cache (`CategoryBank`, keyed by category, caching the "no catalog"
+  case so a headless install is probed once).
+
+Unit-tested (`RideEngineTests.EventTypeClassification` updated to the corrected split, new
+`EventSoundCategoryMapping`). The category banks load from the install (disc image, not extracted here), so
+the audible result stays display/install-blocked — but the routing decision is now correct and tested.
 
 ## Remaining
 
-1. Verify + split EVENT type routing (sound categories vs particle) per the open question above.
-2. Real 3D positioning: feed the node world position (needs T-048's bone-transform decode) into the
+1. Real 3D positioning: feed the node world position (needs T-048's bone-transform decode) into the
    effect/sound spawn instead of the ride origin.
-3. **`COAST`/`BUMP`/`ADDOBJ` sound residue** (their direct sound triggers, e.g. `FUN_00473270` in BUMP).
+2. **`COAST`/`BUMP`/`ADDOBJ` sound residue** (their direct sound triggers, e.g. `FUN_00473270` in BUMP).
+3. End-to-end audible verify of the 3-4-vs-5-9 split once the renderer/display is back.
 
 ## Acceptance criteria
 

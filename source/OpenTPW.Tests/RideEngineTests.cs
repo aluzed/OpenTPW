@@ -202,14 +202,34 @@ public class RideEngineTests
 	[TestMethod]
 	public void EventTypeClassification()
 	{
-		// RE'd from the EVENT dispatch (FUN_005573d0): types 1-2 are positioned sounds, 3-10 are particle
-		// effects, the rest are "unknown object type". This is the core of the T-037 EVENT decode.
+		// RE'd from the EVENT dispatch (FUN_005573d0), corrected in T-047: the 7 "pools" are sound
+		// CATEGORIES, so types 1-2 (positioned sounds) and 5-9 (category sounds) are Sound; types 3-4
+		// (and the custom type 10) are Particle; the rest are "unknown object type".
 		Assert.AreEqual( RideEngine.EventKind.Sound, RideEngine.ClassifyEvent( 1 ) );
 		Assert.AreEqual( RideEngine.EventKind.Sound, RideEngine.ClassifyEvent( 2 ) );
-		foreach ( var t in new[] { 3, 4, 5, 6, 7, 8, 9, 10 } )
-			Assert.AreEqual( RideEngine.EventKind.Particle, RideEngine.ClassifyEvent( t ), $"type {t}" );
+		Assert.AreEqual( RideEngine.EventKind.Particle, RideEngine.ClassifyEvent( 3 ) );
+		Assert.AreEqual( RideEngine.EventKind.Particle, RideEngine.ClassifyEvent( 4 ) );
+		foreach ( var t in new[] { 5, 6, 7, 8, 9 } )
+			Assert.AreEqual( RideEngine.EventKind.Sound, RideEngine.ClassifyEvent( t ), $"type {t}" );
+		Assert.AreEqual( RideEngine.EventKind.Particle, RideEngine.ClassifyEvent( 10 ) );
 		Assert.AreEqual( RideEngine.EventKind.Unknown, RideEngine.ClassifyEvent( 0 ) );
 		Assert.AreEqual( RideEngine.EventKind.Unknown, RideEngine.ClassifyEvent( 11 ) );
+	}
+
+	[TestMethod]
+	public void EventSoundCategoryMapping()
+	{
+		// T-047: types 1-2 & 5 play through the rides bank, 6 kids, 7 staff, 8 ambient, 9 ui; non-sound
+		// types have no category. These map onto cat_<category>BANK.map.
+		Assert.AreEqual( "rides", RideEngine.EventSoundCategory( 1 ) );
+		Assert.AreEqual( "rides", RideEngine.EventSoundCategory( 2 ) );
+		Assert.AreEqual( "rides", RideEngine.EventSoundCategory( 5 ) );
+		Assert.AreEqual( "kids", RideEngine.EventSoundCategory( 6 ) );
+		Assert.AreEqual( "staff", RideEngine.EventSoundCategory( 7 ) );
+		Assert.AreEqual( "ambient", RideEngine.EventSoundCategory( 8 ) );
+		Assert.AreEqual( "ui", RideEngine.EventSoundCategory( 9 ) );
+		Assert.IsNull( RideEngine.EventSoundCategory( 3 ) );  // particle, no category
+		Assert.IsNull( RideEngine.EventSoundCategory( 10 ) ); // custom, no category
 	}
 
 	[TestMethod]
