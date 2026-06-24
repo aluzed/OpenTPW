@@ -95,6 +95,50 @@ public sealed class PlacementGrid
 				}
 	}
 
+	// ── Masked placement (T-052) ───────────────────────────────────────────────────────────────────
+	// A PlacementFootprint reserves only its *solid* tiles, so a piece with passable cells (e.g. an
+	// .hmp-derived queue path or fence) leaves those tiles walkable/buildable. The bounding box must lie
+	// in bounds; only solid cells need to be free + dry. A solid-rectangle footprint behaves exactly like
+	// the int-overloads above.
+
+	/// <summary>Whether <paramref name="fp"/> anchored at (tx,ty) fits: box in bounds, solid cells free + dry.</summary>
+	public bool CanPlace( int tx, int ty, PlacementFootprint fp )
+	{
+		if ( !InBounds( tx, ty, fp.Cols, fp.Rows ) )
+			return false;
+
+		for ( int row = 0; row < fp.Rows; row++ )
+			for ( int col = 0; col < fp.Cols; col++ )
+				if ( fp.IsSolid( col, row ) && (occupied[tx + col, ty + row] || water[tx + col, ty + row]) )
+					return false;
+		return true;
+	}
+
+	/// <summary>Marks <paramref name="fp"/>'s solid tiles occupied if it can be placed; returns success.</summary>
+	public bool TryPlace( int tx, int ty, PlacementFootprint fp )
+	{
+		if ( !CanPlace( tx, ty, fp ) )
+			return false;
+
+		for ( int row = 0; row < fp.Rows; row++ )
+			for ( int col = 0; col < fp.Cols; col++ )
+				if ( fp.IsSolid( col, row ) )
+					occupied[tx + col, ty + row] = true;
+		return true;
+	}
+
+	/// <summary>Frees the solid tiles of <paramref name="fp"/> anchored at (tx,ty).</summary>
+	public void Clear( int tx, int ty, PlacementFootprint fp )
+	{
+		for ( int row = 0; row < fp.Rows; row++ )
+			for ( int col = 0; col < fp.Cols; col++ )
+				if ( fp.IsSolid( col, row ) && InBounds( tx + col, ty + row ) )
+				{
+					occupied[tx + col, ty + row] = false;
+					path[tx + col, ty + row] = false;
+				}
+	}
+
 	/// <summary>Marks a reserved tile as a walkable path (e.g. a queue path): it still blocks placement,
 	/// but peeps may route across it (see <see cref="IsWalkable"/> / T-036 pathfinding).</summary>
 	public void MarkPath( int tx, int ty )

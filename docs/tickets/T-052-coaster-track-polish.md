@@ -44,8 +44,16 @@ station), `StdPylon.hmp`/`questra.hmp` (1×1), `ho_fos1.hmp` (fence 2×2, footpr
 
 1. Author curved track pieces from the per-tile height grids (needs a working renderer to verify).
 2. Per-segment rotation (`ACTION_COASTER_ROTATE`).
-3. (Bonus, now enabled) use `HmpFile.Footprint` for accurate placement footprints of queues/hoardings/
-   sideshows/upgrades, instead of approximations.
+3. ✅ **(Bonus) `.hmp` footprints now drive placement.** New `PlacementFootprint` mask (`Rectangle(w,h)` for
+   the common case — kept allocation-free for the per-frame preview — and `FromHmp(HmpFile)`, which marks a
+   tile solid where the footprint byte is non-zero). `PlacementGrid` gained masked `CanPlace`/`TryPlace`/
+   `Clear` overloads that reserve **only** the solid tiles, so a piece with passable cells (queue paths,
+   fences/hoardings) leaves those tiles walkable + buildable instead of the rectangular approximation.
+   `BuildCatalogItem` carries an optional `HmpPath`, and `CommitPlacement` reserves via the resolved
+   footprint (loads the `.hmp` when present, falls back to the `rw×rh` rectangle on any error). Unit-tested
+   (`PlacementFootprintTests`: rectangle, passable/solid mask, fully-solid≡rectangle, masked place/clear,
+   blocked-solid-tile / off-grid / water). Wiring real catalog items to their `.hmp` templates awaits a
+   game install (the bundled game is a SafeDisc disc image, not an extracted tree).
 
 ## Acceptance criteria
 
@@ -54,4 +62,8 @@ station), `StdPylon.hmp`/`questra.hmp` (1×1), `ho_fos1.hmp` (fence 2×2, footpr
 
 ## Affected files
 
-`source/OpenTPW/World/Build/CoasterTrack.cs`, a new `.hmp` parser under `source/OpenTPW.Files`.
+A new `.hmp` parser under `source/OpenTPW.Files` (`Formats/Map/HmpFile.cs`);
+`source/OpenTPW/World/Terrain/PlacementFootprint.cs` (new), `source/OpenTPW/World/Terrain/PlacementGrid.cs`,
+`source/OpenTPW/World/Build/BuildMode.cs`, `source/OpenTPW/World/Level.cs`,
+`source/OpenTPW.Tests/PlacementFootprintTests.cs` (new). Curved-piece meshes + per-segment rotation in
+`source/OpenTPW/World/Build/CoasterTrack.cs` remain (renderer-blocked).

@@ -3,8 +3,10 @@ using Veldrid;
 namespace OpenTPW;
 
 /// <summary>One placeable catalog entry: a ride (RidePath set), a shop (all null), or a staff member to
-/// hire (Staff set). Staff occupy no grid cell; rides/shops reserve their footprint.</summary>
-public readonly record struct BuildCatalogItem( string Name, string? RidePath, StaffRole? Staff, int Width, int Height, float Cost );
+/// hire (Staff set). Staff occupy no grid cell; rides/shops reserve their footprint. <paramref name="HmpPath"/>
+/// optionally points at an <c>.hmp</c> footprint template, so the piece reserves only its solid tiles
+/// (queue paths / fences leave their passable cells walkable) instead of the Width×Height rectangle (T-052).</summary>
+public readonly record struct BuildCatalogItem( string Name, string? RidePath, StaffRole? Staff, int Width, int Height, float Cost, string? HmpPath = null );
 
 /// <summary>
 /// Build/manage mode (T-040 foundation + T-041 placement). Each frame it projects the cursor to the

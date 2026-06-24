@@ -294,7 +294,11 @@ public class Level
 		int rw = item.RidePath != null && rotation % 2 == 1 ? item.Height : item.Width;
 		int rh = item.RidePath != null && rotation % 2 == 1 ? item.Width : item.Height;
 
-		if ( !grid.CanPlace( tx, ty, rw, rh ) || !grid.TryPlace( tx, ty, rw, rh ) )
+		// Reserve via a footprint mask (T-052): an .hmp template (when the item carries one) reserves only
+		// its solid tiles; otherwise a plain rw×rh rectangle, identical to the previous behaviour.
+		var footprint = ResolveFootprint( item, rw, rh );
+
+		if ( !grid.TryPlace( tx, ty, footprint ) )
 			return false;
 
 		bool ok = item.RidePath == null
@@ -303,11 +307,30 @@ public class Level
 
 		if ( !ok )
 		{
-			grid.Clear( tx, ty, rw, rh );
+			grid.Clear( tx, ty, footprint );
 			return false;
 		}
 		fin?.PayBuild( item.Cost );
 		return true;
+	}
+
+	// The footprint a catalog item reserves (T-052): its .hmp template's solid-tile mask when one is set
+	// and loads, else a plain rw×rh rectangle. Loading failures (missing file / bad data) fall back to the
+	// rectangle so placement never breaks on a stray template path.
+	private static PlacementFootprint ResolveFootprint( BuildCatalogItem item, int rw, int rh )
+	{
+		if ( string.IsNullOrEmpty( item.HmpPath ) )
+			return PlacementFootprint.Rectangle( rw, rh );
+
+		try
+		{
+			return PlacementFootprint.FromHmp( new HmpFile( FileSystem.OpenRead( item.HmpPath ) ) );
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( $"[build] .hmp footprint '{item.HmpPath}' unavailable ({e.Message}); using {rw}×{rh} rectangle." );
+			return PlacementFootprint.Rectangle( rw, rh );
+		}
 	}
 
 	// Sell/demolish a placed ride (T-041): drop its queue so peeps stop targeting it, free its footprint +
