@@ -2,7 +2,7 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: UI / gameplay
-- **Status**: ☐ To do
+- **Status**: ✅ Core done
 - **Parents**: [T-042](T-042-economy-controls-loans.md), [T-043](T-043-staff-management.md),
   [T-044](T-044-research-upgrades.md). **Builds on**: [T-041](T-041-ride-shop-placement.md) (HudPanel/UI).
 
@@ -25,7 +25,37 @@ player-facing UI is still keyboard/HUD-text only. This ticket finishes the click
 - The player can, by mouse: read a finance graph + set a ride's price; fire a staffer + set a patrol
   zone; and drive research / apply an upgrade from a panel — each verified in-game.
 
+## What was done
+
+1. **Finance graph** — `ParkFinances` now keeps a rolling per-month history
+   (`History`: `(Balance, Income, Expense)` sampled in `Tick`, capped at `MaxHistory = 48`). New
+   `FinancePanel` (**F11**) plots the income (green) / expense (red) bars over time with the current
+   balance + cumulative totals. History sampling is unit-tested (`ManagementDepthTests`).
+2. **Per-ride price** — already clickable in `ManagePanel` (`PRICE-`/`PRICE+` on the selected-ride row,
+   from T-042); left as-is.
+3. **Staff fire + patrol zones** — `Staff.Fire()` cleanly removes the staffer + its shadow + guard
+   registration; a new pure `PatrolZone(center, radius)` bounds wandering **and** job-seeking (a zoned
+   guard ignores trouble outside its area; a zoned handyman only clears litter inside it). `BuildMode`
+   selects the nearest staffer to a Default-tool click (`SelectedStaff`) and exposes fire / set-zone-here
+   / grow-shrink / free-roam; `ManagePanel` shows a **FIRE / ZONE± / SET-ZONE / FREE-ROAM** row and
+   `ParkStatsPanel` a status line. `PatrolZone` containment is unit-tested.
+4. **Per-ride research/upgrade** — already a clickable gauge/button in `ManagePanel` (`RESEARCH`/`UPGRADE`
+   with a live progress bar, from T-044); left as-is.
+
+In-park mouse verification (clicking a staffer, dragging the graph open) is display-blocked like the other
+recent UI tickets; the new model logic (`ParkFinances.History`, `PatrolZone`) is unit-tested, and the UI
+reuses the verified `HudPanel` click/hit-test path.
+
+## Remaining (nice-to-have)
+
+- A draggable patrol-zone (currently anchored at the staffer's position with ± radius), and a zone
+  highlight ring in the world.
+- A dedicated per-ride panel window (the controls live on the shared `ManagePanel` bar today).
+
 ## Affected files
 
-`source/OpenTPW/UI/Widgets/ManagePanel.cs`, `ParkStatsPanel.cs`, new per-ride panel; `World/Staff.cs`,
-`World/ParkFinances.cs`, the research/upgrade model.
+`source/OpenTPW/World/ParkFinances.cs`, `source/OpenTPW/World/Staff.cs`,
+`source/OpenTPW/World/Build/BuildMode.cs`, `source/OpenTPW/UI/Widgets/FinancePanel.cs` (new),
+`source/OpenTPW/UI/Widgets/ManagePanel.cs`, `source/OpenTPW/UI/Widgets/ParkStatsPanel.cs`,
+`source/OpenTPW/UI/Widgets/HudPanel.cs`, `source/OpenTPW/World/Level.cs`,
+`source/OpenTPW.Tests/ManagementDepthTests.cs` (new).

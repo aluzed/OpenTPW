@@ -59,6 +59,11 @@ internal sealed class ParkStatsPanel : HudPanel
 			else if ( build.SelectedRide is { Shape.HasTrack: true } )
 				lines.Add( "T: lay coaster track" );
 
+			if ( build.SelectedStaff is { } staffSel )
+				lines.Add( staffSel.HasPatrolZone
+					? $"STAFF {staffSel.Role}  zone r{staffSel.Zone!.Value.Radius:0} (FIRE/ZONE buttons)"
+					: $"STAFF {staffSel.Role}  free roam (FIRE/SET ZONE buttons)" );
+
 			if ( build.SelectedRide is { } sel )
 			{
 				lines.Add( $"RIDE {sel.Name} L{sel.UpgradeLevel} cap {sel.Capacity}  price {sel.TicketPrice:0} (,.)" );

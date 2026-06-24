@@ -16,6 +16,21 @@ public enum StaffRole
 }
 
 /// <summary>
+/// A bounded patrol area a member of staff is confined to (T-049): a world centre + radius, tested in the
+/// XY plane (height is irrelevant on the park ground). A pure value so the containment maths is unit-tested
+/// without standing up a full <see cref="Staff"/> (which needs terrain + sprite assets).
+/// </summary>
+public readonly record struct PatrolZone( Vector3 Center, float Radius )
+{
+	/// <summary>True if <paramref name="p"/> lies within the zone radius (XY distance).</summary>
+	public bool Contains( Vector3 p )
+	{
+		float dx = p.X - Center.X, dy = p.Y - Center.Y;
+		return dx * dx + dy * dy <= Radius * Radius;
+	}
+}
+
+/// <summary>
 /// A member of park staff: wanders the park (a camera-facing billboard in a role colour), draws a wage
 /// every second, and does its job — an <see cref="StaffRole.Entertainer"/> lifts the mood of nearby
 /// visitors (<see cref="Peep.Cheer"/>), a <see cref="StaffRole.Handyman"/> heads for the nearest litter
@@ -60,6 +75,41 @@ public sealed class Staff : ModelEntity
 	private readonly float roam;
 	private readonly float speed;
 	private Vector3 target;
+
+	// Optional patrol zone (T-049): when set, the staff member wanders within it and only does its job
+	// (guard deterrence / litter pickup / repairs) inside the zone. Null = free roam over the spawn area.
+	private PatrolZone? zone;
+
+	/// <summary>The assigned patrol zone, or null when the staff member roams freely.</summary>
+	public PatrolZone? Zone => zone;
+
+	/// <summary>True when the player has bounded this staff member to a patrol zone.</summary>
+	public bool HasPatrolZone => zone != null;
+
+	/// <summary>Confine this staff member to a circular patrol zone and re-target inside it (T-049).</summary>
+	public void SetPatrolZone( Vector3 patrolCenter, float radius )
+	{
+		zone = new PatrolZone( patrolCenter.WithZ( 0 ), MathF.Max( 1f, radius ) );
+		target = PickWanderTarget();
+	}
+
+	/// <summary>Lift the patrol zone: the staff member returns to roaming the whole park.</summary>
+	public void ClearPatrolZone() => zone = null;
+
+	// The effective wander area: the patrol zone if one is set, else the spawn centre + roam radius.
+	private (Vector3 Center, float Radius) WanderArea => zone is { } z ? (z.Center, z.Radius) : (center, roam);
+
+	// Whether a world point is reachable for this staff member (always true when free-roaming).
+	private bool InRange( Vector3 p ) => zone is not { } z || z.Contains( p );
+
+	/// <summary>Dismiss this staff member: remove it (and its shadow) from the world and stop its wage.</summary>
+	public void Fire()
+	{
+		if ( role == StaffRole.Guard )
+			guards.Remove( this );
+		Entity.All.Remove( shadow );
+		Entity.All.Remove( this );
+	}
 
 	// Sprite animation (real sprite path only); falls back to the flat role billboard if unavailable.
 	private readonly SpriteSheet? sheet;
@@ -175,6 +225,8 @@ public sealed class Staff : ModelEntity
 		{
 			if ( e is not Peep { Unhappy: true } p )
 				continue;
+			if ( !InRange( p.Position ) ) // a zoned guard ignores trouble outside its patrol area (T-049)
+				continue;
 			float dx = p.Position.X - Position.X, dy = p.Position.Y - Position.Y;
 			float d2 = dx * dx + dy * dy;
 			if ( d2 < bestD2 )
@@ -255,6 +307,8 @@ public sealed class Staff : ModelEntity
 		float bestD2 = float.MaxValue;
 		foreach ( var l in Litter.Active )
 		{
+			if ( !InRange( l.Position ) ) // a zoned handyman only clears litter inside its patrol area (T-049)
+				continue;
 			float dx = l.Position.X - Position.X, dy = l.Position.Y - Position.Y;
 			float d2 = dx * dx + dy * dy;
 			if ( d2 < bestD2 )
@@ -290,9 +344,10 @@ public sealed class Staff : ModelEntity
 
 	private Vector3 PickWanderTarget()
 	{
+		var (wc, wr) = WanderArea;
 		float a = (float)Random.Shared.NextDouble() * MathF.PI * 2f;
-		float d = (float)Random.Shared.NextDouble() * roam;
-		return new Vector3( center.X + MathF.Cos( a ) * d, center.Y + MathF.Sin( a ) * d, 0 );
+		float d = (float)Random.Shared.NextDouble() * wr;
+		return new Vector3( wc.X + MathF.Cos( a ) * d, wc.Y + MathF.Sin( a ) * d, 0 );
 	}
 
 	private void DropToGround() => Position = Position.WithZ( terrain.SampleHeight( Position.X, Position.Y ) );

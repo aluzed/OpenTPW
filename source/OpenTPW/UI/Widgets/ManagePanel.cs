@@ -77,6 +77,23 @@ internal sealed class ManagePanel : HudPanel
 				$"SELL {shop.Name} ${shop.BuildCost * Ride.SellRefundFraction:0}", true,
 				() => BuildMode.Current?.SellSelected(), Warned: true ) );
 		}
+		// Selected-staff row (T-049): dismiss the staffer + bound their patrol zone.
+		else if ( BuildMode.Current?.SelectedStaff is { } staff )
+		{
+			bool zoned = staff.HasPatrolZone;
+			float radius = staff.Zone?.Radius ?? 0f;
+			list.Add( new Btn( new Rectangle( 16f, RideY, 64f, BtnH ), "FIRE", true,
+				() => BuildMode.Current?.FireSelectedStaff(), Warned: true ) );
+			list.Add( new Btn( new Rectangle( 84f, RideY, 56f, BtnH ), "ZONE-", zoned,
+				() => BuildMode.Current?.AdjustSelectedStaffZone( -1 ) ) );
+			list.Add( new Btn( new Rectangle( 144f, RideY, 156f, BtnH ),
+				zoned ? $"ZONE r{radius:0} (re-set)" : "SET ZONE HERE", true,
+				() => BuildMode.Current?.SetSelectedStaffZoneHere() ) );
+			list.Add( new Btn( new Rectangle( 304f, RideY, 56f, BtnH ), "ZONE+", true,
+				() => BuildMode.Current?.AdjustSelectedStaffZone( +1 ) ) );
+			list.Add( new Btn( new Rectangle( 364f, RideY, 88f, BtnH ), "FREE ROAM", zoned,
+				() => BuildMode.Current?.ClearSelectedStaffZone() ) );
+		}
 		return list;
 	}
 

@@ -482,6 +482,7 @@ public class Level
 			Hud.AddChild( new ParkStatsPanel() ); // live park finances/visitors readout
 			Hud.AddChild( new BuildPanel() );     // clickable build catalog (T-038)
 			Hud.AddChild( new ManagePanel() );    // clickable economy/ride manage buttons (T-038)
+			Hud.AddChild( new FinancePanel() );   // F11 income/expense graph (T-049)
 		}
 		else
 		{

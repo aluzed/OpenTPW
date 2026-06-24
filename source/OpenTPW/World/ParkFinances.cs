@@ -24,6 +24,36 @@ public sealed class ParkFinances
 	public float WagesPaid { get; private set; }
 	public float BuildSpent { get; private set; }
 
+	// ── Finance history (T-049): one sample per in-game "month", for the finance graph ─────────────
+	/// <summary>One period's finances: the closing balance and the income / expense that flowed that month.</summary>
+	public readonly record struct FinanceSample( float Balance, float Income, float Expense );
+
+	/// <summary>How many monthly samples the rolling history keeps (oldest dropped past this).</summary>
+	public const int MaxHistory = 48;
+
+	private readonly List<FinanceSample> history = new();
+	private float lastIncomeTotal;
+	private float lastExpenseTotal;
+
+	/// <summary>Rolling per-month finance history, oldest first (drives the finance graph).</summary>
+	public IReadOnlyList<FinanceSample> History => history;
+
+	private float TotalIncome => RideRevenue + EntryRevenue + FoodRevenue;
+	private float TotalExpense => UpkeepPaid + WagesPaid + BuildSpent;
+
+	// Capture this month's flows (cumulative totals minus the last snapshot) + the closing balance.
+	private void RecordMonth()
+	{
+		float income = TotalIncome - lastIncomeTotal;
+		float expense = TotalExpense - lastExpenseTotal;
+		lastIncomeTotal = TotalIncome;
+		lastExpenseTotal = TotalExpense;
+
+		history.Add( new FinanceSample( Money, income, expense ) );
+		if ( history.Count > MaxHistory )
+			history.RemoveRange( 0, history.Count - MaxHistory );
+	}
+
 	public ParkFinances( float starting, float entryFee )
 	{
 		Money = starting;
@@ -122,6 +152,7 @@ public sealed class ParkFinances
 					l.Bought = false;
 				}
 			}
+			RecordMonth(); // snapshot the closing balance + this month's flows for the finance graph (T-049)
 		}
 		Bankrupt = Money < BankruptLimit;
 	}

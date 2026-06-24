@@ -52,6 +52,40 @@ public sealed class BuildMode : Entity
 	/// <summary>The shop currently selected (clicked) in the Default tool — sellable like a ride (T-041).</summary>
 	public Shop? SelectedShop { get; private set; }
 
+	/// <summary>The staff member currently selected (clicked) in the Default tool — firable / zonable (T-049).</summary>
+	public Staff? SelectedStaff { get; private set; }
+
+	private const float StaffPickRadius = 18f;   // world distance from the clicked point that counts as "this staffer"
+	private const float DefaultZoneRadius = 80f;  // initial patrol-zone radius when first assigned
+	private const float ZoneStep = 20f;           // radius change per ZONE-/ZONE+ press
+
+	/// <summary>Dismiss the selected staff member (T-049). No-op if none selected.</summary>
+	public void FireSelectedStaff()
+	{
+		if ( SelectedStaff is { } s )
+		{
+			s.Fire();
+			SelectedStaff = null;
+		}
+	}
+
+	/// <summary>Anchor the selected staff member's patrol zone at its current position (T-049).</summary>
+	public void SetSelectedStaffZoneHere()
+		=> SelectedStaff?.SetPatrolZone( SelectedStaff.Position, SelectedStaff.Zone?.Radius ?? DefaultZoneRadius );
+
+	/// <summary>Grow / shrink the selected staff member's patrol zone radius (assigning one if absent). T-049.</summary>
+	public void AdjustSelectedStaffZone( int steps )
+	{
+		if ( SelectedStaff is not { } s )
+			return;
+		var center = s.Zone?.Center ?? s.Position;
+		var radius = (s.Zone?.Radius ?? DefaultZoneRadius) + steps * ZoneStep;
+		s.SetPatrolZone( center, radius );
+	}
+
+	/// <summary>Lift the selected staff member's patrol zone (back to free roam). T-049.</summary>
+	public void ClearSelectedStaffZone() => SelectedStaff?.ClearPatrolZone();
+
 	/// <summary>Sell/demolish the selected ride or shop: refunds part of its cost and tears it out of the
 	/// park (T-041). No-op if nothing is selected. Exposed for the manage UI + the Delete shortcut.</summary>
 	public void SellSelected()
@@ -228,10 +262,34 @@ public sealed class BuildMode : Entity
 		{
 			SelectedRide = Entity.All.OfType<Ride>().FirstOrDefault( r => r.Covers( tx, ty ) );
 			SelectedShop = SelectedRide == null ? Shop.Stalls.FirstOrDefault( s => s.Covers( tx, ty ) ) : null;
+			// Staff have no footprint, so pick the nearest one to the clicked point (T-049). A ride/shop
+			// under the cursor takes precedence.
+			SelectedStaff = SelectedRide == null && SelectedShop == null ? NearestStaffTo( c ) : null;
 			Log.Info( SelectedRide != null ? $"[build] selected {SelectedRide.Name} (price {SelectedRide.TicketPrice:0})"
 				: SelectedShop != null ? $"[build] selected {SelectedShop.Name}"
+				: SelectedStaff != null ? $"[build] selected {SelectedStaff.Role}"
 				: $"[build] click tile ({tx},{ty})" );
 		}
+	}
+
+	// Nearest staff member to a world point, within the pick radius (XY) — null if none is close (T-049).
+	private static Staff? NearestStaffTo( Vector3 p )
+	{
+		Staff? best = null;
+		float bestD2 = StaffPickRadius * StaffPickRadius;
+		foreach ( var e in Entity.All )
+		{
+			if ( e is not Staff s )
+				continue;
+			float dx = s.Position.X - p.X, dy = s.Position.Y - p.Y;
+			float d2 = dx * dx + dy * dy;
+			if ( d2 <= bestD2 )
+			{
+				bestD2 = d2;
+				best = s;
+			}
+		}
+		return best;
 	}
 
 	// Placement tool: show the selected item's footprint, green/red by validity, place on click.
