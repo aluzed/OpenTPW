@@ -497,7 +497,8 @@ public class Level
 			Hud.AddChild( new AdvisorPanel() );
 		}
 
-		Hud.AddChild( new Cursor() ); // the cursor is shown in both states
+		Hud.AddChild( new OptionsPanel() ); // F10 audio volume sliders (T-051), available in both states
+		Hud.AddChild( new Cursor() );       // the cursor is shown in both states
 	}
 
 	private static float nextEconLog;

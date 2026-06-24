@@ -43,9 +43,10 @@ strings were unwired labels.
 
 ## To do
 
-1. ☐ **Ambient SFX** — ambience (`AmbientHD.sdt`) and more UI/event sounds beyond the click.
-2. ☐ **Volume settings UI** — persist `MusicVolume`/`SoundEffectsVolume` and expose in a menu
-   (currently runtime keys only); per-category mixing.
+1. ✅ **Ambient SFX** — ambience (`AmbientHD.sdt`) now loops under the music on a dedicated source
+   (T-051). More UI/event sounds beyond the click remain.
+2. ✅ **Volume settings UI** — `MusicVolume`/`SfxVolume`/`SpeechVolume` persist to `GameSettings` and are
+   exposed as draggable sliders in the F10 `OptionsPanel` (T-051); per-category mixing done (3 buses).
 3. ☐ Point the ModKit `AudioPlayer` at the same minimp3 decoder (it still uses NLayer → same
    MPEG-2 Layer II bug when previewing 22 kHz sounds), and share one decode path.
 4. ☐ **Track selection** — pick music by context/level instead of hardcoding `level4c`

@@ -28,6 +28,13 @@ internal static unsafe class Audio
 	private static uint musicSource;
 	private static uint musicBuffer;
 
+	// Ambient bed (T-051): a second looping source that plays level ambience under the music. Its gain
+	// rides the SFX bus (ambience is environmental sound, not music), scaled by a fixed base so it sits
+	// quietly beneath everything else.
+	private static uint ambientSource;
+	private static uint ambientBuffer;
+	private const float AmbientBaseGain = 0.55f;
+
 	// One-shot SFX: a small round-robin pool of sources + a cache of decoded buffers keyed by name
 	// (so a sound decodes once and replays cheaply).
 	private const int SfxSourceCount = 8;
@@ -40,6 +47,7 @@ internal static unsafe class Audio
 
 	private static float musicVolume = 0.5f;
 	private static float sfxVolume = 0.8f;
+	private static float speechVolume = 0.9f;
 
 	/// <summary>Background-music gain in [0,1].</summary>
 	public static float MusicVolume
@@ -53,11 +61,26 @@ internal static unsafe class Audio
 		}
 	}
 
-	/// <summary>Sound-effects gain in [0,1] (applied to each SFX as it plays).</summary>
+	/// <summary>
+	/// Sound-effects gain in [0,1] (applied to each SFX as it plays, and to the ambient bed which rides
+	/// this bus).
+	/// </summary>
 	public static float SfxVolume
 	{
 		get => sfxVolume;
-		set => sfxVolume = Math.Clamp( value, 0f, 1f );
+		set
+		{
+			sfxVolume = Math.Clamp( value, 0f, 1f );
+			if ( available )
+				al.SetSourceProperty( ambientSource, SourceFloat.Gain, AmbientBaseGain * sfxVolume );
+		}
+	}
+
+	/// <summary>Speech gain in [0,1] (applied to advisor / character lines played via <see cref="PlaySpeech"/>).</summary>
+	public static float SpeechVolume
+	{
+		get => speechVolume;
+		set => speechVolume = Math.Clamp( value, 0f, 1f );
 	}
 
 	/// <summary>
@@ -68,6 +91,21 @@ internal static unsafe class Audio
 	/// scale gain by their script level — see RideEngine).
 	/// </summary>
 	public static void PlaySfx( string key, byte[] mpegData, float gain = -1f )
+		=> PlayPooled( key, mpegData, gain, sfxVolume );
+
+	/// <summary>
+	/// Plays a one-shot speech line (advisor / character) through the SFX source pool, scaled by the
+	/// dedicated <see cref="SpeechVolume"/> bus rather than <see cref="SfxVolume"/> so the player can
+	/// balance voice against effects independently. Same caching / round-robin behaviour as
+	/// <see cref="PlaySfx"/>.
+	/// </summary>
+	public static void PlaySpeech( string key, byte[] mpegData, float gain = -1f )
+		=> PlayPooled( key, mpegData, gain, speechVolume );
+
+	// Shared one-shot playback over the SFX source pool. <paramref name="busVolume"/> is the bus the
+	// effect rides (SFX or speech); a negative <paramref name="gain"/> plays at the bus volume, otherwise
+	// the per-effect gain scales the bus.
+	private static void PlayPooled( string key, byte[] mpegData, float gain, float busVolume )
 	{
 		if ( !EnsureInitialized() )
 			return;
@@ -91,7 +129,7 @@ internal static unsafe class Audio
 
 			al.SourceStop( src );
 			al.SetSourceProperty( src, SourceInteger.Buffer, (int)buffer );
-			al.SetSourceProperty( src, SourceFloat.Gain, gain < 0f ? sfxVolume : Math.Clamp( gain, 0f, 1f ) * sfxVolume );
+			al.SetSourceProperty( src, SourceFloat.Gain, gain < 0f ? busVolume : Math.Clamp( gain, 0f, 1f ) * busVolume );
 			al.SourcePlay( src );
 		}
 		catch ( Exception e )
@@ -143,6 +181,52 @@ internal static unsafe class Audio
 
 		try { al.SourceStop( musicSource ); }
 		catch ( Exception e ) { Log.Warning( $"StopMusic failed: {e.Message}" ); }
+	}
+
+	/// <summary>
+	/// Decodes an in-memory MPEG (.mp2) stream and plays it on the looping ambient source (T-051),
+	/// replacing any previous ambience. The ambient bed rides the <see cref="SfxVolume"/> bus. Decode
+	/// errors / no device disable it quietly, matching the rest of the audio layer.
+	/// </summary>
+	public static void PlayAmbient( byte[] mpegData, bool loop = true )
+	{
+		if ( !TryDecode( mpegData, out var pcm, out var sampleRate, out var channels ) || pcm.Length == 0 )
+			return;
+
+		if ( !EnsureInitialized() )
+			return;
+
+		try
+		{
+			al.SourceStop( ambientSource );
+			al.SetSourceProperty( ambientSource, SourceInteger.Buffer, 0 );
+			if ( ambientBuffer != 0 )
+				al.DeleteBuffer( ambientBuffer );
+
+			ambientBuffer = al.GenBuffer();
+			var format = channels >= 2 ? BufferFormat.Stereo16 : BufferFormat.Mono16;
+			fixed ( short* data = pcm )
+				al.BufferData( ambientBuffer, format, data, pcm.Length * sizeof( short ), sampleRate );
+
+			al.SetSourceProperty( ambientSource, SourceInteger.Buffer, (int)ambientBuffer );
+			al.SetSourceProperty( ambientSource, SourceBoolean.Looping, loop );
+			al.SetSourceProperty( ambientSource, SourceFloat.Gain, AmbientBaseGain * sfxVolume );
+			al.SourcePlay( ambientSource );
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( $"Ambient playback failed: {e.Message}" );
+		}
+	}
+
+	/// <summary>Stops the ambient source (no-op if audio is unavailable).</summary>
+	public static void StopAmbient()
+	{
+		if ( !available )
+			return;
+
+		try { al.SourceStop( ambientSource ); }
+		catch ( Exception e ) { Log.Warning( $"StopAmbient failed: {e.Message}" ); }
 	}
 
 	private static bool TryDecode( byte[] mpegData, out short[] pcm, out int sampleRate, out int channels )
@@ -202,8 +286,16 @@ internal static unsafe class Audio
 			context = alc.CreateContext( device, null );
 			alc.MakeContextCurrent( context );
 			musicSource = al.GenSource();
+			ambientSource = al.GenSource();
 			for ( var i = 0; i < SfxSourceCount; i++ )
 				sfxSources[i] = al.GenSource();
+
+			// Adopt the persisted volume buses (T-051) so the first sound already plays at the player's
+			// saved levels rather than the hardcoded defaults.
+			var settings = GameSettings.Current;
+			musicVolume = Math.Clamp( settings.MusicVolume, 0f, 1f );
+			sfxVolume = Math.Clamp( settings.SfxVolume, 0f, 1f );
+			speechVolume = Math.Clamp( settings.SpeechVolume, 0f, 1f );
 
 			available = true;
 			Log.Info( "OpenAL audio initialized." );

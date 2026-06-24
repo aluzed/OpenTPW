@@ -19,8 +19,8 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 
 All format/VM decoding and the core gameplay loop are done. Open work falls into:
 - **Active feature tails** (actionable now): **T-046** advisor render · **T-047** EVENT 3D sound + particle
-  pools · **T-048** ride node geometry/movement · **T-049** management UI depth · **T-050** peep depth ·
-  **T-051** audio polish · **T-052** coaster `.hmp`/rotation.
+  pools · **T-048** ride node geometry/movement · **T-049** management UI depth · **T-052** coaster
+  `.hmp`/rotation.
 - **Blocked / deferred** (need an external sample or have no consumer): **T-017** (`SAD_*` save stream —
   no sample), **T-022** (EA-ADPCM mono waveform — no sample), **T-019** (`.PLB` per-effect field labels —
   no particle system to consume them; needs a dynamic capture), **T-021** (`.TQI` exact dequant — decoder
@@ -80,7 +80,7 @@ All format/VM decoding and the core gameplay loop are done. Open work falls into
 | [T-048](T-048-ride-node-geometry-movement.md) | 🟡 Feature | ⚠️ Partial | Ride **node graph decoded** (count@0x48, table@0x7c, 0x14B/node) + **node types labelled** (selectors RE'd: 0x80 object/head, 0x800 walk, 0x100 car) — `ModelFile.Nodes`/`NodesMatching`/`Node.IsObject/IsWalk/IsCar`, unit-tested, confirmed on real models. **Finding: node positions are NOT static file data** (null transform ptrs, no bone table) — they're runtime simulation output (bone skeleton + ride motion VM), so positions re-scope into T-032/T-033, not a file decode |
 | [T-049](T-049-management-ui-depth.md) | 🟡 Feature | ☐ To do | Management UI depth: clickable **finance graph** + per-ride price, staff **fire/patrol-zones**, **per-ride upgrade/research panel** (systems already core-done). (Tails of T-042/043/044) |
 | [T-050](T-050-peep-simulation-depth.md) | 🟡 Feature | ✅ Done | **Ride ratings & thoughts** (`Peep.RateRide` → satisfaction + `RideThought`, feeding mood / `Ride.Rating` reputation / rating-weighted ride choice), **water-aware pathfinding** (`PlacementGrid` water layer — impassable & unbuildable; A* routes around lakes), and the **real entrance gate** (`Level.ReadEntranceTile` from `FixedItemInfo.EntranceA/B` — peeps enter/leave through the gate) — all unit-tested |
-| [T-051](T-051-audio-polish.md) | 🟡 Feature | ☐ To do | Audio polish: **ambient loops** + a settings-screen **volume UI** (music/SFX/speech), persisted. (Tail of T-031) |
+| [T-051](T-051-audio-polish.md) | 🟡 Feature | ✅ Core done | Audio polish: **looping ambient bed** (`AmbientHD.sdt` under the music, on its own source) + **persistent `GameSettings`** (JSON, fault-tolerant, clamped) + a **dedicated speech bus** (advisor lines) + an **F10 options overlay with draggable music/SFX/speech sliders** (persist on release; `-`/`+` keys persist too). Unit-tested (`GameSettingsTests`). Per-area ambience selection remains (nice-to-have) |
 | [T-052](T-052-coaster-track-polish.md) | 🟢 Low | ⚠️ Partial | **`.hmp` decoded** — general footprint/height template (cols×rows, per-tile 5×5 code sub-grids, code grid + footprint grid; magic `0x0005AB1E`), used game-wide (coaster/queue/fence/sideshow/upgrade). New `HmpFile` parser, unit-tested + verified on real files. Remaining: author curved pieces + segment rotation (need the renderer) |
 
 Priority legend: 🔴 blocking · 🟠 important · 🟡 desirable/feature · ⚪ technical debt/polish.

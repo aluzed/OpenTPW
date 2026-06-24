@@ -160,7 +160,7 @@ public sealed class Advisor : Entity
 			if ( clip == null )
 				return;
 			clipName = clip.Name;
-			Audio.PlaySfx( $"advisor_{clip.Name}", clip.SoundData );
+			Audio.PlaySpeech( $"advisor_{clip.Name}", clip.SoundData );
 			startTime = Time.Now;
 			Log.Info( $"[advisor] speaking '{clipName}', {lip.Keyframes.Count} keyframes, {ClipLength:0.0}s" );
 		}
@@ -219,7 +219,7 @@ public sealed class Advisor : Entity
 			var sdtPath = Path.Join( GameDir.GamePath, "data", "levels", "jungle", "Speech", "speechHD.SDT" );
 			var clip = new SdtArchive( sdtPath ).soundFiles.FirstOrDefault( f => f.Name == clipName );
 			if ( clip != null )
-				Audio.PlaySfx( $"advisor_{clipName}", clip.SoundData );
+				Audio.PlaySpeech( $"advisor_{clipName}", clip.SoundData );
 			startTime = Time.Now;
 		}
 		catch { /* keep the visemes cycling even if audio replay fails */ }

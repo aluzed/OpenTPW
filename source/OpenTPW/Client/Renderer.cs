@@ -279,11 +279,15 @@ public partial class Renderer
 		{
 			Audio.MusicVolume -= 0.1f;
 			Log.Info( $"Music volume: {Audio.MusicVolume:F1}" );
+			GameSettings.Current.MusicVolume = Audio.MusicVolume;
+			GameSettings.Current.Save();
 		}
 		if ( volUp && !_volUpWas )
 		{
 			Audio.MusicVolume += 0.1f;
 			Log.Info( $"Music volume: {Audio.MusicVolume:F1}" );
+			GameSettings.Current.MusicVolume = Audio.MusicVolume;
+			GameSettings.Current.Save();
 		}
 		_volDownWas = volDown;
 		_volUpWas = volUp;

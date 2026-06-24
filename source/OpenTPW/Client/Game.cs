@@ -143,6 +143,27 @@ internal static class Game
 		}
 
 		//
+		// Ambient bed (T-051): a level ambience loop playing quietly under the music, from the global
+		// ambience archive. Optional — a missing archive just leaves the music playing alone.
+		//
+		try
+		{
+			var ambientPath = Path.Join( gamePath, "data", "global", "sound", "AmbientHD.sdt" );
+			if ( File.Exists( ambientPath ) )
+			{
+				var ambience = new SdtArchive( ambientPath );
+				var amb = ambience.soundFiles.FirstOrDefault( x => x.Name.StartsWith( "jungle", StringComparison.OrdinalIgnoreCase ) )
+							?? ambience.soundFiles.FirstOrDefault();
+				if ( amb != null )
+					Audio.PlayAmbient( amb.SoundData, loop: true );
+			}
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( $"Ambient audio unavailable: {e.Message}" );
+		}
+
+		//
 		// Run game loop
 		//
 		Render.OnUpdate += level.Update;
