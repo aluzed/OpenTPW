@@ -14,11 +14,20 @@ namespace OpenTPW;
 /// </summary>
 public sealed class RideVehicle : Entity
 {
-	private const int Seats = 4;
-	private const float Speed = 14f; // world units / second along the loop
+	private const int DefaultSeats = 4;  // when the model declares no car/seat nodes
+	private const int MaxSeats = 12;     // cap the visible markers regardless of the authored count
+	private const float Speed = 14f;     // world units / second along the loop
+	private const float SeatSpacing = 6f; // arc-length gap between trailing riders
 	private static readonly Vector3 Offscreen = new( 0, 0, -100000f );
 
+	/// <summary>The visible seat/rider count for a ride with <paramref name="authoredCarNodes"/> car/seat
+	/// nodes in its model (T-048): the authored count clamped to [1, <see cref="MaxSeats"/>], or the default
+	/// when the model declares none. So a tour ride with nine seat nodes shows nine riders, not a fixed four.</summary>
+	public static int SeatCountFor( int authoredCarNodes )
+		=> authoredCarNodes <= 0 ? DefaultSeats : Math.Clamp( authoredCarNodes, 1, MaxSeats );
+
 	private readonly Ride ride;
+	private readonly int seatCount;
 	private readonly Vector3[] loop; // closed ring of ground points
 	private readonly float[] cum;    // cumulative arc length
 	private readonly float length;
@@ -29,6 +38,7 @@ public sealed class RideVehicle : Entity
 	public RideVehicle( Ride ride, float tileSize, ParkTerrain terrain )
 	{
 		this.ride = ride;
+		seatCount = SeatCountFor( ride.CarNodeCount );
 
 		// An elliptical ring inside the footprint, sampled onto the terrain (a generated stand-in path).
 		const int n = 48;
@@ -58,8 +68,8 @@ public sealed class RideVehicle : Entity
 
 		var seatMat = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader" );
 		seatMat.Set( "Color", new Texture( [250, 220, 90, 255], 1, 1 ) ); // bright rider markers
-		seats = new ModelEntity[Seats];
-		for ( int i = 0; i < Seats; i++ )
+		seats = new ModelEntity[seatCount];
+		for ( int i = 0; i < seatCount; i++ )
 			seats[i] = new ModelEntity { Model = Primitives.Cube.GenerateModel( seatMat ), Scale = new Vector3( tileSize * 0.06f ), Position = Offscreen };
 	}
 
@@ -88,15 +98,18 @@ public sealed class RideVehicle : Entity
 		var rot = System.Numerics.Quaternion.CreateFromAxisAngle( System.Numerics.Vector3.UnitZ, yaw );
 		car.Rotation = rot;
 
-		int occupied = Math.Min( ride.Riders, Seats );
-		var side = new Vector3( -tan.Y, tan.X, 0f ).Normal;
-		for ( int i = 0; i < Seats; i++ )
+		// Riders trail the lead car along the loop, one per occupied seat, so the authored seat count reads
+		// as a train of cars rather than markers stacked beside one box.
+		int occupied = Math.Min( ride.Riders, seatCount );
+		for ( int i = 0; i < seatCount; i++ )
 		{
 			if ( i < occupied )
 			{
-				float off = (i % 2 == 0 ? 1f : -1f) * 4f;
-				seats[i].Position = pos + Vector3.Up * 4f + side * off;
-				seats[i].Rotation = rot;
+				float d = ((dist - (i + 1) * SeatSpacing) % length + length) % length;
+				var (sp, st) = Sample( d );
+				seats[i].Position = sp + Vector3.Up * 4f;
+				float syaw = MathF.Atan2( st.Y, st.X ) - MathF.PI / 2f;
+				seats[i].Rotation = System.Numerics.Quaternion.CreateFromAxisAngle( System.Numerics.Vector3.UnitZ, syaw );
 			}
 			else
 			{

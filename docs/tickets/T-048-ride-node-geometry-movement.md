@@ -66,12 +66,28 @@ RE'd the node graph from the MD2 loader + the runtime resolver `FUN_0044b220` / 
   not a decode — they fold into T-032's "authored car-physics subsystem" + the T-033 skeleton, not this
   file format.
 
+## Done (this pass — authored car/seat count drives the vehicle)
+
+The node **count** is static file data even though the positions aren't, so the first visible consumer of
+the decoded graph landed without needing the motion sim or a renderer: a car ride's `RideVehicle` now shows
+**as many riders/cars as the model declares car/seat nodes** (object `0x80` + car `0x100`), instead of a
+hardcoded four.
+
+- `Ride.CarNodeCount` = count of the model's object/car nodes, captured at model load.
+- `RideVehicle.SeatCountFor(authoredCarNodes)` clamps that to `[1, 12]` (default 4 when the model has no
+  node graph); the seat array is sized from it and the riders **trail the lead car along the loop** (a
+  train of cars) rather than four markers beside one box.
+- Unit-tested (`RideVehicleTests`: count-from-graph via `ParseNodeTable`, clamping/fallback) — so e.g.
+  Bird's nine seat nodes → nine riders, go-karts' three → three.
+
+The loop is still the procedural ellipse (the real path needs node *positions*, below).
+
 ## Remaining
 
 1. **Node world positions** require the ride **motion/skeleton simulation** (T-032 car-physics + T-033
    bone transforms), since they're not stored statically — re-scoped out of the "file decode" framing.
 2. Apply (once positions exist + a working renderer): drive `RideVehicle`/the coaster train along the car
-   nodes; place WALKON peeps & ADDHEAD heads at their nodes; feed positions to T-047.
+   nodes' authored *path*; place WALKON peeps & ADDHEAD heads at their nodes; feed positions to T-047.
 
 ## Acceptance criteria
 

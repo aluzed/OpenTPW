@@ -182,6 +182,11 @@ public class Ride : Entity
 	/// <summary>A generic moving car for "car" rides (set by the placement code) — torn down with the ride.</summary>
 	public RideVehicle? Vehicle { get; internal set; }
 
+	/// <summary>How many car/seat nodes the ride's authored model declares (object 0x80 + car 0x100 nodes
+	/// in its node graph — e.g. Bird's nine per-seat nodes). Drives the visible seat/car count on the
+	/// <see cref="RideVehicle"/> instead of a fixed guess (T-048). 0 when the model carries no node graph.</summary>
+	public int CarNodeCount { get; private set; }
+
 	/// <summary>True if this is a car ride — its script drives cars via the <c>TOUR</c>/<c>BUMP</c> opcodes
 	/// (tour rides, go-karts, water rides, bumpers). Such a ride gets a visible <see cref="RideVehicle"/>.</summary>
 	public bool IsCarRide => VM != null && VM.Instructions.Any( i => i.opcode is Opcode.TOUR or Opcode.BUMP );
@@ -457,7 +462,11 @@ public class Ride : Entity
 	private List<ModelEntity> BuildMeshEntities( string md2Path, string rideArchive )
 	{
 		var modelFile = new ModelFile( md2Path );
-		Log.Info( $"[ride] model {md2Path}: {modelFile.Meshes.Count} mesh(es)" );
+		// The authored car/seat nodes (object 0x80 + car 0x100) — their count drives how many riders the
+		// RideVehicle shows (T-048). Their world positions are runtime sim output, not file data, so only
+		// the count is used here.
+		CarNodeCount = modelFile.Nodes.Count( n => n.IsObject || n.IsCar );
+		Log.Info( $"[ride] model {md2Path}: {modelFile.Meshes.Count} mesh(es), {modelFile.Nodes.Count} node(s) ({CarNodeCount} car/seat)" );
 
 		var parts = new List<ModelEntity>();
 		foreach ( var mesh in modelFile.Meshes )
