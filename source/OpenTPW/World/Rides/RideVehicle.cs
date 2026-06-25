@@ -46,6 +46,9 @@ public sealed class RideVehicle : Entity
 	// branch of the original car engine). Tour/kart/water rides keep the loop (`carSim` stays null).
 	private readonly CarSim? carSim;
 	private readonly ParkTerrain terrain;
+	private readonly Model[]? carFrames; // the bumper's real b_car.MD2 mesh (+ b_carm wobble frame), if loaded
+	private float carAnimT;
+	private const float CarAnimFps = 6f;
 
 	public RideVehicle( Ride ride, float tileSize, ParkTerrain terrain )
 	{
@@ -74,23 +77,59 @@ public sealed class RideVehicle : Entity
 			Position = Offscreen,
 		};
 
-		// Bumper dodgems read as proper cars (bigger, dodgem-red); tour/kart seats are small rider markers.
+		// A bumper ride uses the real dodgem car mesh (b_car.MD2) driven by the arena collision sim; tour/
+		// kart seats are small rider markers along the loop.
 		bool isBumper = ride.IsBumperRide;
-		var seatMat = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader" );
-		seatMat.Set( "Color", isBumper
-			? new Texture( [220, 40, 40, 255], 1, 1 )    // dodgem red
-			: new Texture( [250, 220, 90, 255], 1, 1 ) ); // bright rider markers
-		float seatScale = isBumper ? tileSize * 0.22f : tileSize * 0.06f;
 		seats = new ModelEntity[seatCount];
-		for ( int i = 0; i < seatCount; i++ )
-			seats[i] = new ModelEntity { Model = Primitives.Cube.GenerateModel( seatMat ), Scale = new Vector3( seatScale ), Position = Offscreen };
 
-		// A bumper ride drives its cars through the arena collision sim instead of the loop: the arena is
-		// the ride's footprint half-extents, the cars its dodgems (one per seat). See CarSim / docs/08.
+		Model carModel; Vector3 carScale;
 		if ( isBumper )
+		{
 			carSim = new CarSim( seatCount,
 				ride.Shape.Width * tileSize * 0.5f, ride.Shape.Height * tileSize * 0.5f,
 				radius: tileSize * 0.3f, speed: Speed );
+
+			var (frames, scale) = LoadDodgemFrames( ride.Archive, tileSize );
+			carFrames = frames; // null if b_car.MD2 didn't load → fall back to a red box below
+			if ( frames != null ) { carModel = frames[0]; carScale = scale; }
+			else { carModel = ColourCube( 220, 40, 40 ); carScale = new Vector3( tileSize * 0.22f ); }
+		}
+		else
+		{
+			carModel = ColourCube( 250, 220, 90 ); carScale = new Vector3( tileSize * 0.06f ); // rider markers
+		}
+
+		for ( int i = 0; i < seatCount; i++ )
+			seats[i] = new ModelEntity { Model = carModel, Scale = carScale, Position = Offscreen };
+	}
+
+	private static Model ColourCube( byte r, byte g, byte b )
+	{
+		var mat = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader" );
+		mat.Set( "Color", new Texture( [r, g, b, 255], 1, 1 ) );
+		return Primitives.Cube.GenerateModel( mat );
+	}
+
+	// The bumper's real dodgem car (b_car.MD2) + its motion frame (b_carm.MD2), sized to ~0.9 tile so the
+	// cars read at dodgem scale. Null if the mesh doesn't load (caller uses a red box stand-in).
+	private static (Model[]? Frames, Vector3 Scale) LoadDodgemFrames( string archive, float tileSize )
+	{
+		var frames = new List<Model>();
+		Vector3 scale = Vector3.One;
+		foreach ( var name in new[] { "b_car.MD2", "b_carm.MD2" } )
+		{
+			var built = RideCarMesh.Build( archive, name );
+			if ( built == null )
+				continue;
+			frames.Add( built.Value.Model );
+			if ( frames.Count == 1 )
+			{
+				float he = built.Value.HalfExtent;
+				float fit = he > 1e-3f ? (tileSize * 0.9f) / (2f * he) : 1f;
+				scale = built.Value.DecompScale * fit;
+			}
+		}
+		return frames.Count > 0 ? (frames.ToArray(), scale) : (null, scale);
 	}
 
 	/// <summary>Despawn the car + rider markers (called when the ride is sold/demolished).</summary>
@@ -164,13 +203,18 @@ public sealed class RideVehicle : Entity
 			carSim!.Step( Time.Delta );
 
 		car.Position = Offscreen; // no lead car in bumper mode
+
+		// Cycle the dodgem's animation frames (b_car ↔ b_carm) for its wobble.
+		carAnimT += Time.Delta;
+		int frame = carFrames is { Length: > 1 } ? (int)(carAnimT * CarAnimFps) % carFrames.Length : 0;
+
 		int occupied = DemoAllCars ? seatCount : Math.Min( ride.Riders, seatCount );
 		var c = ride.Position;
 		for ( int i = 0; i < seatCount; i++ )
 		{
 			var cs = carSim!.Cars[i];
 			float wx = c.X + cs.Pos.X, wy = c.Y + cs.Pos.Y;
-			var pos = new Vector3( wx, wy, 0 ).WithZ( terrain.SampleHeight( wx, wy ) + 3f );
+			var pos = new Vector3( wx, wy, 0 ).WithZ( terrain.SampleHeight( wx, wy ) + 2f );
 
 			if ( i < seatNodeIds.Count )
 				ride.NodeField.PublishMoving( seatNodeIds[i], pos );
@@ -178,7 +222,12 @@ public sealed class RideVehicle : Entity
 			if ( i < occupied )
 			{
 				seats[i].Position = pos;
-				seats[i].Rotation = System.Numerics.Quaternion.CreateFromAxisAngle( System.Numerics.Vector3.UnitZ, cs.Heading );
+				// The car mesh's long axis is +Y (the ride-car convention), so face it along travel by -90°;
+				// the plain marker box has no front, so it uses the raw heading.
+				float yaw = carFrames != null ? cs.Heading - MathF.PI / 2f : cs.Heading;
+				seats[i].Rotation = System.Numerics.Quaternion.CreateFromAxisAngle( System.Numerics.Vector3.UnitZ, yaw );
+				if ( carFrames != null )
+					seats[i].Model = carFrames[frame];
 			}
 			else
 			{

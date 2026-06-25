@@ -201,53 +201,8 @@ public sealed class CoasterTrain : Entity
 		return ([Primitives.Cube.GenerateModel( mat )], new Vector3( tileSize * 0.22f, tileSize * 0.36f, 1.4f ));
 	}
 
-	// One CrocCar frame mesh, built the same way ride meshes are (per-material .wct textures, Y/Z swizzle),
-	// centred on its own centroid so it sits on the track point. Returns null if the mesh won't load.
+	// One CrocCar frame mesh — the shared ride-car mesh loader (per-material .wct textures, Y/Z swizzle,
+	// centroid-centred). Returns null if the mesh won't load.
 	private static (Model Model, Vector3 DecompScale, float HalfExtent)? BuildCarMesh( string archive, string name )
-	{
-		try
-		{
-			var mesh = new ModelFile( $"{archive}/{name}" ).Meshes[0];
-
-			var material = new Material<ObjectUniformBuffer>( "content/shaders/test.shader" );
-			var textures = new List<Texture>();
-			for ( int i = 0; i < 16; ++i )
-			{
-				if ( mesh.Materials.Length <= i ) { textures.Add( Texture.Missing ); continue; }
-				try { textures.Add( new Texture( $"{archive}/textures/{mesh.Materials[i].Name}.wct", TextureFlags.Repeat ) ); }
-				catch { textures.Add( Texture.Missing ); }
-			}
-			material.Set( "Color", [.. textures] );
-
-			System.Numerics.Matrix4x4.Decompose( mesh.TransformMatrix, out var scl, out _, out _ );
-
-			var centroid = Vector3.Zero;
-			for ( int i = 0; i < mesh.Vertices.Length; ++i )
-				centroid += new Vector3( mesh.Vertices[i].Position.X, mesh.Vertices[i].Position.Z, mesh.Vertices[i].Position.Y );
-			centroid *= 1f / mesh.Vertices.Length;
-
-			var vertices = new List<Vertex>( mesh.Vertices.Length );
-			float halfExtent = 0f;
-			for ( int i = 0; i < mesh.Vertices.Length; ++i )
-			{
-				var p = new Vector3( mesh.Vertices[i].Position.X, mesh.Vertices[i].Position.Z, mesh.Vertices[i].Position.Y ) - centroid;
-				halfExtent = MathF.Max( halfExtent, MathF.Max( MathF.Abs( p.X ), MathF.Abs( p.Y ) ) );
-				vertices.Add( new Vertex
-				{
-					Position = p,
-					Normal = mesh.Normals[i],
-					TexCoords = mesh.TexCoords[i],
-					TexIndex = (int)mesh.Vertices[i].TextureIndex,
-					MatFlags = mesh.Materials[(int)mesh.Vertices[i].TextureIndex].Flags,
-				} );
-			}
-
-			var model = new Model( [.. vertices], mesh.Indices, material );
-			return (model, new Vector3( scl.X, scl.Z, scl.Y ), halfExtent);
-		}
-		catch
-		{
-			return null;
-		}
-	}
+		=> RideCarMesh.Build( archive, name );
 }
