@@ -6,11 +6,14 @@ namespace OpenTPW;
 /// riders (occupancy-driven, like the coaster's <see cref="CoasterTrain"/>), giving these rides a visible
 /// moving wagon instead of a static model. T-032.
 ///
-/// <para>The path is a <b>generated</b> ring inside the footprint, not the ride's authored track: the real
-/// car path lives in the ride's data (tour nodes / track geometry) which isn't decoded yet, and the
-/// <c>TOUR</c>/<c>BUMP</c> opcodes that drive the authentic car-object engine are multiplexed commands
-/// over a car class we don't model. So this is a visible stand-in (like the light/particle proxies); the
-/// car moves while the ride is running and carries seat markers for its live occupancy.</para>
+/// <para>The path follows the ride's <b>authored footprint</b> (its <c>.sam</c> shape) and passes the
+/// entrance (<see cref="RidePath.FootprintRing"/>), falling back to a generic ellipse for a degenerate
+/// footprint. It is <b>not</b> the ride's exact authored track: the real car path is simulation output —
+/// the original animates a bone rig and reads the car/seat node positions off it each frame — and that rig
+/// isn't decoded (there is no static path in the asset files), while the <c>TOUR</c>/<c>BUMP</c> opcodes
+/// that drive the authentic car-object engine are multiplexed commands over a car class we don't model. So
+/// this is a footprint-shaped stand-in (like the light/particle proxies); the car moves while the ride is
+/// running and carries seat markers for its live occupancy.</para>
 /// </summary>
 public sealed class RideVehicle : Entity
 {
@@ -45,18 +48,9 @@ public sealed class RideVehicle : Entity
 		// follow the moving car instead of the ride centre.
 		seatNodeIds = ride.NodeField.CarSeatNodeIds.Take( seatCount ).ToList();
 
-		// An elliptical ring inside the footprint, sampled onto the terrain (a generated stand-in path).
-		const int n = 48;
-		float rx = MathF.Max( tileSize, ride.TileW * tileSize * 0.32f );
-		float ry = MathF.Max( tileSize, ride.TileH * tileSize * 0.32f );
-		var c = ride.Position;
-		loop = new Vector3[n + 1];
-		for ( int i = 0; i <= n; i++ )
-		{
-			float a = i / (float)n * MathF.Tau;
-			var p = new Vector3( c.X + MathF.Cos( a ) * rx, c.Y + MathF.Sin( a ) * ry, 0 );
-			loop[i] = p.WithZ( terrain.SampleHeight( p.X, p.Y ) + 2f );
-		}
+		// Prefer a loop that traces the ride's authored footprint (its .sam shape) and passes the entrance;
+		// fall back to a generic ellipse for a degenerate footprint (T-048).
+		loop = BuildFootprintLoop( ride, tileSize, terrain ) ?? BuildEllipseLoop( ride, tileSize, terrain );
 		cum = new float[loop.Length];
 		for ( int i = 1; i < loop.Length; i++ )
 			cum[i] = cum[i - 1] + loop[i].Distance( loop[i - 1] );
@@ -128,6 +122,46 @@ public sealed class RideVehicle : Entity
 				seats[i].Position = Offscreen;
 			}
 		}
+	}
+
+	// A closed loop tracing the ride's authored footprint perimeter (its .sam shape), pulled slightly
+	// inside the edge and smoothed into a curve; null when the footprint is degenerate (caller uses the
+	// ellipse). Uses real authored shape data + the entrance, so the loop adapts to non-rectangular rides
+	// and passes the boarding tile. See RidePath.
+	private static Vector3[]? BuildFootprintLoop( Ride ride, float tileSize, ParkTerrain terrain )
+	{
+		var ring = RidePath.FootprintRing( ride.Shape.Cells, ride.Shape.Entrance );
+		if ( ring.Count < 3 )
+			return null;
+
+		const float Inset = 0.82f; // pull the ring inside the footprint edge so the car reads as "on" the ride
+		float halfW = ride.Shape.Width / 2f, halfH = ride.Shape.Height / 2f;
+		var ctr = ride.Position;
+		var ctrl = new List<Vector3>( ring.Count );
+		foreach ( var (tx, ty) in ring )
+		{
+			float wx = ctr.X + (tx + 0.5f - halfW) * Inset * tileSize;
+			float wy = ctr.Y + (ty + 0.5f - halfH) * Inset * tileSize;
+			ctrl.Add( new Vector3( wx, wy, 0 ).WithZ( terrain.SampleHeight( wx, wy ) + 2f ) );
+		}
+		return RidePath.Smooth( ctrl, closed: true, sub: 6 ).ToArray();
+	}
+
+	// The original generic fallback: an elliptical ring inside the footprint, sampled onto the terrain.
+	private static Vector3[] BuildEllipseLoop( Ride ride, float tileSize, ParkTerrain terrain )
+	{
+		const int n = 48;
+		float rx = MathF.Max( tileSize, ride.TileW * tileSize * 0.32f );
+		float ry = MathF.Max( tileSize, ride.TileH * tileSize * 0.32f );
+		var c = ride.Position;
+		var l = new Vector3[n + 1];
+		for ( int i = 0; i <= n; i++ )
+		{
+			float a = i / (float)n * MathF.Tau;
+			var p = new Vector3( c.X + MathF.Cos( a ) * rx, c.Y + MathF.Sin( a ) * ry, 0 );
+			l[i] = p.WithZ( terrain.SampleHeight( p.X, p.Y ) + 2f );
+		}
+		return l;
 	}
 
 	// Position + forward tangent at arc-length d along the loop.

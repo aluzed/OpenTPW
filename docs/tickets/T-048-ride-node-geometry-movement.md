@@ -133,12 +133,36 @@ behaviour + tests are untouched:
 - Unit-tested (`RideEngineTests.WalkSample*` — midpoint/clamp/end-pin/zero-span + atan2 facing;
   `RideScriptTests.HeadCapacityFollowsHeadNodeCount`/`HeadCapacityIgnoresNonPositive`).
 
+## Done (this pass — footprint-shaped car path) + the hard limit on the authored shape
+
+First, the **finding** (confirmed by a full code+asset sweep, corroborating the T-048 node finding):
+**there is no authored car-path data in the ride files.** The original animates a **bone rig** and reads
+the car/seat node positions off it each frame (`FUN_00556b90`); that rig isn't decoded, and the only
+static path anywhere is the **player-laid coaster** (`CoasterTrack`, tile list + cross-section + Catmull-Rom
+spline). So the exact authored track shape is **simulation output** — it needs the motion sim / skeleton
+(T-032 car-physics + T-033 bone transforms), not a decode, and tp.exe would have to be re-imported to RE the
+car engine the prior pass already showed is engine-less in our state.
+
+What **is** authored and was being ignored: the ride's **footprint** (the `.sam` `Info.Shape` grid,
+`RideShape.Cells`) and its **entrance**. So the car loop now **traces the real footprint perimeter and
+passes the boarding tile** instead of a generic centred ellipse:
+
+- new `RidePath.FootprintRing` (pure): orders the footprint's perimeter tiles into a ring by angle around
+  the centroid, rotated to start at the entrance; degenerate footprints (a thin strip / < 3 perimeter
+  tiles) return empty so the caller keeps the ellipse.
+- `RidePath.Smooth` is the coaster's closed **Catmull-Rom** curve (reused per the recommendation), so the
+  loop is a smooth ride-shaped track; `RideVehicle.BuildFootprintLoop` maps the ring to world (inset inside
+  the footprint edge, terrain-sampled) and `BuildEllipseLoop` is the unchanged fallback.
+- Net: the car now circulates the **ride's actual shape** (adapts to L-shapes / non-rectangular rides) and
+  passes the entrance — a faithful-but-bounded stand-in, honestly **not** the exact authored track.
+- Unit-tested (`RidePathTests`: perimeter ring + loop order, entrance anchoring, non-rectangular shape,
+  degenerate fallback, Catmull-Rom closure/subdivision).
+
 ## Remaining
 
-1. **Authored path shape.** The moving nodes follow the *procedural* ellipse, not the ride's authored
-   track — the real shape still needs the ride **motion/skeleton simulation** (T-032 car-physics + T-033
-   bone transforms). The resolver is shape-agnostic, so once the real path exists, the vehicle just
-   publishes those positions instead.
+1. **Exact authored track shape** (the deep one): the real per-frame car path is the **bone-rig motion sim**
+   output (T-032 car-physics + T-033 skeleton) — not in the files. The footprint loop is the stand-in until
+   that's decoded; `RideVehicle`'s `loop`/`Sample` is shape-agnostic, so the real path drops straight in.
 2. **Art swap.** WALKON peeps + ADDHEAD heads are placed + animated as marker proxies; rendering the real
    peep sprite / head sub-mesh at those positions is a renderer follow-up.
 
@@ -146,13 +170,12 @@ behaviour + tests are untouched:
 
 - A tour ride's car follows the ride's authored path; a walking peep (WALKON) glides between the ride's
   real walk nodes; heads (ADDHEAD) appear at head nodes. *(Node-table decode + the runtime resolver +
-  node-positioned effects + WALKON/ADDHEAD placement done — peeps glide between walk nodes, heads sit at
-  head nodes, as marker proxies; the authored path shape + the real peep/head art await the motion sim +
-  the render path.)*
+  node-positioned effects + WALKON/ADDHEAD placement + a footprint-shaped car path done; the exact authored
+  track shape (bone-rig sim output, not in the files) + the real peep/head art remain.)*
 
 ## Affected files
 
-`source/OpenTPW/World/Rides/RideNodePositions.cs` (new), `RideVehicle.cs`, `RideEngine.cs`,
-`IRideEngine.cs`, `source/OpenTPW/World/Ride.cs`, `source/OpenTPW/World/Level.cs`,
+`source/OpenTPW/World/Rides/RideNodePositions.cs` (new), `RidePath.cs` (new), `RideVehicle.cs`,
+`RideEngine.cs`, `IRideEngine.cs`, `source/OpenTPW/World/Ride.cs`, `source/OpenTPW/World/Level.cs`,
 `source/OpenTPW/VM/RideVM.Walk.cs`/`RideVM.Heads.cs` (head-capacity setter), `source/OpenTPW/VM/Handlers/Particles.cs`,
 `source/OpenTPW.Files/Formats/Model/ModelFile.cs` (node-graph access).
