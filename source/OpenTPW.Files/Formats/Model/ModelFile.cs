@@ -18,7 +18,10 @@ public partial class ModelFile : BaseFormat
 	/// at header 0x48, table = <c>u32</c> file offset at header 0x7c, 0x14 bytes/node. The VM resolves a
 	/// node by <c>(TypeMask &amp; selector) != 0 &amp;&amp; NodeId == requested</c>. <see cref="Node.TypeMask"/>
 	/// is a bitfield of which subsystems may use the node. (The per-node transform pointers are null in the
-	/// file — node world positions bind to bone transforms at runtime, a follow-up; see docs/tickets/T-048.)
+	/// file and there is <b>no bone table</b> — Ghidra-confirmed there is no file skeleton: a node's world
+	/// position is a runtime 4×4 matrix bound on the fly, translation row at <c>+0x30</c>, read by
+	/// <c>FUN_00556b90</c>/<c>FUN_00435710</c> and driven by the keyframe anim or the car waypoint sim. So
+	/// only the type/id graph is file data; positions are simulation output. See docs/08 + docs/tickets/T-048.)
 	/// </summary>
 	public List<Node> Nodes { get; } = new();
 

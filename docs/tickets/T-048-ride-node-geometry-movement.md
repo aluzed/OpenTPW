@@ -158,11 +158,33 @@ passes the boarding tile** instead of a generic centred ellipse:
 - Unit-tested (`RidePathTests`: perimeter ring + loop order, entrance anchoring, non-rectangular shape,
   degenerate fallback, Catmull-Rom closure/subdivision).
 
+## Done (this pass — the "rig" decoded: there is no file skeleton)
+
+tp.exe was re-imported into Ghidra and the node-positioning chain decompiled end to end (write-up:
+[docs/08 — "The node rig"](../08-ghidra-animation.md#the-node-rig--how-node-world-positions-are-produced-no-file-skeleton)).
+**Definitive result: there is no bone/skeleton structure in the model file, and nothing to decode as a
+format.** A node's world position is produced entirely at runtime:
+
+- `FUN_0044b220(model, selector, id)` resolves a node **index** (count `@0x48`, table `@0x7c`, `0x14`/entry,
+  match `(mask & selector) && id`) — byte-for-byte OpenTPW's `ModelFile`/`Node.Matches`.
+- `FUN_00556b90` reads that node's **runtime 4×4 matrix** (in a per-instance parallel table) and returns its
+  **translation row `+0x30`** as the position (`FUN_00435710`) and forward row `+0x20` as facing.
+- The matrix is **never loaded from the file** (the file node entry's pointer slots `+0xc/+0x10` are null,
+  there is no bone table). It's bound at runtime to an attached object and driven by either the **keyframe
+  surface animation** (T-033) or, for cars, the **waypoint sim** (`FUN_0054a040`: a kart loops the model's
+  `0x100` car-node list, a bumper randoms it). So node motion is the runtime composition of those two — **not
+  a separable rig**, which is why neither the node positions nor the car path are static file data.
+
+This **closes the "decode the rig" thread** (the answer is structural: nothing to decode) and turns three
+prior "RE'd" claims into binary-cited facts: head capacity = type-`0x80` node count (`FUN_005587f0`), the
+node table layout + resolver match, and the EVENT/walk/head positioning all flowing through `FUN_00556b90`.
+
 ## Remaining
 
-1. **Exact authored track shape** (the deep one): the real per-frame car path is the **bone-rig motion sim**
-   output (T-032 car-physics + T-033 skeleton) — not in the files. The footprint loop is the stand-in until
-   that's decoded; `RideVehicle`'s `loop`/`Sample` is shape-agnostic, so the real path drops straight in.
+1. **Exact authored track shape / node motion** is **runtime simulation output** (now proven, not a file
+   decode): it needs re-implementing the **car waypoint/keyframe motion** (T-032 car-physics + T-033
+   skeleton-driven surface transforms), not a parser. The footprint loop + the node→world resolver are the
+   stand-ins until then; `RideVehicle`'s `loop`/`Sample` is shape-agnostic, so a real path drops straight in.
 2. **Art swap.** WALKON peeps + ADDHEAD heads are placed + animated as marker proxies; rendering the real
    peep sprite / head sub-mesh at those positions is a renderer follow-up.
 
@@ -170,8 +192,9 @@ passes the boarding tile** instead of a generic centred ellipse:
 
 - A tour ride's car follows the ride's authored path; a walking peep (WALKON) glides between the ride's
   real walk nodes; heads (ADDHEAD) appear at head nodes. *(Node-table decode + the runtime resolver +
-  node-positioned effects + WALKON/ADDHEAD placement + a footprint-shaped car path done; the exact authored
-  track shape (bone-rig sim output, not in the files) + the real peep/head art remain.)*
+  node-positioned effects + WALKON/ADDHEAD placement + a footprint-shaped car path done; the "rig" is now
+  proven to be **runtime sim, not a file structure** — the exact node motion needs the car/keyframe sim
+  re-implemented, and the real peep/head art remains.)*
 
 ## Affected files
 

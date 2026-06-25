@@ -247,6 +247,71 @@ the procedural placeholder until the keyframe bytes are decoded.
 quantisation it references) so the engine can morph the base mesh through the real per-frame positions
 — replacing the placeholder with the original animation.
 
+## The node "rig" — how node world positions are produced (no file skeleton)
+
+> **Method.** Ghidra 12.1.2 headless on the no-CD `tp.exe` (3.56 MB, the depacked build — see
+> [05](05-ghidra-reverse.md)); the functions below were decompiled directly. This closes the
+> long-standing T-048 question "decode the skeleton/rig that positions ride nodes."
+
+**Conclusion up front: there is no bone/skeleton structure in the model file, and nothing to decode as a
+format.** A node's world position is produced entirely at **runtime**, by composing a per-node 4×4 matrix
+that the engine binds on the fly. The whole mechanism:
+
+### The node resolver — `FUN_0044b220(model, selector, id) → index`
+
+Exactly the OpenTPW `ModelFile` model: it reads the node **count** at the file header `0x48` (`u16`) and
+the node **table** pointer at `0x7c`, walks `0x14`-byte entries, and returns the **index** of the first
+node whose **id** (entry `+4`) equals `id` **and** whose **type mask** (entry `+0`) ANDs non-zero with
+`selector`. An all-types request uses `selector = 0x3da1f82`. This is byte-for-byte
+`ModelFile.NodesMatching` / `Node.Matches` — confirmed against the binary.
+
+### The node positioner — `FUN_00556b90` + `FUN_00435710`
+
+`FUN_00556b90(model, outPos, outDir, nodeId, selector)` resolves the node index with `FUN_0044b220`, then
+reads a **runtime parallel node table** (allocated per model instance, same `0x14` stride, reached via
+`instance → +8 → +0x28 → +4`):
+
+- entry `+4` = a pointer to the node's **4×4 transform matrix** (`0` ⇒ position is the origin);
+- entry `+0` = a flags byte (bit `0x10` flips the facing direction).
+
+The **position is the matrix's translation row**: `FUN_00435710` copies `matrix +0x30 / +0x34 / +0x38`.
+The **facing** is the matrix's forward row `+0x20 / +0x24 / +0x28` (normalised, negated when flag `0x10`).
+So a node's matrix is a standard 4×4 (`+0x00` right, `+0x10` up, `+0x20` forward, `+0x30` translation;
+each row four floats), and the world position is that matrix composed with the **model's own world
+transform** (the walk updater `FUN_00557ab0` post-multiplies by `model … +0x78`). The error path logs
+`"RSSE: Invalid Node ID"`; when `nodeId < 0` it falls back to the model body position
+(`model … +0x78 → +0x44`) — which is exactly OpenTPW's "no node ⇒ ride centre" fallback.
+
+### Where the matrix comes from — runtime, never the file
+
+In every shipped model the file node entry's two pointer slots (`+0xc/+0x10`) are **null** and there is
+**no bone table** — so the matrix at runtime `entry+4` is **not** loaded from the file. It is bound when an
+object is attached to the node, and updated by that object's subsystem:
+
+- **Animated meshes** — the keyframe surface animation above (`FUN_00471860`: rotation/scale/translation
+  /morph) writes the surface transforms each frame; a node bound to a surface tracks it.
+- **Cars (TOUR/BUMP/COAST)** — a car *instance* carries its own matrix and walks a **waypoint list**. The
+  kart/bumper updater `FUN_0054a040` holds the class's node/waypoint list at `class[0x2a]` (singly linked by
+  `+0x14`, length `class[0x17]`); the instance's current waypoint is `inst[0x1f] = *(node+4)`. A **kart**
+  steps the list in order (a fixed loop); a **bumper** picks waypoints at random (`FUN_00516330 % count`)
+  and does pairwise proximity collision against the other cars. The car's front/rear nodes are resolved as
+  `FUN_0044b220(model, 0x100, 1)` and `(…, 0x100, 2)` — i.e. **car nodes carry type `0x100`, ids 1/2**.
+
+So node motion is the runtime **composition of the keyframe animation (T-033) and the car waypoint sim** —
+there is no separable rig to lift out of the file. The car *path shape* is the sequence of the model's car
+nodes, but their **positions** are produced by the sim, not stored — matching the T-048 finding and the
+footprint-shaped stand-in OpenTPW now uses.
+
+### Cross-validation of existing OpenTPW code (now binary-cited)
+
+- **Head capacity = count of type-`0x80` nodes.** The RSE loader `FUN_005587f0` loops
+  `FUN_0044b220(model, 0x80, i)` for `i = 1, 2, …` until `-1`, storing the count — exactly
+  `RideVM.SetHeadCapacity(NodeField.ObjectNodeIds.Count)`.
+- **Node table layout + resolver match** (count `@0x48`, table `@0x7c`, `0x14`/entry, `{mask, id, …}`,
+  match `(mask & selector) && id`) — exactly `ModelFile.ParseNodeTable` / `Node.Matches`.
+- **Effect/walk/head node positioning** all flow through `FUN_00556b90`, the function whose `nodeId`
+  operand OpenTPW now threads through EVENT/SPARK/REPAIREFFECT and WALKON/ADDHEAD (T-048).
+
 ## Function map
 
 | Function | Role |
@@ -266,6 +331,12 @@ quantisation it references) so the engine can morph the base mesh through the re
 | `FUN_00467310` | **Animating textures** (`ANIMATINGTEXTURES`): procedural UV scroll — a *separate* system from keyframes |
 | `FUN_00470b30` | Marks a frame surface dirty (sets flag `0x20` on the model) — not the vertex fold |
 | `FUN_005ecb40` | GDI text → sign texture rasterisation |
+| `FUN_0044b220` | **Node resolver**: count `@0x48`, table `@0x7c`, `0x14`/entry; returns the index where `(mask & selector) && id` |
+| `FUN_00556b90` | **Node positioner**: resolves the node, reads its runtime 4×4 matrix (translation `+0x30`, forward `+0x20`); `nodeId < 0` ⇒ model body |
+| `FUN_00435710` | Copies a matrix's translation row (`+0x30/0x34/0x38`) — the node→position primitive |
+| `FUN_00557ab0` | Per-frame **walk** update: resolves each walk slot's `0x800` node, post-multiplies by the model world transform (`+0x78`) |
+| `FUN_0054a040` | **Kart/bumper car** updater: waypoint list `class[0x2a]` (linked `+0x14`), current `inst[0x1f]`; kart loops it, bumper randoms; car nodes `0x100` ids 1/2 |
+| `FUN_005587f0` | RSE script loader; counts type-`0x80` nodes (`FUN_0044b220(model,0x80,i)`) for the **head-slot capacity** |
 
 Strings: `%s%s%c.md2` `0x0074d2a8` · `%s%s%c%d.md2` `0x0074d2b4` · `sign1.tga` `0x0074d6b4` ·
 `sign2.tga` `0x0074d6a8` · `%s\%s.sgn` `0x0074d68c` · `ANIMATINGTEXTURES` `0x007443f0` ·
