@@ -1,19 +1,22 @@
 namespace OpenTPW;
 
 /// <summary>
-/// A generic ride car for the "car" rides — tour rides, go-karts, water rides, bumpers (their scripts use
-/// the <c>TOUR</c>/<c>BUMP</c> opcodes). It runs a loop around the ride's footprint carrying the ride's
-/// riders (occupancy-driven, like the coaster's <see cref="CoasterTrain"/>), giving these rides a visible
-/// moving wagon instead of a static model. T-032.
+/// A ride car for the "car" rides — tour rides, go-karts, water rides, bumpers (their scripts use the
+/// <c>TOUR</c>/<c>BUMP</c> opcodes). It re-implements the two motion behaviours of the original car engine
+/// (Ghidra <c>FUN_0054a040</c>, docs/08), occupancy-driven, giving these rides visible moving cars:
+/// <list type="bullet">
+///   <item><b>Circuit</b> (tour / kart / water): the cars follow a loop around the footprint in sequence,
+///   like the coaster's <see cref="CoasterTrain"/>.</item>
+///   <item><b>Arena</b> (bumper / dodgem — the ride's script uses <c>BUMP</c>): the cars roam to random
+///   waypoints inside the footprint and bounce off each other and the walls, via <see cref="CarSim"/>.</item>
+/// </list>
 ///
-/// <para>The path follows the ride's <b>authored footprint</b> (its <c>.sam</c> shape) and passes the
-/// entrance (<see cref="RidePath.FootprintRing"/>), falling back to a generic ellipse for a degenerate
-/// footprint. It is <b>not</b> the ride's exact authored track: the real car path is simulation output —
-/// the original animates a bone rig and reads the car/seat node positions off it each frame — and that rig
-/// isn't decoded (there is no static path in the asset files), while the <c>TOUR</c>/<c>BUMP</c> opcodes
-/// that drive the authentic car-object engine are multiplexed commands over a car class we don't model. So
-/// this is a footprint-shaped stand-in (like the light/particle proxies); the car moves while the ride is
-/// running and carries seat markers for its live occupancy.</para>
+/// <para>The circuit path follows the ride's <b>authored footprint</b> (its <c>.sam</c> shape) and passes
+/// the entrance (<see cref="RidePath.FootprintRing"/>), falling back to a generic ellipse for a degenerate
+/// footprint. The motion <i>behaviour</i> is faithful to the original; the waypoint <i>positions</i> are a
+/// footprint-shaped stand-in, because the real ones are runtime sim output, not file data — the original
+/// reads car/seat node positions off matrices bound at runtime (no static path in the assets; docs/08 /
+/// T-048). So like the light/particle proxies, the cars move while the ride runs and carry their riders.</para>
 /// </summary>
 public sealed class RideVehicle : Entity
 {
@@ -39,9 +42,15 @@ public sealed class RideVehicle : Entity
 	private readonly IReadOnlyList<int> seatNodeIds; // car/seat node ids this vehicle drives (T-048)
 	private float dist;
 
+	// Bumper/dodgem rides run the arena collision sim instead of the circuit loop (docs/08 — the BUMP
+	// branch of the original car engine). Tour/kart/water rides keep the loop (`carSim` stays null).
+	private readonly CarSim? carSim;
+	private readonly ParkTerrain terrain;
+
 	public RideVehicle( Ride ride, float tileSize, ParkTerrain terrain )
 	{
 		this.ride = ride;
+		this.terrain = terrain;
 		seatCount = SeatCountFor( ride.CarNodeCount );
 		// The model's car/seat node ids, one per visible seat — we publish each one's live world position
 		// to the ride's node field every frame (T-048), so EVENT/SPARK effects addressed to a seat node
@@ -70,6 +79,13 @@ public sealed class RideVehicle : Entity
 		seats = new ModelEntity[seatCount];
 		for ( int i = 0; i < seatCount; i++ )
 			seats[i] = new ModelEntity { Model = Primitives.Cube.GenerateModel( seatMat ), Scale = new Vector3( tileSize * 0.06f ), Position = Offscreen };
+
+		// A bumper ride drives its cars through the arena collision sim instead of the loop: the arena is
+		// the ride's footprint half-extents, the cars its dodgems (one per seat). See CarSim / docs/08.
+		if ( ride.IsBumperRide )
+			carSim = new CarSim( seatCount,
+				ride.Shape.Width * tileSize * 0.5f, ride.Shape.Height * tileSize * 0.5f,
+				radius: tileSize * 0.3f, speed: Speed );
 	}
 
 	/// <summary>Despawn the car + rider markers (called when the ride is sold/demolished).</summary>
@@ -83,6 +99,12 @@ public sealed class RideVehicle : Entity
 
 	protected override void OnUpdate()
 	{
+		if ( carSim != null )
+		{
+			UpdateArena();
+			return;
+		}
+
 		if ( length < 1e-3f )
 			return;
 
@@ -116,6 +138,38 @@ public sealed class RideVehicle : Entity
 				seats[i].Position = seatPos;
 				float syaw = MathF.Atan2( st.Y, st.X ) - MathF.PI / 2f;
 				seats[i].Rotation = System.Numerics.Quaternion.CreateFromAxisAngle( System.Numerics.Vector3.UnitZ, syaw );
+			}
+			else
+			{
+				seats[i].Position = Offscreen;
+			}
+		}
+	}
+
+	// Bumper/dodgem update: advance the arena collision sim and place one car per occupied seat at its
+	// local arena position mapped to world + terrain. There's no lead car or circuit loop — the dodgems
+	// roam and bump (docs/08, the BUMP branch). Each car's live world position feeds the node field (T-048).
+	private void UpdateArena()
+	{
+		if ( ride.Riders > 0 && !ride.IsBroken )
+			carSim!.Step( Time.Delta );
+
+		car.Position = Offscreen; // no lead car in bumper mode
+		int occupied = Math.Min( ride.Riders, seatCount );
+		var c = ride.Position;
+		for ( int i = 0; i < seatCount; i++ )
+		{
+			var cs = carSim!.Cars[i];
+			float wx = c.X + cs.Pos.X, wy = c.Y + cs.Pos.Y;
+			var pos = new Vector3( wx, wy, 0 ).WithZ( terrain.SampleHeight( wx, wy ) + 3f );
+
+			if ( i < seatNodeIds.Count )
+				ride.NodeField.PublishMoving( seatNodeIds[i], pos );
+
+			if ( i < occupied )
+			{
+				seats[i].Position = pos;
+				seats[i].Rotation = System.Numerics.Quaternion.CreateFromAxisAngle( System.Numerics.Vector3.UnitZ, cs.Heading );
 			}
 			else
 			{

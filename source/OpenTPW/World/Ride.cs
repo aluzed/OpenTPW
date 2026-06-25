@@ -197,6 +197,11 @@ public class Ride : Entity
 	/// (tour rides, go-karts, water rides, bumpers). Such a ride gets a visible <see cref="RideVehicle"/>.</summary>
 	public bool IsCarRide => VM != null && VM.Instructions.Any( i => i.opcode is Opcode.TOUR or Opcode.BUMP );
 
+	/// <summary>True if this is a <b>bumper/dodgem</b> ride — its script drives the cars via the <c>BUMP</c>
+	/// opcode. Its <see cref="RideVehicle"/> runs the arena collision sim (<see cref="CarSim"/>) instead of
+	/// the tour/kart circuit loop (T-048 / docs/08).</summary>
+	public bool IsBumperRide => VM != null && VM.Instructions.Any( i => i.opcode is Opcode.BUMP );
+
 	/// <summary>What the player paid to build this ride — used to compute the sell refund (T-041).</summary>
 	public float BuildCost { get; set; }
 

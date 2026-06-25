@@ -182,9 +182,12 @@ node table layout + resolver match, and the EVENT/walk/head positioning all flow
 ## Remaining
 
 1. **Exact authored track shape / node motion** is **runtime simulation output** (now proven, not a file
-   decode): it needs re-implementing the **car waypoint/keyframe motion** (T-032 car-physics + T-033
-   skeleton-driven surface transforms), not a parser. The footprint loop + the node→world resolver are the
-   stand-ins until then; `RideVehicle`'s `loop`/`Sample` is shape-agnostic, so a real path drops straight in.
+   decode). The **motion behaviour is now re-implemented** from the RE'd car engine (`FUN_0054a040`): the
+   tour/kart **circuit** loop and the bumper **arena** sim (`CarSim` — random waypoints + pairwise
+   collision/bounce, the BUMP branch), occupancy-driven + unit-tested (`CarSimTests`). What stays a
+   stand-in is the waypoint **positions** (the footprint loop / arena rectangle), because the authored ones
+   are bound at runtime, not stored. `RideVehicle`'s `loop`/`Sample` is shape-agnostic, so real positions
+   drop straight in once the keyframe/skeleton transforms feed them (T-033).
 2. **Art swap.** WALKON peeps + ADDHEAD heads are placed + animated as marker proxies; rendering the real
    peep sprite / head sub-mesh at those positions is a renderer follow-up.
 

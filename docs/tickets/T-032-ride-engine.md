@@ -7,9 +7,12 @@
   **lights**, **particle effects** (decoded `.PLB`), **limbo**, **walk** (slot scheduler) and **heads**
   all landed via T-007 (**106/106 opcodes** — the `COAST`/`TOUR`/`BUMP` car-object multiplexers are in too,
   routed to no-op engine stubs with the faithful queries-return-0 behaviour the original uses when its car
-  subsystem isn't live), and **ride breakdown + a mechanic staff role** are in. Remaining engine work: a
-  full authored car-physics subsystem, walk-node geometry for visual peep movement, and 3D-positioned
-  EVENT sound.
+  subsystem isn't live), and **ride breakdown + a mechanic staff role** are in. **Car motion is now
+  re-implemented from the RE'd car engine** (`FUN_0054a040`, docs/08): the tour/kart **circuit** loop and the
+  bumper **arena** sim (`CarSim` — random waypoints + pairwise collision/bounce), occupancy-driven and
+  unit-tested; walk/head node placement landed via T-048. Remaining engine work: the cars follow a
+  footprint-shaped stand-in path (the authored node positions are runtime sim output, not file data —
+  docs/08), and 3D-positioned EVENT sound.
 - **Related**: [T-007](T-007-vm-opcodes-rse.md) (the VM + opcode RE), [T-033](T-033-ride-animation-keyframes.md) (animation keyframes), [05](../05-ghidra-reverse.md)/[07](../07-ghidra-render.md)/[08](../08-ghidra-animation.md).
 
 ## Problem
