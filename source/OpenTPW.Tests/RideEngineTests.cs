@@ -86,6 +86,41 @@ public class RideEngineTests
 	}
 
 	[TestMethod]
+	public void WalkSampleInterpolatesBetweenNodes()
+	{
+		// T-048: a walking peep glides linearly between its two walk nodes by its own clock, facing along
+		// the travel direction (the original's atan2). Halfway through, it's at the midpoint.
+		var from = new Vector3( 0f, 0f, 0f );
+		var to = new Vector3( 10f, 0f, 0f );
+
+		var (mid, yaw) = RideEngine.WalkSample( from, to, startTime: 100, endTime: 200, now: 150, atEnd: false );
+		Assert.AreEqual( 5f, mid.X, 1e-3f, "halfway → midpoint" );
+		Assert.AreEqual( 0f, yaw, 1e-3f, "travelling +X → facing 0" );
+
+		var (start, _) = RideEngine.WalkSample( from, to, 100, 200, 100, false );
+		Assert.AreEqual( 0f, start.X, 1e-3f, "at start time → start node" );
+
+		var (clamped, _) = RideEngine.WalkSample( from, to, 100, 200, 999, false );
+		Assert.AreEqual( 10f, clamped.X, 1e-3f, "past the end time → clamped to the end node" );
+	}
+
+	[TestMethod]
+	public void WalkSamplePinsAtEndAndGuardsZeroSpan()
+	{
+		var from = new Vector3( 0f, 0f, 0f );
+		var to = new Vector3( 0f, 8f, 0f );
+
+		// Arrived/Done peeps sit at the end node regardless of the clock.
+		var (pinned, yaw) = RideEngine.WalkSample( from, to, 0, 100, 0, atEnd: true );
+		Assert.AreEqual( 8f, pinned.Y, 1e-3f );
+		Assert.AreEqual( MathF.PI / 2f, yaw, 1e-3f, "travelling +Y → facing +90°" );
+
+		// A zero/negative span can't divide — treat as arrived (no NaN).
+		var (safe, _) = RideEngine.WalkSample( from, to, 50, 50, 50, false );
+		Assert.AreEqual( 8f, safe.Y, 1e-3f );
+	}
+
+	[TestMethod]
 	public void ParticleOpcodesPassTheirTargetNode()
 	{
 		// T-048/T-047: REPAIREFFECT/SPARK resolve a ride node before spawning — the first operand is the

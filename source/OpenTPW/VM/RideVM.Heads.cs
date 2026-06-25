@@ -17,11 +17,21 @@ namespace OpenTPW;
 /// </summary>
 public partial class RideVM
 {
-	/// <summary>Stand-in head-slot count; the real value is the ride's head-node count (not decoded).</summary>
+	/// <summary>Fallback head-slot count when the ride model declares no head nodes.</summary>
 	public const int DefaultHeadCapacity = 8;
 
+	private int headCapacity = DefaultHeadCapacity;
 	private int[]? headSlots; // 0 = empty slot (the original's sentinel)
-	private int[] HeadTable => headSlots ??= new int[DefaultHeadCapacity];
+	private int[] HeadTable => headSlots ??= new int[headCapacity];
+
+	/// <summary>Set the head-slot capacity to the ride's head-node count (the original sizes the table from
+	/// the type-<c>0x80</c> node count at spawn). Only takes effect before the table is first used; a
+	/// non-positive value is ignored, keeping the <see cref="DefaultHeadCapacity"/> stand-in. See T-048.</summary>
+	public void SetHeadCapacity( int capacity )
+	{
+		if ( capacity > 0 && headSlots == null )
+			headCapacity = capacity;
+	}
 
 	/// <summary>The head slots (0 = empty), read-only.</summary>
 	public IReadOnlyList<int> HeadSlots => HeadTable;

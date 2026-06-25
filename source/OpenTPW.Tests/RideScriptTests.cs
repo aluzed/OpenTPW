@@ -512,6 +512,38 @@ public class RideScriptTests
 		finally { RideVM.RandomIndex = prev; }
 	}
 
+	[TestMethod]
+	public void HeadCapacityFollowsHeadNodeCount()
+	{
+		// T-048: the head table sizes to the ride's head-node count (set before the table is first used).
+		Log = new();
+		var vm = LoadTestVm();
+		var prev = RideVM.RandomIndex;
+		try
+		{
+			RideVM.RandomIndex = _ => 0;
+			vm.SetHeadCapacity( 3 );
+			Assert.AreEqual( 3, vm.HeadSlots.Count, "capacity sized to the head-node count" );
+
+			for ( var i = 0; i < 5; i++ )
+				OpcodeHandlers.Heads.AddHead( ref vm, Lit( vm, 7 ) );
+			Assert.AreEqual( 3, vm.HeadCount, "fills to the model's head-node count, then stops" );
+
+			vm.SetHeadCapacity( 6 ); // ignored once the table exists
+			Assert.AreEqual( 3, vm.HeadSlots.Count );
+		}
+		finally { RideVM.RandomIndex = prev; }
+	}
+
+	[TestMethod]
+	public void HeadCapacityIgnoresNonPositive()
+	{
+		Log = new();
+		var vm = LoadTestVm();
+		vm.SetHeadCapacity( 0 );
+		Assert.AreEqual( RideVM.DefaultHeadCapacity, vm.HeadSlots.Count, "no head nodes → the default stand-in" );
+	}
+
 	// GETCUSTPTCLCODE: RE'd at instruction level (op_94) — it discards its operand and always writes 0
 	// (the result is EDI, zeroed in the executor prologue). A stub returning 0 in the shipped build. T-007.
 	[TestMethod]

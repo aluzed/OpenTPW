@@ -113,25 +113,46 @@ vehicle, later WALKON/ADDHEAD) was missing. New `RideNodePositions` (`source/Ope
   unconfigured resolution, moving-overrides-static, footprint scaling + placement rotation; new
   `RideEngineTests.ParticleOpcodesPassTheirTargetNode` for the REPAIREFFECT/SPARK passthrough).
 
+## Done (this pass — WALKON / ADDHEAD visual placement)
+
+The VM's WALKON/ADDHEAD families kept pure slot tables (`RideVM.Walk`/`RideVM.Heads`); the visual placement
+was the gap. The **engine now mirrors those tables into the world each frame** from the node positions —
+no VM/handler changes (the engine reads the read-only `WalkSlots`/`HeadSlots` views), so the pure-VM
+behaviour + tests are untouched:
+
+- **ADDHEAD** → `RideEngine.SyncHeads(VM.HeadSlots)`: each occupied slot shows a head marker at its
+  **head node** (`RideNodePositions.ObjectNodeIds[slot]`, the type-`0x80` mounts), removed when the slot is
+  vacated (DELHEAD). The head table is also **sized to the model's head-node count** (`VM.SetHeadCapacity`,
+  matching the original probing type-`0x80` at spawn) instead of the fixed-8 stand-in.
+- **WALKON** → `RideEngine.SyncWalk(VM.WalkSlots, VM.GameTime)`: each non-free slot shows a peep marker
+  **gliding between its two walk nodes**, interpolated by the slot's own start/end clock and facing along
+  the travel direction (the original's `atan2`); Arrived/Done peeps pin at the end node; a freed slot drops
+  its marker. The interpolation is a pure, unit-tested helper (`RideEngine.WalkSample`).
+- The markers are emissive **stand-ins** (no peep/head art — same pattern as the light/particle proxies),
+  driven by **real node positions**; swapping in the peep sprite / head mesh is a renderer follow-up.
+- Unit-tested (`RideEngineTests.WalkSample*` — midpoint/clamp/end-pin/zero-span + atan2 facing;
+  `RideScriptTests.HeadCapacityFollowsHeadNodeCount`/`HeadCapacityIgnoresNonPositive`).
+
 ## Remaining
 
 1. **Authored path shape.** The moving nodes follow the *procedural* ellipse, not the ride's authored
    track — the real shape still needs the ride **motion/skeleton simulation** (T-032 car-physics + T-033
    bone transforms). The resolver is shape-agnostic, so once the real path exists, the vehicle just
    publishes those positions instead.
-2. **WALKON / ADDHEAD visual placement.** The resolver gives `RideVM.Walk.cs`/`RideVM.Heads.cs` the node
-   positions they need; gliding the peep between walk nodes and attaching a head mesh at a head node still
-   needs the peep/head render path.
+2. **Art swap.** WALKON peeps + ADDHEAD heads are placed + animated as marker proxies; rendering the real
+   peep sprite / head sub-mesh at those positions is a renderer follow-up.
 
 ## Acceptance criteria
 
 - A tour ride's car follows the ride's authored path; a walking peep (WALKON) glides between the ride's
   real walk nodes; heads (ADDHEAD) appear at head nodes. *(Node-table decode + the runtime resolver +
-  node-positioned effects done; the authored path shape + WALKON/ADDHEAD visuals await the motion sim +
-  the peep/head render path to verify in-world.)*
+  node-positioned effects + WALKON/ADDHEAD placement done — peeps glide between walk nodes, heads sit at
+  head nodes, as marker proxies; the authored path shape + the real peep/head art await the motion sim +
+  the render path.)*
 
 ## Affected files
 
 `source/OpenTPW/World/Rides/RideNodePositions.cs` (new), `RideVehicle.cs`, `RideEngine.cs`,
 `IRideEngine.cs`, `source/OpenTPW/World/Ride.cs`, `source/OpenTPW/World/Level.cs`,
-`source/OpenTPW/VM/Handlers/Particles.cs`, `source/OpenTPW.Files/Formats/Model/ModelFile.cs` (node-graph access).
+`source/OpenTPW/VM/RideVM.Walk.cs`/`RideVM.Heads.cs` (head-capacity setter), `source/OpenTPW/VM/Handlers/Particles.cs`,
+`source/OpenTPW.Files/Formats/Model/ModelFile.cs` (node-graph access).

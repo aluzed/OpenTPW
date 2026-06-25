@@ -190,6 +190,14 @@ public sealed class RideEngine : IRideEngine
 		foreach ( var (entity, _) in particleProxies )
 			Entity.All.Remove( entity );
 		particleProxies.Clear();
+
+		foreach ( var (_, e) in headProxies.Values )
+			Entity.All.Remove( e );
+		headProxies.Clear();
+
+		foreach ( var e in walkProxies.Values )
+			Entity.All.Remove( e );
+		walkProxies.Clear();
 	}
 
 	public void SetObjectParam( int id, int param, int value )
@@ -508,6 +516,127 @@ public sealed class RideEngine : IRideEngine
 			Entity.All.Remove( particleProxies[i].Entity );
 			particleProxies.RemoveAt( i );
 		}
+	}
+
+	//
+	// Walk + head node visuals (T-048). The VM's WALKON/ADDHEAD families keep pure slot tables (RideVM.Walk
+	// / RideVM.Heads); the *visual* placement was the gap. The engine mirrors those tables each frame from
+	// the ride's node positions (RideNodePositions): a walk peep glides between its two walk nodes, a head
+	// sits at its head node. Like the light/particle proxies, the markers are simple emissive stand-ins (no
+	// peep/head mesh here) — verifiable + driven by real node positions; the art swap is a renderer follow-up.
+	//
+
+	private readonly Dictionary<int, (int Value, ModelEntity Entity)> headProxies = new(); // by VM head-slot
+	private readonly Dictionary<int, ModelEntity> walkProxies = new();                       // by VM walk-slot
+
+	/// <summary>Mirror the VM head table to head-node positions: show a head marker for each occupied slot at
+	/// its head node, hide vacated ones. <paramref name="slots"/> is <c>RideVM.HeadSlots</c> (0 = empty).</summary>
+	public void SyncHeads( IReadOnlyList<int> slots )
+	{
+		try
+		{
+			for ( int slot = 0; slot < slots.Count; slot++ )
+			{
+				int value = slots[slot];
+				bool shown = headProxies.TryGetValue( slot, out var cur );
+
+				if ( value == 0 )
+				{
+					if ( shown )
+					{
+						Entity.All.Remove( cur.Entity );
+						headProxies.Remove( slot );
+					}
+					continue;
+				}
+
+				if ( shown && cur.Value == value )
+					continue; // already shown, unchanged
+
+				if ( shown )
+					Entity.All.Remove( cur.Entity );
+
+				var e = new ModelEntity
+				{
+					Model = Primitives.Cube.GenerateModel( SolidMaterial( 90, 200, 250 ) ), // head marker
+					Scale = new Vector3( 1.6f ),
+					Position = HeadNodePosition( slot ) + Vector3.Up * 6f,
+				};
+				headProxies[slot] = (value, e);
+			}
+		}
+		catch ( Exception ex ) { Log.Warning( $"[ride] head sync failed: {ex.Message}" ); }
+	}
+
+	/// <summary>Mirror the VM walk table: position a gliding peep marker for each non-free slot between its
+	/// start + end walk nodes, interpolated by the slot's own clock; free slots drop their marker.
+	/// <paramref name="slots"/> is <c>RideVM.WalkSlots</c>, <paramref name="gameTime"/> is <c>RideVM.GameTime</c>.</summary>
+	public void SyncWalk( IReadOnlyList<RideVM.WalkSlot> slots, int gameTime )
+	{
+		try
+		{
+			for ( int slot = 0; slot < slots.Count; slot++ )
+			{
+				var s = slots[slot];
+				if ( s.State == RideVM.WalkState.Free )
+				{
+					if ( walkProxies.TryGetValue( slot, out var dead ) )
+					{
+						Entity.All.Remove( dead );
+						walkProxies.Remove( slot );
+					}
+					continue;
+				}
+
+				var from = NodePosition( s.StartNode );
+				var to = NodePosition( s.EndNode );
+				var (pos, yaw) = WalkSample( from, to, s.StartTime, s.EndTime, gameTime,
+					atEnd: s.State is RideVM.WalkState.Arrived or RideVM.WalkState.Done );
+
+				if ( !walkProxies.TryGetValue( slot, out var e ) )
+				{
+					e = new ModelEntity
+					{
+						Model = Primitives.Cube.GenerateModel( SolidMaterial( 250, 250, 250 ) ), // walking peep
+						Scale = new Vector3( 1.4f, 1.4f, 3f ),
+					};
+					walkProxies[slot] = e;
+				}
+				e.Position = pos + Vector3.Up * 3f;
+				e.Rotation = System.Numerics.Quaternion.CreateFromAxisAngle( System.Numerics.Vector3.UnitZ, yaw );
+			}
+		}
+		catch ( Exception ex ) { Log.Warning( $"[ride] walk sync failed: {ex.Message}" ); }
+	}
+
+	/// <summary>Position + facing of a peep partway between two walk nodes — the linear interpolation by the
+	/// slot's start/end clock + the original's <c>atan2</c> travel facing. Pure (unit-tested). When
+	/// <paramref name="atEnd"/> (Arrived/Done) the peep is pinned at the end node.</summary>
+	internal static (Vector3 Pos, float Yaw) WalkSample( Vector3 from, Vector3 to, int startTime, int endTime, int now, bool atEnd )
+	{
+		float span = endTime - startTime;
+		float t = atEnd || span <= 0f ? 1f : Math.Clamp( (now - startTime) / span, 0f, 1f );
+		var pos = from + (to - from) * t;
+		float yaw = MathF.Atan2( to.Y - from.Y, to.X - from.X );
+		return (pos, yaw);
+	}
+
+	// World position of head slot `slot`: the slot-th object/head node (type 0x80) resolved through the node
+	// field, else the ride centre. Modulo the head-node count so an over-capacity slot still lands on a node.
+	private Vector3 HeadNodePosition( int slot )
+	{
+		var ids = NodeField?.ObjectNodeIds;
+		if ( ids != null && ids.Count > 0 )
+			return NodePosition( ids[slot % ids.Count] );
+		return LightPosition( SelfId );
+	}
+
+	// A small unlit emissive material of the given colour (the light/particle/marker proxy pattern).
+	private static Material<ObjectUniformBuffer> SolidMaterial( byte r, byte g, byte b )
+	{
+		var mat = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader", MaterialFlags.DoubleSided );
+		mat.Set( "Color", new Texture( [r, g, b, 255], 1, 1 ) );
+		return mat;
 	}
 
 	public void SetReverb( int level ) => Log.Trace( $"[ride] SETREVERB {level}" );

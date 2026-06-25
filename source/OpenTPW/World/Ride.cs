@@ -475,6 +475,8 @@ public class Ride : Entity
 		// Runtime node→world-position resolver (T-048/T-047): EVENT/SPARK effects + the vehicle read it.
 		NodeField = new RideNodePositions( modelFile.Nodes );
 		engine.NodeField = NodeField;
+		// Size the head-slot table to the model's head-node count (the original probes type-0x80 at spawn).
+		VM?.SetHeadCapacity( NodeField.ObjectNodeIds.Count );
 		Log.Info( $"[ride] model {md2Path}: {modelFile.Meshes.Count} mesh(es), {modelFile.Nodes.Count} node(s) ({CarNodeCount} car/seat)" );
 
 		var parts = new List<ModelEntity>();
@@ -543,6 +545,14 @@ public class Ride : Entity
 		// so a ride that failed to load (VM never assigned) would otherwise crash the update loop.
 		VM?.Update();
 		engine.Update( Time.Now );
+
+		// Mirror the VM's WALKON/ADDHEAD slot tables into the world at the ride's node positions (T-048):
+		// gliding walk peeps between walk nodes, decorative heads at head nodes.
+		if ( VM != null )
+		{
+			engine.SyncHeads( VM.HeadSlots );
+			engine.SyncWalk( VM.WalkSlots, VM.GameTime );
+		}
 
 		// Running the ride costs money over time (its upkeep drains the park balance).
 		ParkFinances.Current?.PayUpkeep( UpkeepPerSecond * Time.Delta );

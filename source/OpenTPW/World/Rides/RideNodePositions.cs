@@ -61,6 +61,16 @@ public sealed class RideNodePositions
 	public IReadOnlyList<int> CarSeatNodeIds =>
 		nodes.Where( n => n.IsObject || n.IsCar ).Select( n => n.NodeId ).ToList();
 
+	/// <summary>Node ids of the ride's object/head-attach nodes (object <c>0x80</c>), in graph order — the
+	/// head-mount points ADDHEAD drops decorative heads onto (the engine probes type-<c>0x80</c> at spawn).</summary>
+	public IReadOnlyList<int> ObjectNodeIds =>
+		nodes.Where( n => n.IsObject ).Select( n => n.NodeId ).ToList();
+
+	/// <summary>Node ids of the ride's walk nodes (walk <c>0x800</c>), in graph order — the path endpoints
+	/// WALKON glides a peep between.</summary>
+	public IReadOnlyList<int> WalkNodeIds =>
+		nodes.Where( n => n.IsWalk ).Select( n => n.NodeId ).ToList();
+
 	/// <summary>Fix the ride's world placement (origin, 90°-step orientation, footprint size in world
 	/// units) so static nodes can be worldised. Called when the ride is placed (see Level.SpawnRideAt).</summary>
 	public void Configure( Vector3 worldOrigin, int rotation, float worldWidth, float worldHeight )
