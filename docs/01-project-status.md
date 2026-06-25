@@ -14,8 +14,11 @@ You therefore **need a legal copy of the game** to provide the assets — which 
 
 ## Maturity
 
-- **Stage: boots & runs on Linux** (window + Vulkan render loop), not yet playable. Verified by
-  running on an AMD Radeon (Mesa/Vulkan) after fixing the Vulkan `libdl` load ([T-023](tickets/T-023-linux-vulkan-libdl.md)).
+- **Stage: boots, runs & plays on Linux** (window + Vulkan render loop) — the core park loop is live.
+  Verified this session by running on an AMD Radeon (Vulkan): the park renders with terrain, placed
+  rides + shops, animated peeps, staff and a build/manage HUD, and a placed **bumper ride's dodgem cars
+  visibly roam + collide in their arena** (see the Update below). Earlier verified on the same GPU after
+  fixing the Vulkan `libdl` load ([T-023](tickets/T-023-linux-vulkan-libdl.md)).
   The **lobby renders** — island, advisor model, water, sky, and the purple buttons with text
   labels — behind a "LOADING…" screen during the level load
   ([T-024](tickets/T-024-linux-black-screen.md), resolved). The lobby now runs at **vsync ~60 fps**:
@@ -29,7 +32,7 @@ You therefore **need a legal copy of the game** to provide the assets — which 
 - **Upstream** (`OpenTPW/OpenTPW`) is dormant (last real activity early 2025). **This fork**
   is under active development: full Linux portability, CI, and a large reverse-engineering
   push this session (see the Update below).
-- **Tests**: ~38 passing, 0 failing (was 7/7 failing) + ~9 inconclusive integration tests that
+- **Tests**: **161 passing, 0 failing** (was 7/7 failing) + 18 inconclusive integration tests that
   need a real asset (gated on `TPW_*_SAMPLE`/`OPENTPW_GAMEPATH`). Build: **0 warnings**.
 
 ## Architecture (`source/OpenTPW.sln`)
@@ -62,6 +65,26 @@ All targets are **`net8.0`**.
 >   See [05-ghidra-reverse.md](05-ghidra-reverse.md) and [06-rse-vm-opcodes.md](06-rse-vm-opcodes.md).
 > - Catch-all tickets T-008/T-012 were split into focused per-concern tickets (T-015…T-022).
 
+> **Update (2026-06-25): ride engine + node motion + in-game verification.**
+> - **Ride VM is 106/106 opcodes** ([T-007](tickets/T-007-vm-opcodes-rse.md)) and the **ride engine**
+>   backs all of Batch B: object lifecycle, channel keyframe animation (rotation/scale/translation + vertex
+>   morph), lights, particles (decoded `.PLB`), walk/head/limbo, scream, breakdown + a mechanic, and the
+>   `COAST`/`TOUR`/`BUMP` car multiplexers. A full **gameplay loop** runs: build/manage mode + catalog,
+>   ride/shop placement + rotation + sell/demolish, queues, peeps (real `esprites.wad` sprites, A*
+>   pathfinding around footprints + water, needs, ratings/thoughts), staff (entertainer/handyman/guard/
+>   researcher/mechanic + patrols), economy (prices, fees, loans, upkeep, finance graph), research/upgrades,
+>   and a coaster track editor. See [T-032](tickets/T-032-ride-engine.md) + T-034–T-052.
+> - **Ride node positioning, end to end** ([T-048](tickets/T-048-ride-node-geometry-movement.md)): a runtime
+>   node→world resolver (`RideNodePositions`) drives EVENT/SPARK/REPAIREFFECT effects, WALKON peeps and
+>   ADDHEAD heads at their addressed nodes (`FUN_00556b90`), and the car path traces the authored footprint.
+> - **The "rig" was decoded (Ghidra) — and it is *not a file structure*.** Decompiling the node-positioning
+>   chain proved there is **no bone/skeleton in the model file**: a node's position is a runtime 4×4 matrix
+>   (translation `+0x30`) bound on the fly and driven by the keyframe animation or the **car waypoint sim**.
+>   That sim is now **re-implemented** (`CarSim`): the tour/kart **circuit** loop and the bumper **arena**
+>   (random waypoints + pairwise collision) — verified **live in the game**. See [docs/08](08-ghidra-animation.md).
+> - **Disc tooling**: `tools/ccd-img-to-iso.py` converts the CloneCD `.img` to a plain `.iso` (no extra
+>   tools) so `DATA/` can be extracted for `OPENTPW_GAMEPATH` — see [03](03-disc-compatibility.md).
+
 ## What works (✅)
 
 - **Linux/cross-platform**: builds + tests on Linux, CI, portable audio (NLayer + OpenAL),
@@ -72,19 +95,26 @@ All targets are **`net8.0`**.
   `.SDT`/`.MP2` sounds, **`.BF4` fonts** (glyphs + metrics), **`.TQI`/`.TGQ` video**
   (EA container + EA-ADPCM audio + TQI frames), and **`.PLB` particles** (effect names + colour
   ramps). `.MTR` is a tool artifact the game never loads (texture binding lives in the `.MD2`).
-- **`.RSE` ride VM**: loader/disassembler restored; **50 / 106 opcodes — Batch A (all 43 pure
-  opcodes) complete** (arithmetic, flags, two stacks, branches/JSR/RETURN, date/time, timers,
-  cross-VM variables, the WAIT scheduler), all Ghidra-verified.
-- **Basic rendering**: window, demo terrain, ImGui UI.
+- **`.RSE` ride VM**: loader/disassembler restored; **106 / 106 opcodes** — Batch A (43 pure) +
+  all of Batch B (engine side-effects), all Ghidra-verified. [T-007](tickets/T-007-vm-opcodes-rse.md).
+- **Ride engine + gameplay loop**: ride objects/animation (keyframe rotation/scale/translation + vertex
+  morph)/lights/particles/scream, breakdown + mechanic; build/manage mode, ride+shop placement (rotate,
+  sell/demolish), queues, peeps (animated sprites, A* pathfinding, needs, ratings), staff + patrols,
+  economy (prices/fees/loans/upkeep/finance graph), research/upgrades, coaster track editor, car rides
+  (tour/kart **circuit** + bumper **arena** sim). [T-032](tickets/T-032-ride-engine.md) + T-034–T-052.
+- **Ride node positioning**: runtime node→world resolver; EVENT/SPARK/REPAIREFFECT effects, WALKON peeps
+  and ADDHEAD heads placed at their model nodes. [T-048](tickets/T-048-ride-node-geometry-movement.md).
+- **Rendering**: window, real jungle terrain mesh, `.MD2` models (advisor + rides), bitmap fonts
+  (1bpp + antialiased), `.PLB`-driven effect proxies, lobby↔in-park HUD; ImGui debug UI.
 
 ## What is partial (⚠️)
 
-- **`.RSE` opcodes**: 50 / 106. The remaining **63 are `engine`** side-effects (objects,
-  animations, sound, lights, walk/limbo, scream) + `SPAWNCHILD`, blocked on the ride engine.
-  See [T-007](tickets/T-007-vm-opcodes-rse.md).
-- **`.MD2` models**: parses + verified-renders the current format; the version gate (0xDD/0xCB)
-  is Ghidra-confirmed and rejects the legacy/static variant cleanly. Static-variant decode +
-  render integration remain. [T-015](tickets/T-015-md2-static-variant.md).
+- **Ride node motion**: the node→world resolver + car waypoint sim run, but the exact node *positions*
+  are a footprint-shaped stand-in — Ghidra proved they're **runtime simulation output, not file data**
+  (no file skeleton; bound to keyframe/car-sim transforms). Feeding the real per-frame transforms is the
+  remaining depth. [T-048](tickets/T-048-ride-node-geometry-movement.md), [docs/08](08-ghidra-animation.md).
+- **Many engine visuals are proxies**: lights/particles/effects, WALKON peeps and ADDHEAD heads render as
+  emissive marker stand-ins (driven by real data) pending the final art/render path.
 - **`.LIP` lip-sync**: keyframe timestamps decoded; **unit confirmed = microseconds**. Mouth-shape
   semantics remain. [T-020](tickets/T-020-lip-mouth-shapes.md).
 - **`.MAP`**: audio category catalog (not terrain). Variant (BANK/SFX) + BANK entry names + SFX
@@ -96,29 +126,26 @@ All targets are **`net8.0`**.
 
 ## What is not started (❌)
 
-- Real game logic (park management, visitor AI, economy, functional saving).
-- Multiplayer / online aspect (the game's servers are long shut down).
-- Engine wiring of the decoded assets (fonts/models/video into the renderer).
+- **Multiplayer / online** aspect (the game's servers are long shut down) — out of scope.
+- **Functional saving** (`.TPWS`): container read/write round-trips, but the inner `SAD_*` module
+  stream is opaque and no real save sample exists to verify. [T-017](tickets/T-017-tpws-saves.md).
 
 ## Remaining work (see [tickets/](tickets/))
 
-The project has reached the **engine frontier**: the formats and the pure VM are done, and most
-of what's left needs the ride engine itself (which also lets further RE be verified).
+The formats, the full VM, the ride engine and the core gameplay loop are **done**. What's left is
+finishing depth + visual fidelity, most of it renderer- or simulation-bounded:
 
-1. **Ride engine** — the biggest unlock: instantiate ride objects/animations/sound/lights in the
-   world. This backs **Batch B** of the VM (the 63 engine opcodes, incl. `SPAWNCHILD`) and lets
-   `.PLB` particles / `.LIP` lip-sync / `.MAP` mixing actually run.
-2. **Engine wiring**: ⏳ in progress. **Bitmap fonts are wired and live** — `FontAtlas` (CPU,
-   unit-tested) packs `.BF4` glyphs into an atlas + layout, `Render/Assets/Font.cs` uploads it,
-   `Graphics.DrawText` batches a quad per glyph (UV V-flipped to match the UI shader, Y-up baseline
-   alignment), and it now draws the **loading screen** and the **PurpleButton labels** in the lobby.
-   Only the **1bpp** `.BF4` fonts decode cleanly (e.g. `GAME12`); the antialiased/multi-bit faces
-   (`MENU*`, `TITLE*`, `*AA`) still render as noise — [T-025](tickets/T-025-bf4-antialiased-fonts.md).
-   Models (`.MD2`) already render in the lobby. Drawing a real level from textures remains
-   (terrain is hardcoded).
-3. **Format tails** (each now its own ticket): `.MD2` static variant [T-015], `.MAP` records
-   [T-016], `.TPWS` [T-017], `.PLB` params [T-019], `.LIP` shapes [T-020], exact TQI dequant
-   [T-021], mono EA-ADPCM [T-022]. Several need the engine or Ghidra on the spawn/render paths.
+1. **Exact node motion / authored track shape** — re-implement the per-frame car/keyframe transforms so
+   ride nodes (and the car path) use real positions instead of the footprint stand-in
+   ([T-048](tickets/T-048-ride-node-geometry-movement.md), [T-033](tickets/T-033-ride-animation-keyframes.md)).
+2. **Final art for the proxies** — swap the emissive marker stand-ins (lights, particles, WALKON peeps,
+   ADDHEAD heads, dodgems) for the real sprites/meshes; draw the level fully from its textures.
+3. **3D-positioned audio** — the node position is resolved + recorded for EVENT/category sounds; spatial
+   playback waits on a 3D audio bus ([T-047](tickets/T-047-ride-event-3d-sound-particle-pools.md)).
+4. **Format tails** (each its own ticket, several deferred for want of a sample): `.MAP` SFX curve
+   [T-016], `.TPWS` [T-017], `.PLB` field labels [T-019], `.LIP` mouth shapes [T-020], exact TQI dequant
+   [T-021], mono EA-ADPCM [T-022], antialiased `.BF4` edge faces [T-025].
 
-Done this project so far: Linux portability + CI (T-001…T-006, T-013, T-014), build warnings
-→ 0 (T-009), VM correctness (T-010, T-011), and the format/VM RE above.
+Done this project: Linux portability + CI (T-001…T-006, T-013, T-014), 0 build warnings (T-009),
+VM correctness + the full 106-opcode VM (T-007, T-010, T-011), every format decoded, the ride engine +
+gameplay loop (T-032, T-034–T-052), node positioning + the rig RE (T-046–T-048), and the format/VM RE above.
