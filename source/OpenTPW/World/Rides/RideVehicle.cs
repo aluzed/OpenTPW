@@ -74,15 +74,20 @@ public sealed class RideVehicle : Entity
 			Position = Offscreen,
 		};
 
+		// Bumper dodgems read as proper cars (bigger, dodgem-red); tour/kart seats are small rider markers.
+		bool isBumper = ride.IsBumperRide;
 		var seatMat = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader" );
-		seatMat.Set( "Color", new Texture( [250, 220, 90, 255], 1, 1 ) ); // bright rider markers
+		seatMat.Set( "Color", isBumper
+			? new Texture( [220, 40, 40, 255], 1, 1 )    // dodgem red
+			: new Texture( [250, 220, 90, 255], 1, 1 ) ); // bright rider markers
+		float seatScale = isBumper ? tileSize * 0.22f : tileSize * 0.06f;
 		seats = new ModelEntity[seatCount];
 		for ( int i = 0; i < seatCount; i++ )
-			seats[i] = new ModelEntity { Model = Primitives.Cube.GenerateModel( seatMat ), Scale = new Vector3( tileSize * 0.06f ), Position = Offscreen };
+			seats[i] = new ModelEntity { Model = Primitives.Cube.GenerateModel( seatMat ), Scale = new Vector3( seatScale ), Position = Offscreen };
 
 		// A bumper ride drives its cars through the arena collision sim instead of the loop: the arena is
 		// the ride's footprint half-extents, the cars its dodgems (one per seat). See CarSim / docs/08.
-		if ( ride.IsBumperRide )
+		if ( isBumper )
 			carSim = new CarSim( seatCount,
 				ride.Shape.Width * tileSize * 0.5f, ride.Shape.Height * tileSize * 0.5f,
 				radius: tileSize * 0.3f, speed: Speed );
@@ -149,13 +154,17 @@ public sealed class RideVehicle : Entity
 	// Bumper/dodgem update: advance the arena collision sim and place one car per occupied seat at its
 	// local arena position mapped to world + terrain. There's no lead car or circuit loop — the dodgems
 	// roam and bump (docs/08, the BUMP branch). Each car's live world position feeds the node field (T-048).
+	// Dev visualisation: drive + show every dodgem regardless of occupancy, so the arena sim is visible
+	// without waiting for peeps to board (OPENTPW_BUMPER_DEMO=1). Off by default — normal play is occupancy-driven.
+	private static readonly bool DemoAllCars = Environment.GetEnvironmentVariable( "OPENTPW_BUMPER_DEMO" ) == "1";
+
 	private void UpdateArena()
 	{
-		if ( ride.Riders > 0 && !ride.IsBroken )
+		if ( DemoAllCars || (ride.Riders > 0 && !ride.IsBroken) )
 			carSim!.Step( Time.Delta );
 
 		car.Position = Offscreen; // no lead car in bumper mode
-		int occupied = Math.Min( ride.Riders, seatCount );
+		int occupied = DemoAllCars ? seatCount : Math.Min( ride.Riders, seatCount );
 		var c = ride.Position;
 		for ( int i = 0; i < seatCount; i++ )
 		{

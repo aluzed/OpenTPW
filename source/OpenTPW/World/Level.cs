@@ -92,6 +92,20 @@ public class Level
 		{
 			int cx = grid.Width / 2, cy = grid.Height / 2;
 			BuildCatalogItem Item( string name ) => catalog.First( c => c.Name == name );
+
+			// Bumper demo: place ONLY a bumper at the park centre on clear grass and aim the camera at it,
+			// so the arena collision sim (CarSim) is cleanly framed (OPENTPW_BUMPER_DEMO=1). See docs/08.
+			if ( Environment.GetEnvironmentVariable( "OPENTPW_BUMPER_DEMO" ) == "1" )
+			{
+				if ( CommitPlacement( Item( "bumper" ), grid, terrain, cx - 2, cy - 2 ) )
+				{
+					var b = Entity.All.OfType<Ride>().Last();
+					BuildCameraMode.Focus = b.Position;
+					Log.Info( $"[build] bumper-demo: placed at park centre, isBumper={b.IsBumperRide} vehicle={(b.Vehicle != null)} cars={b.CarNodeCount}" );
+				}
+				return;
+			}
+
 			Log.Info( $"[build] autoplace totem={CommitPlacement( Item( "totem" ), grid, terrain, cx - 6, cy - 2 )} "
 				+ $"monkey={CommitPlacement( Item( "monkey" ), grid, terrain, cx + 1, cy - 2 )} "
 				+ $"coaster={CommitPlacement( Item( "coaster1" ), grid, terrain, cx - 6, cy + 4 )} "
@@ -111,12 +125,16 @@ public class Level
 				Log.Info( $"[build] rotate-test: totem placed rot{rot.Rotation}, footprint {rot.TileW}x{rot.TileH} (upright is 3x4)" );
 			}
 
-			// Car rides (T-032): place a tour ride + go-karts and confirm each gets a moving RideVehicle.
-			foreach ( var (carName, ctx, cty) in new[] { ("tourride", cx - 12, cy + 2), ("gokarts", cx - 12, cy + 8) } )
+			// Car rides (T-032): place a tour ride + go-karts + bumpers and confirm each gets a moving
+			// RideVehicle. The bumper drives the arena collision sim (CarSim), the others the circuit loop.
+			foreach ( var (carName, ctx, cty) in new[] { ("tourride", cx - 12, cy + 2), ("gokarts", cx - 12, cy + 8), ("bumper", cx + 9, cy - 6) } )
 				if ( CommitPlacement( Item( carName ), grid, terrain, ctx, cty ) )
 				{
 					var car = Entity.All.OfType<Ride>().Last();
-					Log.Info( $"[build] car-test: {carName} isCarRide={car.IsCarRide} vehicle={(car.Vehicle != null)}" );
+					Log.Info( $"[build] car-test: {carName} isCarRide={car.IsCarRide} isBumper={car.IsBumperRide} vehicle={(car.Vehicle != null)}" );
+					// Dev visualisation: point the build camera at the bumper so its arena cars are on screen.
+					if ( car.IsBumperRide && Environment.GetEnvironmentVariable( "OPENTPW_BUMPER_DEMO" ) == "1" )
+						BuildCameraMode.Focus = car.Position;
 				}
 
 			// Lay a coaster track that loops around the station back to its '<' entry connector, so the
@@ -222,7 +240,7 @@ public class Level
 	private static List<BuildCatalogItem> BuildCatalog()
 	{
 		var list = new List<BuildCatalogItem>();
-		foreach ( var path in new[] { "levels/jungle/rides/totem", "levels/jungle/rides/monkey", "levels/jungle/rides/wateride", "levels/jungle/rides/coaster1", "levels/jungle/rides/gokarts", "levels/jungle/rides/tourride" } )
+		foreach ( var path in new[] { "levels/jungle/rides/totem", "levels/jungle/rides/monkey", "levels/jungle/rides/wateride", "levels/jungle/rides/coaster1", "levels/jungle/rides/gokarts", "levels/jungle/rides/tourride", "levels/jungle/rides/bumper" } )
 		{
 			var name = Path.GetFileName( path );
 			var shape = RideShape.Load( path, name );
