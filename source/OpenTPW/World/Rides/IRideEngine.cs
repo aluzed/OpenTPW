@@ -87,6 +87,11 @@ public interface IRideEngine
 	/// <c>.PLB</c>-driven effect system behind REPAIREFFECT / SPARK).</summary>
 	void SpawnParticleEffect( int effectCode );
 
+	/// <summary>Spawn a particle effect at the world position of ride node <paramref name="nodeId"/>
+	/// (REPAIREFFECT/SPARK resolve a node before spawning — <c>FUN_00556b90</c>; see T-048/T-047). Falls
+	/// back to the ride centre when the node can't be placed.</summary>
+	void SpawnParticleEffect( int effectCode, int nodeId );
+
 	/// <summary>SETREVERB — set the audio reverb preset/level.</summary>
 	void SetReverb( int level );
 

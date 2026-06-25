@@ -362,6 +362,10 @@ public class Level
 			ride.SetActive( false );
 			ride.BuildCost = cost; // remembered for the sell refund (T-041)
 			ride.TileX = tx; ride.TileY = ty; ride.TileW = ride.Shape.Width; ride.TileH = ride.Shape.Height;
+			// Fix the node field's world placement now the footprint is known, so static (walk/head/particle)
+			// nodes worldise at the ride's real origin/orientation/size (T-048). Moving car/seat nodes are
+			// published by the vehicle each frame regardless.
+			ride.NodeField.Configure( ride.Position, rotation, ride.TileW * grid.TileSize, ride.TileH * grid.TileSize );
 			PlaceEntranceExitMarkers( ride, grid, terrain, tx, ty );
 			var waypoints = SpawnQueuePath( ride, grid, terrain, tx, ty );
 			if ( waypoints != null )

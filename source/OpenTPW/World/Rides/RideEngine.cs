@@ -341,21 +341,32 @@ public sealed class RideEngine : IRideEngine
 		_ => null
 	};
 
+	/// <summary>Resolves this ride's node ids to world positions (T-048/T-047) — set by <see cref="Ride"/>
+	/// when the model loads. EVENT effects + REPAIREFFECT/SPARK spawn at the addressed node through it.</summary>
+	public RideNodePositions? NodeField { get; set; }
+
+	// World position of an addressed ride node (T-048): the node's resolved position (a live car/seat
+	// position, or the footprint layout), else the ride body — so a script with no decoded node graph
+	// behaves exactly as before (effect at the ride centre).
+	private Vector3 NodePosition( int nodeId )
+		=> NodeField != null && NodeField.TryResolve( nodeId, out var p ) ? p : LightPosition( SelfId );
+
 	public void Event( int type, int p1, int p2 )
 	{
+		// p1 = target node id (where the effect/sound plays); p2 = code (a sound id or par_lib particle index).
 		switch ( ClassifyEvent( type ) )
 		{
 			case EventKind.Sound:
-				PlayEventSound( type, p2 );
+				PlayEventSound( type, p2, p1 );
 				break;
 			case EventKind.Particle:
 				if ( !EventDebounced( $"fx{type}:{p2}" ) )
-					SpawnParticleEffect( p2 );
+					SpawnParticleEffect( p2, p1 );
 				break;
 		}
 	}
 
-	private void PlayEventSound( int type, int code )
+	private void PlayEventSound( int type, int code, int node )
 	{
 		var category = EventSoundCategory( type );
 		if ( category == null )
@@ -365,8 +376,11 @@ public sealed class RideEngine : IRideEngine
 			return;
 		if ( EventDebounced( $"snd:{category}:{code}" ) )
 			return;
+		// The node world position is resolved (T-048) so positional playback can use it once the audio
+		// bus is 3D; the current mixer is 2D, so it's recorded rather than spatialised.
+		var pos = NodePosition( node );
 		Audio.PlaySfx( $"ev_{track.Name}", track.SoundData );
-		Log.Trace( $"[ride] EVENT t{type} cat={category} code={code} -> {track.Name}" );
+		Log.Trace( $"[ride] EVENT t{type} cat={category} code={code} node={node}@{pos} -> {track.Name}" );
 	}
 
 	// True if this event key fired within the debounce window (and refreshes it when it hasn't).
@@ -427,7 +441,18 @@ public sealed class RideEngine : IRideEngine
 	private readonly List<(ModelEntity Entity, float Expire)> particleProxies = new();
 	private float lastNow; // most recent Update time, for timing proxy expiry
 
+	// Particle effect at the ride centre (no addressed node) — the Repair() effect + any caller without a
+	// node. Sits high over the ride body, as before.
 	public void SpawnParticleEffect( int effectCode )
+		=> SpawnParticleEffectAt( effectCode, LightPosition( SelfId ) + Vector3.Up * 8f );
+
+	// Particle effect at a ride node's world position (REPAIREFFECT/SPARK + EVENT particles — T-048/T-047).
+	// Resolves the node (a live car/seat position, or the footprint layout), lifting it slightly so the
+	// proxy reads above the geometry; falls back to the ride centre when the node can't be placed.
+	public void SpawnParticleEffect( int effectCode, int nodeId )
+		=> SpawnParticleEffectAt( effectCode, NodePosition( nodeId ) + Vector3.Up * 2f );
+
+	private void SpawnParticleEffectAt( int effectCode, Vector3 position )
 	{
 		var (name, r, g, b) = ResolveEffectColour( effectCode );
 		if ( name == "?" )
@@ -446,7 +471,7 @@ public sealed class RideEngine : IRideEngine
 			{
 				Model = Primitives.Cube.GenerateModel( mat ),
 				Scale = new Vector3( 2.5f ),
-				Position = LightPosition( SelfId ) + Vector3.Up * 8f,
+				Position = position,
 			};
 			particleProxies.Add( (proxy, lastNow + ParticleProxyLife) );
 		}
@@ -454,7 +479,7 @@ public sealed class RideEngine : IRideEngine
 		{
 			Log.Warning( $"[ride] particle effect {effectCode} proxy failed: {e.Message}" );
 		}
-		Log.Info( $"[ride] particle effect {effectCode} ({name})" );
+		Log.Info( $"[ride] particle effect {effectCode} ({name}) @{position}" );
 	}
 
 	// The effect's name + a representative colour (its brightest ramp stop) from the decoded .PLB (T-019);

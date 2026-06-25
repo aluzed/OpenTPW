@@ -33,12 +33,17 @@ public sealed class RideVehicle : Entity
 	private readonly float length;
 	private readonly ModelEntity car;
 	private readonly ModelEntity[] seats;
+	private readonly IReadOnlyList<int> seatNodeIds; // car/seat node ids this vehicle drives (T-048)
 	private float dist;
 
 	public RideVehicle( Ride ride, float tileSize, ParkTerrain terrain )
 	{
 		this.ride = ride;
 		seatCount = SeatCountFor( ride.CarNodeCount );
+		// The model's car/seat node ids, one per visible seat — we publish each one's live world position
+		// to the ride's node field every frame (T-048), so EVENT/SPARK effects addressed to a seat node
+		// follow the moving car instead of the ride centre.
+		seatNodeIds = ride.NodeField.CarSeatNodeIds.Take( seatCount ).ToList();
 
 		// An elliptical ring inside the footprint, sampled onto the terrain (a generated stand-in path).
 		const int n = 48;
@@ -99,15 +104,22 @@ public sealed class RideVehicle : Entity
 		car.Rotation = rot;
 
 		// Riders trail the lead car along the loop, one per occupied seat, so the authored seat count reads
-		// as a train of cars rather than markers stacked beside one box.
+		// as a train of cars rather than markers stacked beside one box. Each seat's path position is the
+		// car/seat node's live world position — published to the node field (T-048) whether or not it's
+		// occupied (the node exists physically), while the visible marker hides when empty.
 		int occupied = Math.Min( ride.Riders, seatCount );
 		for ( int i = 0; i < seatCount; i++ )
 		{
+			float d = ((dist - (i + 1) * SeatSpacing) % length + length) % length;
+			var (sp, st) = Sample( d );
+			var seatPos = sp + Vector3.Up * 4f;
+
+			if ( i < seatNodeIds.Count )
+				ride.NodeField.PublishMoving( seatNodeIds[i], seatPos );
+
 			if ( i < occupied )
 			{
-				float d = ((dist - (i + 1) * SeatSpacing) % length + length) % length;
-				var (sp, st) = Sample( d );
-				seats[i].Position = sp + Vector3.Up * 4f;
+				seats[i].Position = seatPos;
 				float syaw = MathF.Atan2( st.Y, st.X ) - MathF.PI / 2f;
 				seats[i].Rotation = System.Numerics.Quaternion.CreateFromAxisAngle( System.Numerics.Vector3.UnitZ, syaw );
 			}

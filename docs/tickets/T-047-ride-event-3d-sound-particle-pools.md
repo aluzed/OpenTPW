@@ -5,9 +5,12 @@
 - **Status**: ⚠️ Mostly done — the "7 particle pools / per-pool library" model was **wrong** (single
   particle library; the pools are **sound categories** in a unified effect manager), and the EVENT type
   routing is now **split per that corrected RE**: types 3-4 & 10 → particle, 5-9 → category sounds (each
-  its own `cat_*BANK.map`). Unit-tested. Real 3D node positioning (needs T-048's bone transforms) and the
-  `COAST`/`BUMP`/`ADDOBJ` sound residue remain; the visual/audio result is still **display-blocked** to
-  confirm end to end.
+  its own `cat_*BANK.map`). **3D node positioning is now wired**: EVENT's `node` operand + REPAIREFFECT/
+  SPARK's node operand resolve through the runtime resolver `RideNodePositions` (T-048), so effects spawn
+  at the addressed node (a moving car/seat, or the footprint layout) instead of the ride centre, and
+  category sounds resolve + record the node position for a future 3D audio bus. Unit-tested. The
+  `COAST`/`BUMP`/`ADDOBJ` sound residue remains, and the audible result is still **display/install-blocked**
+  to confirm end to end.
 - **Parent**: [T-037](T-037-ride-cycle-sound.md) (EVENT type switch decoded — this is the residue).
 - **Related**: [T-019](T-019-plb-parameter-fields.md), [T-032](T-032-ride-engine.md), [T-048](T-048-ride-node-geometry-movement.md).
 
@@ -54,18 +57,38 @@ Unit-tested (`RideEngineTests.EventTypeClassification` updated to the corrected 
 `EventSoundCategoryMapping`). The category banks load from the install (disc image, not extracted here), so
 the audible result stays display/install-blocked — but the routing decision is now correct and tested.
 
+## Done (this pass — 3D node positioning wired)
+
+The node-position layer T-048 was blocked on now exists as a runtime resolver (`RideNodePositions`), so the
+EVENT/effect spawn is wired to it:
+
+- `Event(type, node, code)` passes its **`node` operand** (previously ignored) through: particle effects
+  spawn at `NodePosition(node)`; category sounds resolve + record the node position (the mixer is still 2D,
+  so it's logged not spatialised — ready for a 3D bus).
+- `REPAIREFFECT`/`SPARK` (op_93/op_105) pass their **first operand (the node id — `FUN_00556b90`)** to a new
+  `IRideEngine.SpawnParticleEffect(code, nodeId)` overload, so sparks fire at the addressed node (e.g. a
+  moving coaster car) rather than the ride centre. The legacy node-less `SpawnParticleEffect(code)` stays
+  for the centre case (e.g. the mechanic's repair effect).
+- `RideNodePositions` resolves a node to a **live moving position** (car/seat nodes, published by the
+  `RideVehicle` each frame) or a **deterministic footprint layout** (static walk/head/particle nodes); an
+  unresolved node falls back to the ride body, so scripts with no decoded node graph are unchanged.
+- Unit-tested (`RideNodePositionsTests`, `RideEngineTests.ParticleOpcodesPassTheirTargetNode`).
+
 ## Remaining
 
-1. Real 3D positioning: feed the node world position (needs T-048's bone-transform decode) into the
-   effect/sound spawn instead of the ride origin.
+1. **3D audio**: the node position is resolved + recorded for sounds, but the mixer is 2D — spatialised
+   playback waits on a positional audio bus.
 2. **`COAST`/`BUMP`/`ADDOBJ` sound residue** (their direct sound triggers, e.g. `FUN_00473270` in BUMP).
 3. End-to-end audible verify of the 3-4-vs-5-9 split once the renderer/display is back.
 
 ## Acceptance criteria
 
 - Out-of-range EVENT particle codes resolve to a real effect (no "unresolved"); effects/sounds play at
-  the correct node position rather than the ride centre.
+  the correct node position rather than the ride centre. *(Particle effects now spawn at the resolved node;
+  sound spatialisation awaits a 3D audio bus.)*
 
 ## Affected files
 
-`source/OpenTPW/World/Rides/RideEngine.cs`, `source/OpenTPW.Files/Formats/Particle/ParticleLibraryFile.cs`.
+`source/OpenTPW/World/Rides/RideEngine.cs`, `RideNodePositions.cs` (new), `IRideEngine.cs`,
+`source/OpenTPW/VM/Handlers/Particles.cs`, `source/OpenTPW/World/Ride.cs`/`Level.cs`,
+`source/OpenTPW.Files/Formats/Particle/ParticleLibraryFile.cs`.

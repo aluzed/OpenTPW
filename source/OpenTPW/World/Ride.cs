@@ -187,6 +187,12 @@ public class Ride : Entity
 	/// <see cref="RideVehicle"/> instead of a fixed guess (T-048). 0 when the model carries no node graph.</summary>
 	public int CarNodeCount { get; private set; }
 
+	/// <summary>Resolves this ride's node ids to world positions (T-048/T-047): car/seat nodes follow the
+	/// <see cref="RideVehicle"/> path, other nodes sit at a footprint-derived layout. EVENT effects and
+	/// REPAIREFFECT/SPARK spawn at the addressed node via this instead of the ride centre. Built when the
+	/// model loads (empty until then); placed by Level.SpawnRideAt.</summary>
+	public RideNodePositions NodeField { get; private set; } = new( null );
+
 	/// <summary>True if this is a car ride — its script drives cars via the <c>TOUR</c>/<c>BUMP</c> opcodes
 	/// (tour rides, go-karts, water rides, bumpers). Such a ride gets a visible <see cref="RideVehicle"/>.</summary>
 	public bool IsCarRide => VM != null && VM.Instructions.Any( i => i.opcode is Opcode.TOUR or Opcode.BUMP );
@@ -466,6 +472,9 @@ public class Ride : Entity
 		// RideVehicle shows (T-048). Their world positions are runtime sim output, not file data, so only
 		// the count is used here.
 		CarNodeCount = modelFile.Nodes.Count( n => n.IsObject || n.IsCar );
+		// Runtime node→world-position resolver (T-048/T-047): EVENT/SPARK effects + the vehicle read it.
+		NodeField = new RideNodePositions( modelFile.Nodes );
+		engine.NodeField = NodeField;
 		Log.Info( $"[ride] model {md2Path}: {modelFile.Meshes.Count} mesh(es), {modelFile.Nodes.Count} node(s) ({CarNodeCount} car/seat)" );
 
 		var parts = new List<ModelEntity>();

@@ -4,8 +4,11 @@
 - **Type**: Engine / reverse engineering
 - **Status**: ⚠️ Partial — the **node graph is decoded structurally** (type + id per node, exposed in
   `ModelFile.Nodes`, unit-tested + confirmed on real ride models). Node **world positions** bind to bone
-  transforms at runtime (not stored in the node entry), which is the remaining decode; the visual
-  consumer work (car paths / WALKON / ADDHEAD placement) then follows and needs the renderer.
+  transforms at runtime (not stored in the node entry), so they're **simulation output, not a decode**.
+  A **runtime node→world-position resolver** (`RideNodePositions`) now supplies them — car/seat nodes from
+  the live vehicle path, the rest from a deterministic footprint layout — and **EVENT effects +
+  REPAIREFFECT/SPARK now spawn at the addressed node** instead of the ride centre (T-047 #1). WALKON /
+  ADDHEAD visual placement can use the same resolver but still needs the peep/head render path.
 - **Parent**: [T-032](T-032-ride-engine.md) (ride engine — this is the "node geometry" tail).
 - **Related**: [T-007](T-007-vm-opcodes-rse.md) (WALKON/ADDHEAD/TOUR/BUMP), [T-047](T-047-ride-event-3d-sound-particle-pools.md).
 
@@ -82,20 +85,53 @@ hardcoded four.
 
 The loop is still the procedural ellipse (the real path needs node *positions*, below).
 
+## Done (this pass — runtime node→world-position resolver + 3D effect placement)
+
+Since node positions are simulation output, not file data, the missing layer was a **runtime resolver**
+that supplies a world position per node id each frame — the seam every consumer (effects, sounds, the
+vehicle, later WALKON/ADDHEAD) was missing. New `RideNodePositions` (`source/OpenTPW/World/Rides/`):
+
+- **Two regimes.** *Moving* nodes (object `0x80` + car `0x100`) take a **live world position published by
+  the `RideVehicle` each frame** — these are real (the car genuinely moves there). *Static* nodes
+  (walk/head/particle) take a **deterministic footprint layout** (walk nodes ring the perimeter at ground
+  level; other nodes sit on a raised inner ring), worldised by the ride's placement transform (origin +
+  90°-step orientation + footprint size — the exact quarter-turn math `Ride.BuildMeshEntities` uses). The
+  static layout is an honest engine-side **stand-in** (like the procedural path / the light/particle
+  proxies), not decoded geometry — the authored positions don't exist statically.
+- **Resolution order**: a published moving position wins; else the static layout (once the ride is placed
+  via `Configure`); else unresolved → the caller falls back to the ride body. So a ride with no decoded
+  node graph behaves exactly as before.
+- **Wired into the effect path (closes T-047 #1).** `EVENT(type, node, code)` now passes its `node`
+  operand through: particle effects spawn at `NodePosition(node)`, category sounds resolve + record the
+  node position (for when the audio bus goes 3D). `REPAIREFFECT`/`SPARK` (op_93/op_105) pass their
+  first operand (the node id — `FUN_00556b90`) to a new `SpawnParticleEffect(code, nodeId)` overload, so
+  sparks fire at the addressed node (e.g. a moving coaster car) instead of dead-centre.
+- **Vehicle publishes.** `RideVehicle` precomputes its car/seat node ids (`CarSeatNodeIds`) and publishes
+  each seat's path position every frame, whether or not the seat is occupied (the node exists physically),
+  while the visible marker still hides when empty.
+- Unit-tested (`RideNodePositionsTests`: layout split walk-vs-inner, car/seat id selection, configured-vs-
+  unconfigured resolution, moving-overrides-static, footprint scaling + placement rotation; new
+  `RideEngineTests.ParticleOpcodesPassTheirTargetNode` for the REPAIREFFECT/SPARK passthrough).
+
 ## Remaining
 
-1. **Node world positions** require the ride **motion/skeleton simulation** (T-032 car-physics + T-033
-   bone transforms), since they're not stored statically — re-scoped out of the "file decode" framing.
-2. Apply (once positions exist + a working renderer): drive `RideVehicle`/the coaster train along the car
-   nodes' authored *path*; place WALKON peeps & ADDHEAD heads at their nodes; feed positions to T-047.
+1. **Authored path shape.** The moving nodes follow the *procedural* ellipse, not the ride's authored
+   track — the real shape still needs the ride **motion/skeleton simulation** (T-032 car-physics + T-033
+   bone transforms). The resolver is shape-agnostic, so once the real path exists, the vehicle just
+   publishes those positions instead.
+2. **WALKON / ADDHEAD visual placement.** The resolver gives `RideVM.Walk.cs`/`RideVM.Heads.cs` the node
+   positions they need; gliding the peep between walk nodes and attaching a head mesh at a head node still
+   needs the peep/head render path.
 
 ## Acceptance criteria
 
 - A tour ride's car follows the ride's authored path; a walking peep (WALKON) glides between the ride's
-  real walk nodes; heads (ADDHEAD) appear at head nodes. *(Foundational node-table decode done; the above
-  await the bone-transform decode + a working renderer to verify.)*
+  real walk nodes; heads (ADDHEAD) appear at head nodes. *(Node-table decode + the runtime resolver +
+  node-positioned effects done; the authored path shape + WALKON/ADDHEAD visuals await the motion sim +
+  the peep/head render path to verify in-world.)*
 
 ## Affected files
 
-`source/OpenTPW/World/Rides/RideVehicle.cs`, `RideEngine.cs`, `RideVM.Walk.cs`/`RideVM.Heads.cs`,
-`source/OpenTPW.Files/Formats/Model/ModelFile.cs` (node-graph access).
+`source/OpenTPW/World/Rides/RideNodePositions.cs` (new), `RideVehicle.cs`, `RideEngine.cs`,
+`IRideEngine.cs`, `source/OpenTPW/World/Ride.cs`, `source/OpenTPW/World/Level.cs`,
+`source/OpenTPW/VM/Handlers/Particles.cs`, `source/OpenTPW.Files/Formats/Model/ModelFile.cs` (node-graph access).

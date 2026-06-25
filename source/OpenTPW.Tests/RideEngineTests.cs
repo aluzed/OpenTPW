@@ -42,7 +42,13 @@ public class RideEngineTests
 		public void SetReverb( int level ) => Effects.Add( $"reverb({level})" );
 		public void DipMusic( int amount ) => Effects.Add( $"dip({amount})" );
 		public List<int> ParticleEffects = new(); // SpawnParticleEffect codes
+		public List<(int Code, int Node)> ParticleEffectsAtNode = new(); // node-positioned spawns (T-048)
 		public void SpawnParticleEffect( int effectCode ) => ParticleEffects.Add( effectCode );
+		public void SpawnParticleEffect( int effectCode, int nodeId )
+		{
+			ParticleEffects.Add( effectCode );
+			ParticleEffectsAtNode.Add( (effectCode, nodeId) );
+		}
 		public List<string> LightCalls = new(); // light opcode trace (id + scaled values)
 		private static string F( float v ) => v.ToString( "0.00", System.Globalization.CultureInfo.InvariantCulture );
 		public void EnableLight( int id ) => LightCalls.Add( $"enable({id})" );
@@ -77,6 +83,23 @@ public class RideEngineTests
 		Assert.AreEqual( (3, 42, 7, 1), fake.Spawns[0] );
 		CollectionAssert.AreEqual( new[] { "EventMap.rse" }, fake.Sounds );
 		CollectionAssert.AreEqual( new[] { 7 }, fake.Kills );
+	}
+
+	[TestMethod]
+	public void ParticleOpcodesPassTheirTargetNode()
+	{
+		// T-048/T-047: REPAIREFFECT/SPARK resolve a ride node before spawning — the first operand is the
+		// node id, which must reach the engine's node-positioned spawn (not the centre-only overload).
+		var vm = NewVm();
+		var fake = new FakeEngine();
+		vm.Engine = fake;
+
+		vm.CallOpcodeHandler( Opcode.REPAIREFFECT, Lit( vm, 4 ) );
+		vm.CallOpcodeHandler( Opcode.SPARK, Lit( vm, 2 ), Lit( vm, 0 ), Lit( vm, 0 ), Lit( vm, 0 ) );
+
+		Assert.AreEqual( 2, fake.ParticleEffectsAtNode.Count, "both spawn at a node, not the centre overload" );
+		Assert.AreEqual( (51, 4), fake.ParticleEffectsAtNode[0], "P_EFFECT_Repair at node 4" );
+		Assert.AreEqual( (1, 2), fake.ParticleEffectsAtNode[1], "P_EFFECT_Sparks at node 2" );
 	}
 
 	[TestMethod]
