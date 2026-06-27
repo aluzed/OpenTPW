@@ -175,7 +175,9 @@ public sealed class RideVehicle : Entity
 			var seatPos = sp + Vector3.Up * 4f;
 
 			if ( i < seatNodeIds.Count )
-				ride.NodeField.PublishMoving( seatNodeIds[i], seatPos );
+				// Publish the seat's world position + travel direction (the node matrix's forward row); the
+				// art-orientation offset (the +Y car mesh) is the consumer's business, not the node facing.
+				ride.NodeField.PublishMoving( seatNodeIds[i], seatPos, new Vector3( st.X, st.Y, 0f ) );
 
 			if ( i < occupied )
 			{
@@ -217,7 +219,8 @@ public sealed class RideVehicle : Entity
 			var pos = new Vector3( wx, wy, 0 ).WithZ( terrain.SampleHeight( wx, wy ) + 2f );
 
 			if ( i < seatNodeIds.Count )
-				ride.NodeField.PublishMoving( seatNodeIds[i], pos );
+				ride.NodeField.PublishMoving( seatNodeIds[i], pos,
+					new Vector3( MathF.Cos( cs.Heading ), MathF.Sin( cs.Heading ), 0f ) );
 
 			if ( i < occupied )
 			{

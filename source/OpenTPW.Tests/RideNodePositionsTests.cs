@@ -144,6 +144,46 @@ public class RideNodePositionsTests
 	}
 
 	[TestMethod]
+	public void FacingResolvesVehicleTangentOverBodyForward()
+	{
+		// The original reads a node's forward (matrix +0x20) alongside its position. Priority mirrors
+		// TryResolve: a live vehicle tangent wins over the animated part's forward.
+		var f = Field( Node( 0x80, 1 ) );
+
+		f.PublishBody( 1, Vector3.Zero, new Vector3( 0f, 1f, 0f ) );
+		Assert.IsTrue( f.TryResolveFacing( 1, out var body ) );
+		Assert.AreEqual( new Vector3( 0f, 1f, 0f ), body, "body forward when only the engine published" );
+
+		f.PublishMoving( 1, Vector3.Zero, new Vector3( 1f, 0f, 0f ) );
+		Assert.IsTrue( f.TryResolveFacing( 1, out var moving ) );
+		Assert.AreEqual( new Vector3( 1f, 0f, 0f ), moving, "the vehicle tangent wins" );
+	}
+
+	[TestMethod]
+	public void FacingIsUnsetWithoutAPublishedDirection()
+	{
+		// A position-only publish (or the static layout) carries no facing → TryResolveFacing is false.
+		var f = Field( Node( 0x80, 1 ) );
+		f.Configure( Vector3.Zero, rotation: 0, worldWidth: 8f, worldHeight: 8f );
+		f.PublishBody( 1, new Vector3( 1f, 2f, 3f ) ); // no forward
+		Assert.IsTrue( f.TryResolve( 1, out _ ), "position still resolves" );
+		Assert.IsFalse( f.TryResolveFacing( 1, out _ ), "no facing was published" );
+	}
+
+	[TestMethod]
+	public void ClearDropsBothPositionAndFacing()
+	{
+		var f = Field( Node( 0x80, 1 ) );
+		f.PublishMoving( 1, Vector3.One, new Vector3( 1f, 0f, 0f ) );
+		f.ClearMoving();
+		Assert.IsFalse( f.TryResolveFacing( 1, out _ ), "moving facing cleared with the position" );
+
+		f.PublishBody( 1, Vector3.One, new Vector3( 0f, 1f, 0f ) );
+		f.ClearBody();
+		Assert.IsFalse( f.TryResolveFacing( 1, out _ ), "body facing cleared with the position" );
+	}
+
+	[TestMethod]
 	public void StaticNodeWorldisedAtOriginAndFootprint()
 	{
 		// One walk node (angle 0 → +X), footprint 8×4 → half-extents 4×2, origin (10,20,5), no rotation.

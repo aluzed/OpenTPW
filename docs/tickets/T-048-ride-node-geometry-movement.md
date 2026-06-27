@@ -204,19 +204,36 @@ those transforms now **feed the node resolver**:
   `BodyPositionResolvesAboveStaticLayout` + clear-to-fallback, `VehicleMovingPositionWinsOverBodyPosition`,
   `BodyPositionResolvesEvenWhenUnconfigured`). Build 0-warning, 165 tests pass.
 
+## Done (this pass — node facing: the full 4×4, not just the translation)
+
+The prior pass published a node's **position** (matrix translation row `+0x30`); the original also reads its
+**forward row `+0x20`** to orient the attached object (`FUN_00556b90` returns both). That's now published too,
+completing the runtime transform:
+
+- **`RideNodePositions` carries facing** alongside position in both live regimes (`movingDir`/`bodyDir`),
+  resolved at the same priority via `TryResolveFacing` (vehicle tangent > animated part forward > none). A
+  position-only publish or the static layout carries no facing (returns false) — callers keep their own.
+- **Producers.** `RideEngine.PublishBodyNodes` publishes each body node's forward = its animated part's
+  rotated `+X` axis (the surface matrix forward row), so a head turns *with* the keyframe rotation.
+  `RideVehicle` publishes the seat's **travel direction** (circuit tangent / bumper heading) — the raw node
+  forward, without the `+Y` car-mesh art offset (that's the consumer's concern).
+- **Consumer.** `SyncHeads` now **tracks the head node every frame** (it previously set the position only at
+  creation, so heads never followed the animation) — position from the node field, **yaw from the resolved
+  facing** (`atan2(fwd.Y, fwd.X)` about Z, the engine's facing convention). `HeadNodeId` factored out so the
+  position + facing lookups share the slot→node mapping.
+- Unit-tested (`RideNodePositionsTests`: `FacingResolvesVehicleTangentOverBodyForward`,
+  `FacingIsUnsetWithoutAPublishedDirection`, `ClearDropsBothPositionAndFacing`). 168 tests pass, 0-warning.
+
 ## Remaining
 
 1. **Exact authored track shape / car-path node positions.** The **car/seat** nodes are driven by the
    re-implemented car sim (`CarSim`: tour/kart **circuit** + bumper **arena**, `FUN_0054a040`), and the
-   **body-attached** nodes now ride the real keyframe transforms (above). What stays a stand-in is the car
-   **waypoint geometry** (footprint loop / arena rectangle) and the node→surface **binding** (ordered, not
-   file-decoded) — both because the authored data is bound at runtime, not stored. `RideVehicle`'s
+   **body-attached** nodes now ride the real keyframe transforms (position + facing). What stays a stand-in is
+   the car **waypoint geometry** (footprint loop / arena rectangle) and the node→surface **binding** (ordered,
+   not file-decoded) — both because the authored data is bound at runtime, not stored. `RideVehicle`'s
    `loop`/`Sample` is shape-agnostic, so real waypoint positions drop straight in if a future RE recovers them.
-2. **Node facing.** The original also reads a node's forward row (`+0x20`) to orient attached objects; the
-   resolver publishes position only (consumers that need facing — WALKON — compute their own `atan2`). A
-   `PublishBody` direction is a small follow-up if a consumer needs it.
-3. **Art swap.** WALKON peeps + ADDHEAD heads are placed + animated as marker proxies; rendering the real
-   peep sprite / head sub-mesh at those positions is a renderer follow-up.
+2. **Art swap.** WALKON peeps + ADDHEAD heads are placed + animated (position + facing) as marker proxies;
+   rendering the real peep sprite / head sub-mesh at those positions is a renderer follow-up.
 
 ## Acceptance criteria
 
@@ -228,8 +245,9 @@ those transforms now **feed the node resolver**:
 
 ## Affected files
 
-`source/OpenTPW/World/Rides/RideNodePositions.cs` (body regime: `PublishBody`/`ClearBody`/`BodyNodeIds`),
-`RidePath.cs` (new), `RideVehicle.cs`, `RideEngine.cs` (`PublishBodyNodes`/`AnimatedSurfaceIndices`),
+`source/OpenTPW/World/Rides/RideNodePositions.cs` (body regime + facing: `PublishBody`/`ClearBody`/
+`BodyNodeIds`/`TryResolveFacing`), `RidePath.cs` (new), `RideVehicle.cs` (publishes seat facing),
+`RideEngine.cs` (`PublishBodyNodes`/`AnimatedSurfaceIndices`/`HeadNodeId`, per-frame `SyncHeads` tracking),
 `IRideEngine.cs`, `source/OpenTPW/World/Ride.cs`, `source/OpenTPW/World/Level.cs`,
 `source/OpenTPW/VM/RideVM.Walk.cs`/`RideVM.Heads.cs` (head-capacity setter), `source/OpenTPW/VM/Handlers/Particles.cs`,
 `source/OpenTPW.Files/Formats/Model/ModelFile.cs` (node-graph access).

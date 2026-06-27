@@ -41,8 +41,10 @@ public sealed class RideNodePositions
 
 	private readonly List<ModelNode> nodes;
 	private readonly List<LocalNode> layout;
-	private readonly Dictionary<int, Vector3> moving = new(); // live car/seat positions, fed by the vehicle
-	private readonly Dictionary<int, Vector3> body = new();   // live body-part positions, fed by the engine's keyframe anim
+	private readonly Dictionary<int, Vector3> moving = new();    // live car/seat positions, fed by the vehicle
+	private readonly Dictionary<int, Vector3> movingDir = new(); // their forward directions (vehicle path tangent)
+	private readonly Dictionary<int, Vector3> body = new();      // live body-part positions, fed by the engine's keyframe anim
+	private readonly Dictionary<int, Vector3> bodyDir = new();   // their forward directions (animated part rotation)
 
 	private bool configured;
 	private Vector3 origin;
@@ -103,8 +105,22 @@ public sealed class RideNodePositions
 	/// car/seat node it carries). Overrides the static layout for that node id.</summary>
 	public void PublishMoving( int nodeId, Vector3 worldPos ) => moving[nodeId] = worldPos;
 
-	/// <summary>Forget all published moving positions (the vehicle re-publishes each frame).</summary>
-	public void ClearMoving() => moving.Clear();
+	/// <summary>Publish a moving node's world position <i>and</i> its forward direction (the vehicle's path
+	/// tangent) — the original reads both off the node matrix (translation <c>+0x30</c>, forward <c>+0x20</c>;
+	/// <c>FUN_00556b90</c>). Facing lets an attached object orient along travel.</summary>
+	public void PublishMoving( int nodeId, Vector3 worldPos, Vector3 forward )
+	{
+		moving[nodeId] = worldPos;
+		if ( forward != Vector3.Zero )
+			movingDir[nodeId] = forward;
+	}
+
+	/// <summary>Forget all published moving positions + facings (the vehicle re-publishes each frame).</summary>
+	public void ClearMoving()
+	{
+		moving.Clear();
+		movingDir.Clear();
+	}
 
 	/// <summary>Publish a body-attached node's current world position from the live keyframe animation (the
 	/// engine calls this per frame for each non-walk node, binding it to an animated body part). Lower
@@ -112,8 +128,35 @@ public sealed class RideNodePositions
 	/// static layout — so a head/effect on an animated ride tracks the real moving mesh.</summary>
 	public void PublishBody( int nodeId, Vector3 worldPos ) => body[nodeId] = worldPos;
 
-	/// <summary>Forget all published body-part positions (the engine re-publishes each frame).</summary>
-	public void ClearBody() => body.Clear();
+	/// <summary>Publish a body-attached node's world position <i>and</i> its forward direction (the animated
+	/// part's rotated forward axis — the surface matrix's forward row <c>+0x20</c>), so a head/object mounted
+	/// on an animated ride turns with it.</summary>
+	public void PublishBody( int nodeId, Vector3 worldPos, Vector3 forward )
+	{
+		body[nodeId] = worldPos;
+		if ( forward != Vector3.Zero )
+			bodyDir[nodeId] = forward;
+	}
+
+	/// <summary>Forget all published body-part positions + facings (the engine re-publishes each frame).</summary>
+	public void ClearBody()
+	{
+		body.Clear();
+		bodyDir.Clear();
+	}
+
+	/// <summary>Resolve a node's forward direction (the matrix forward row <c>+0x20</c> the original reads
+	/// alongside the position): a live vehicle tangent first, then the animated part's forward, else false
+	/// (the static layout carries no meaningful facing). Mirrors <see cref="TryResolve"/>'s priority.</summary>
+	public bool TryResolveFacing( int nodeId, out Vector3 forward )
+	{
+		if ( movingDir.TryGetValue( nodeId, out forward ) )
+			return true;
+		if ( bodyDir.TryGetValue( nodeId, out forward ) )
+			return true;
+		forward = Vector3.Zero;
+		return false;
+	}
 
 	/// <summary>Resolve a node id to a world position: a live moving (vehicle) position first, then a live
 	/// body-part (keyframe) position, then the deterministic static layout (when configured), else false.</summary>

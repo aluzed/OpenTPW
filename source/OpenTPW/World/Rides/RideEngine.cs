@@ -550,19 +550,28 @@ public sealed class RideEngine : IRideEngine
 					continue;
 				}
 
-				if ( shown && cur.Value == value )
-					continue; // already shown, unchanged
-
-				if ( shown )
-					Entity.All.Remove( cur.Entity );
-
-				var e = new ModelEntity
+				// (Re)create the marker on first show or when the head value changes (the value picks the head
+				// graphic once real art lands).
+				if ( !shown || cur.Value != value )
 				{
-					Model = Primitives.Cube.GenerateModel( SolidMaterial( 90, 200, 250 ) ), // head marker
-					Scale = new Vector3( 1.6f ),
-					Position = HeadNodePosition( slot ) + Vector3.Up * 6f,
-				};
-				headProxies[slot] = (value, e);
+					if ( shown )
+						Entity.All.Remove( cur.Entity );
+
+					cur.Entity = new ModelEntity
+					{
+						Model = Primitives.Cube.GenerateModel( SolidMaterial( 90, 200, 250 ) ), // head marker
+						Scale = new Vector3( 1.6f ),
+					};
+					headProxies[slot] = (value, cur.Entity);
+				}
+
+				// Track the head node every frame (it rides the animated body — real per-frame transform):
+				// position from the node field, facing from the node's forward direction (yaw about Z).
+				int nodeId = HeadNodeId( slot );
+				cur.Entity.Position = HeadNodePosition( slot ) + Vector3.Up * 6f;
+				if ( nodeId >= 0 && NodeField != null && NodeField.TryResolveFacing( nodeId, out var fwd ) )
+					cur.Entity.Rotation = System.Numerics.Quaternion.CreateFromAxisAngle(
+						System.Numerics.Vector3.UnitZ, MathF.Atan2( fwd.Y, fwd.X ) );
 			}
 		}
 		catch ( Exception ex ) { Log.Warning( $"[ride] head sync failed: {ex.Message}" ); }
@@ -621,14 +630,20 @@ public sealed class RideEngine : IRideEngine
 		return (pos, yaw);
 	}
 
-	// World position of head slot `slot`: the slot-th object/head node (type 0x80) resolved through the node
-	// field, else the ride centre. Modulo the head-node count so an over-capacity slot still lands on a node.
-	private Vector3 HeadNodePosition( int slot )
+	// The object/head node id (type 0x80) head slot `slot` mounts on, or -1 if the ride has no head nodes.
+	// Modulo the head-node count so an over-capacity slot still lands on a node.
+	private int HeadNodeId( int slot )
 	{
 		var ids = NodeField?.ObjectNodeIds;
-		if ( ids != null && ids.Count > 0 )
-			return NodePosition( ids[slot % ids.Count] );
-		return LightPosition( SelfId );
+		return ids != null && ids.Count > 0 ? ids[slot % ids.Count] : -1;
+	}
+
+	// World position of head slot `slot`: its object/head node resolved through the node field, else the
+	// ride centre (a ride with no decoded head nodes behaves as before).
+	private Vector3 HeadNodePosition( int slot )
+	{
+		int nodeId = HeadNodeId( slot );
+		return nodeId >= 0 ? NodePosition( nodeId ) : LightPosition( SelfId );
 	}
 
 	// A small unlit emissive material of the given colour (the light/particle/marker proxy pattern).
@@ -993,7 +1008,11 @@ public sealed class RideEngine : IRideEngine
 		for ( int i = 0; i < nodeIds.Count; i++ )
 		{
 			int part = candidates[i % candidates.Count];
-			NodeField.PublishBody( nodeIds[i], body.Parts[part].Entity.Position );
+			var entity = body.Parts[part].Entity;
+			// Forward = the part's rotated +X axis (the surface matrix forward row +0x20 the original reads),
+			// so an object/head bound to an animated surface turns with it. Consumers take the yaw.
+			var sf = System.Numerics.Vector3.Transform( System.Numerics.Vector3.UnitX, entity.Rotation );
+			NodeField.PublishBody( nodeIds[i], entity.Position, new Vector3( sf.X, sf.Y, sf.Z ) );
 		}
 	}
 
