@@ -962,7 +962,57 @@ public sealed class RideEngine : IRideEngine
 				ApplyKeyframes( obj, kf, t );
 			else
 				ApplyBob( obj, t );
+
+			if ( obj.Id == SelfId )
+				PublishBodyNodes( obj );
 		}
+	}
+
+	// Feeds the ride's body-attached nodes their REAL per-frame positions (T-048): the keyframe animation
+	// above has just written each body part's live world transform, and the original reads a node's position
+	// off the surface matrix it's bound to (FUN_00556b90, translation row +0x30; docs/08). So instead of the
+	// static footprint ring, each non-walk node (head/object/particle mount) tracks an animated body part.
+	//
+	// The node→surface *binding* isn't in the file (the node entry's pointer slots are null), so which part a
+	// node binds to is a deterministic stand-in — nodes are ordered onto the model's animated surfaces (the
+	// ones the keyframe file actually moves; all parts if none animate) — but the positions themselves are
+	// the real per-frame transforms. A car/seat node the vehicle owns still wins (PublishMoving > PublishBody).
+	private void PublishBodyNodes( RideObject body )
+	{
+		if ( NodeField == null || body.Parts.Count == 0 )
+			return;
+
+		var nodeIds = NodeField.BodyNodeIds;
+		if ( nodeIds.Count == 0 )
+			return;
+
+		// Candidate parts: prefer the surfaces the active keyframe file animates (those genuinely move, like
+		// the original's animated bind targets); fall back to every body part when nothing animates (bob/static).
+		var candidates = AnimatedSurfaceIndices( body );
+
+		for ( int i = 0; i < nodeIds.Count; i++ )
+		{
+			int part = candidates[i % candidates.Count];
+			NodeField.PublishBody( nodeIds[i], body.Parts[part].Entity.Position );
+		}
+	}
+
+	// The valid body-part indices the active animation drives, in order — used to bind nodes onto moving
+	// surfaces. Falls back to all parts (0..n) when the channel has no keyframes or none are in range.
+	private List<int> AnimatedSurfaceIndices( RideObject body )
+	{
+		var result = new List<int>();
+		if ( body.AnimId is int anim && channelAnims.TryGetValue( anim, out var kf ) )
+		{
+			foreach ( var sa in kf.Surfaces )
+				if ( sa.HasAnimation && sa.SurfaceIndex >= 0 && sa.SurfaceIndex < body.Parts.Count
+					&& !result.Contains( sa.SurfaceIndex ) )
+					result.Add( sa.SurfaceIndex );
+		}
+		if ( result.Count == 0 )
+			for ( int p = 0; p < body.Parts.Count; p++ )
+				result.Add( p );
+		return result;
 	}
 
 	// Drives each animated surface's part by its keyframe tracks. The model-space TRS is swizzled to

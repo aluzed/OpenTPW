@@ -17,10 +17,18 @@ using ModelNode = OpenTPW.ModelFile.Node;
 ///   <see cref="RideVehicle"/> drives them along the ride's path and <see cref="PublishMoving"/>es each
 ///   one's live world position every frame. These are <b>real</b> positions (the car genuinely moves
 ///   there).</item>
-///   <item><b>Static nodes</b> (walk/head/particle): a deterministic, footprint-derived layout
-///   (<see cref="BuildLayout"/>) transformed into world space by the ride's placement transform. This is
-///   an engine-side <b>stand-in</b> — like the procedural ellipse path and the light/particle proxies —
-///   not decoded geometry, because the authored positions don't exist statically in the file.</item>
+///   <item><b>Body-attached nodes</b> (head/object/particle — everything bar walk paths): the
+///   <see cref="RideEngine"/> publishes each one's <b>live animated body-part position</b> via
+///   <see cref="PublishBody"/> every frame. This is the real per-frame transform the keyframe surface
+///   animation produces — the original reads a node's position off the surface matrix it's bound to
+///   (<c>FUN_00556b90</c>, translation row <c>+0x30</c>; docs/08), so a head/effect on an animated ride
+///   tracks the moving mesh instead of floating on a static ring. The node→surface <i>binding</i> isn't
+///   in the file (the entry's pointer slots are null), so which part a node binds to is a deterministic
+///   stand-in (ordered onto the animated surfaces) — but the <b>positions are real</b>, not synthetic.</item>
+///   <item><b>Static fallback</b> (no body / walk paths): a deterministic, footprint-derived layout
+///   (<see cref="BuildLayout"/>) transformed into world space by the ride's placement transform. Used when
+///   no animated body has published (and for walk paths, which genuinely ring the footprint at ground
+///   level) — an engine-side <b>stand-in</b>, like the procedural ellipse path and the light proxies.</item>
 /// </list>
 /// A node not covered by either falls through (<see cref="TryResolve"/> returns false) so the caller can
 /// default to the ride body. The layout math is pure and unit-tested.
@@ -34,6 +42,7 @@ public sealed class RideNodePositions
 	private readonly List<ModelNode> nodes;
 	private readonly List<LocalNode> layout;
 	private readonly Dictionary<int, Vector3> moving = new(); // live car/seat positions, fed by the vehicle
+	private readonly Dictionary<int, Vector3> body = new();   // live body-part positions, fed by the engine's keyframe anim
 
 	private bool configured;
 	private Vector3 origin;
@@ -71,6 +80,13 @@ public sealed class RideNodePositions
 	public IReadOnlyList<int> WalkNodeIds =>
 		nodes.Where( n => n.IsWalk ).Select( n => n.NodeId ).ToList();
 
+	/// <summary>Node ids of the ride's body-attached nodes (everything bar walk paths — heads, objects,
+	/// particle/effect mounts), ordered deterministically (the same node-id ordering <see cref="BuildLayout"/>
+	/// uses). The engine binds these onto the animated body surfaces and publishes their live positions.</summary>
+	public IReadOnlyList<int> BodyNodeIds =>
+		nodes.Where( n => !n.IsWalk ).OrderBy( n => n.NodeId ).ThenBy( n => n.TypeMask )
+			.Select( n => n.NodeId ).ToList();
+
 	/// <summary>Fix the ride's world placement (origin, 90°-step orientation, footprint size in world
 	/// units) so static nodes can be worldised. Called when the ride is placed (see Level.SpawnRideAt).</summary>
 	public void Configure( Vector3 worldOrigin, int rotation, float worldWidth, float worldHeight )
@@ -90,11 +106,22 @@ public sealed class RideNodePositions
 	/// <summary>Forget all published moving positions (the vehicle re-publishes each frame).</summary>
 	public void ClearMoving() => moving.Clear();
 
-	/// <summary>Resolve a node id to a world position: a live moving position if the vehicle owns it,
-	/// else the deterministic static layout (when configured), else false.</summary>
+	/// <summary>Publish a body-attached node's current world position from the live keyframe animation (the
+	/// engine calls this per frame for each non-walk node, binding it to an animated body part). Lower
+	/// priority than <see cref="PublishMoving"/> (a car/seat node the vehicle owns wins), higher than the
+	/// static layout — so a head/effect on an animated ride tracks the real moving mesh.</summary>
+	public void PublishBody( int nodeId, Vector3 worldPos ) => body[nodeId] = worldPos;
+
+	/// <summary>Forget all published body-part positions (the engine re-publishes each frame).</summary>
+	public void ClearBody() => body.Clear();
+
+	/// <summary>Resolve a node id to a world position: a live moving (vehicle) position first, then a live
+	/// body-part (keyframe) position, then the deterministic static layout (when configured), else false.</summary>
 	public bool TryResolve( int nodeId, out Vector3 world )
 	{
 		if ( moving.TryGetValue( nodeId, out world ) )
+			return true;
+		if ( body.TryGetValue( nodeId, out world ) )
 			return true;
 		if ( configured )
 		{

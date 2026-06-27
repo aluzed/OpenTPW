@@ -179,16 +179,43 @@ This **closes the "decode the rig" thread** (the answer is structural: nothing t
 prior "RE'd" claims into binary-cited facts: head capacity = type-`0x80` node count (`FUN_005587f0`), the
 node table layout + resolver match, and the EVENT/walk/head positioning all flowing through `FUN_00556b90`.
 
+## Done (this pass — real per-frame node transforms fed from the keyframe animation)
+
+The last fidelity gap was that **static** nodes (head/object/particle mounts — everything bar the car/seat
+nodes the vehicle drives) resolved to a **synthetic footprint ring** that ignored the live animation. The
+keyframe animation (T-033) already computes each body part's **real per-frame world transform** every frame
+(`RideEngine.ApplyKeyframes` writes `Parts[surface].Entity.Position/Rotation/Scale`), which is exactly what
+the original reads off a node's bound surface matrix (`FUN_00556b90`, translation row `+0x30`; docs/08). So
+those transforms now **feed the node resolver**:
+
+- **New body regime in `RideNodePositions`.** A third source between the vehicle's moving positions and the
+  static layout: `PublishBody(nodeId, world)` / `ClearBody()`, resolved at **priority moving > body >
+  static** (`TryResolve`). A head/effect on an animated ride now tracks the **moving mesh** instead of a
+  fixed ring; a car/seat node the vehicle owns still wins.
+- **Engine publishes each frame.** `RideEngine.PublishBodyNodes` (called from `Update` after the body's
+  keyframes apply) binds every non-walk node (`NodeField.BodyNodeIds`) onto a body part and publishes that
+  part's **live `Entity.Position`**. Binding prefers the surfaces the active channel actually animates
+  (`AnimatedSurfaceIndices` — the original's animated bind targets), falling back to all parts when nothing
+  animates. The node→surface *binding* is still a deterministic stand-in (the file's binding pointers are
+  null), but the **positions are real per-frame transforms**, not synthetic geometry.
+- Walk nodes stay on the ground footprint ring (they genuinely ring the perimeter — peep paths), and a ride
+  with no animated body falls back to the static layout exactly as before.
+- Unit-tested (`RideNodePositionsTests`: `BodyNodeIdsAreEveryNonWalkNodeOrderedById`,
+  `BodyPositionResolvesAboveStaticLayout` + clear-to-fallback, `VehicleMovingPositionWinsOverBodyPosition`,
+  `BodyPositionResolvesEvenWhenUnconfigured`). Build 0-warning, 165 tests pass.
+
 ## Remaining
 
-1. **Exact authored track shape / node motion** is **runtime simulation output** (now proven, not a file
-   decode). The **motion behaviour is now re-implemented** from the RE'd car engine (`FUN_0054a040`): the
-   tour/kart **circuit** loop and the bumper **arena** sim (`CarSim` — random waypoints + pairwise
-   collision/bounce, the BUMP branch), occupancy-driven + unit-tested (`CarSimTests`). What stays a
-   stand-in is the waypoint **positions** (the footprint loop / arena rectangle), because the authored ones
-   are bound at runtime, not stored. `RideVehicle`'s `loop`/`Sample` is shape-agnostic, so real positions
-   drop straight in once the keyframe/skeleton transforms feed them (T-033).
-2. **Art swap.** WALKON peeps + ADDHEAD heads are placed + animated as marker proxies; rendering the real
+1. **Exact authored track shape / car-path node positions.** The **car/seat** nodes are driven by the
+   re-implemented car sim (`CarSim`: tour/kart **circuit** + bumper **arena**, `FUN_0054a040`), and the
+   **body-attached** nodes now ride the real keyframe transforms (above). What stays a stand-in is the car
+   **waypoint geometry** (footprint loop / arena rectangle) and the node→surface **binding** (ordered, not
+   file-decoded) — both because the authored data is bound at runtime, not stored. `RideVehicle`'s
+   `loop`/`Sample` is shape-agnostic, so real waypoint positions drop straight in if a future RE recovers them.
+2. **Node facing.** The original also reads a node's forward row (`+0x20`) to orient attached objects; the
+   resolver publishes position only (consumers that need facing — WALKON — compute their own `atan2`). A
+   `PublishBody` direction is a small follow-up if a consumer needs it.
+3. **Art swap.** WALKON peeps + ADDHEAD heads are placed + animated as marker proxies; rendering the real
    peep sprite / head sub-mesh at those positions is a renderer follow-up.
 
 ## Acceptance criteria
@@ -201,7 +228,8 @@ node table layout + resolver match, and the EVENT/walk/head positioning all flow
 
 ## Affected files
 
-`source/OpenTPW/World/Rides/RideNodePositions.cs` (new), `RidePath.cs` (new), `RideVehicle.cs`,
-`RideEngine.cs`, `IRideEngine.cs`, `source/OpenTPW/World/Ride.cs`, `source/OpenTPW/World/Level.cs`,
+`source/OpenTPW/World/Rides/RideNodePositions.cs` (body regime: `PublishBody`/`ClearBody`/`BodyNodeIds`),
+`RidePath.cs` (new), `RideVehicle.cs`, `RideEngine.cs` (`PublishBodyNodes`/`AnimatedSurfaceIndices`),
+`IRideEngine.cs`, `source/OpenTPW/World/Ride.cs`, `source/OpenTPW/World/Level.cs`,
 `source/OpenTPW/VM/RideVM.Walk.cs`/`RideVM.Heads.cs` (head-capacity setter), `source/OpenTPW/VM/Handlers/Particles.cs`,
 `source/OpenTPW.Files/Formats/Model/ModelFile.cs` (node-graph access).

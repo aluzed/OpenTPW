@@ -89,6 +89,61 @@ public class RideNodePositionsTests
 	}
 
 	[TestMethod]
+	public void BodyNodeIdsAreEveryNonWalkNodeOrderedById()
+	{
+		// The engine binds these onto the animated body surfaces; walk paths are excluded (they ring the
+		// footprint on the ground). Ordered by id (then type) for a stable node→surface assignment.
+		var f = Field( Node( 0x80, 3 ), Node( 0x800, 9 ), Node( 0x100, 1 ), Node( 0x80, 2 ) );
+		CollectionAssert.AreEqual( new[] { 1, 2, 3 }, f.BodyNodeIds.ToArray(),
+			"non-walk nodes (object/car) ordered by id; the walk node (9) is excluded" );
+	}
+
+	[TestMethod]
+	public void BodyPositionResolvesAboveStaticLayout()
+	{
+		// The engine publishes a live body-part position (real per-frame keyframe transform) — it beats the
+		// static footprint ring but yields to a vehicle-owned moving position.
+		var f = Field( Node( 0x80, 1 ) );
+		f.Configure( Vector3.Zero, rotation: 0, worldWidth: 8f, worldHeight: 8f );
+		Assert.IsTrue( f.TryResolve( 1, out var stat ), "configured → static layout resolves" );
+
+		var bodyPos = new Vector3( 3f, 4f, 9f );
+		f.PublishBody( 1, bodyPos );
+		Assert.IsTrue( f.TryResolve( 1, out var got ) );
+		Assert.AreEqual( bodyPos, got, "the live body-part position wins over the static layout" );
+		Assert.AreNotEqual( stat, got );
+
+		f.ClearBody();
+		Assert.IsTrue( f.TryResolve( 1, out var back ), "cleared → falls back to the static layout" );
+		Assert.AreEqual( stat, back );
+	}
+
+	[TestMethod]
+	public void VehicleMovingPositionWinsOverBodyPosition()
+	{
+		// Priority: vehicle-moving > body (keyframe) > static layout. A car/seat node the vehicle owns keeps
+		// its sim position even if the body anim also published it.
+		var f = Field( Node( 0x80, 1 ) );
+		f.PublishBody( 1, new Vector3( 3f, 4f, 9f ) );
+		var seat = new Vector3( 50f, 60f, 7f );
+		f.PublishMoving( 1, seat );
+
+		Assert.IsTrue( f.TryResolve( 1, out var got ) );
+		Assert.AreEqual( seat, got, "the vehicle's live seat position wins" );
+	}
+
+	[TestMethod]
+	public void BodyPositionResolvesEvenWhenUnconfigured()
+	{
+		// Like moving positions, body positions are absolute world coords, so they resolve before Configure.
+		var f = Field( Node( 0x80, 2 ) );
+		var p = new Vector3( 1f, 2f, 3f );
+		f.PublishBody( 2, p );
+		Assert.IsTrue( f.TryResolve( 2, out var got ) );
+		Assert.AreEqual( p, got );
+	}
+
+	[TestMethod]
 	public void StaticNodeWorldisedAtOriginAndFootprint()
 	{
 		// One walk node (angle 0 → +X), footprint 8×4 → half-extents 4×2, origin (10,20,5), no rotation.
