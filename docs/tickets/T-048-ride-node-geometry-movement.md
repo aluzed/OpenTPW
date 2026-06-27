@@ -223,6 +223,12 @@ completing the runtime transform:
   position + facing lookups share the slot→node mapping.
 - Unit-tested (`RideNodePositionsTests`: `FacingResolvesVehicleTangentOverBodyForward`,
   `FacingIsUnsetWithoutAPublishedDirection`, `ClearDropsBothPositionAndFacing`). 168 tests pass, 0-warning.
+- **Verified in-game** (real jungle assets, `OPENTPW_AUTOPLACE`): the animated rides (Inca Totem, Ape Ride,
+  coaster, tour ride, bumper) load their node graphs (totem 18 nodes, monkey 24, bumper 13) and
+  `PublishBodyNodes` runs every frame across them with **no exceptions / sync failures**. A temporary
+  diagnostic confirmed each ride's body node reports a **real per-frame model-space position + facing** (one
+  ride's part 0 resolved raised at Z=10 with yaw −90° — i.e. tracking an elevated, rotated mesh part, not the
+  flat footprint ring); EVENT effects resolve to live node positions. Diagnostic reverted after the run.
 
 ## Remaining
 
