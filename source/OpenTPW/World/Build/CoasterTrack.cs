@@ -203,6 +203,14 @@ public sealed class CoasterTrack
 	private const float TieHalfLength = 0.22f; // ×TileSize: cross-tie reach along travel
 	private const int TieEvery = 4;            // a cross-tie every N spline points (~2 ties / tile at sub=8)
 
+	// Track banking (T-052): on a curve the swept frame rolls about the travel tangent so the track tilts
+	// into the turn — the spline-track realization of the original's per-segment rotation. The bank angle is
+	// proportional to each point's heading change (curvature), clamped, then smoothed so it eases through the
+	// curve instead of snapping at the control points.
+	private const float BankGain = 1.6f;  // heading-change (rad) → roll (rad) multiplier
+	private const float MaxBank = 0.6f;   // ≈34° cap on the roll
+	private const int BankSmooth = 2;     // ± window (spline points) of the bank moving-average
+
 	// The authored track cross-section: the 2D profile (X across, Y up, U texcoord) the original sweeps
 	// along the track centre-line, read from coaster.sam's asCrossSectionPoints1[*] (plain settings text).
 	// This is the real rail/channel silhouette (e.g. ±4 wide, rails at ±3, dipping to centre −1.5).
@@ -268,6 +276,37 @@ public sealed class CoasterTrack
 			tan[i] = dir;
 		}
 
+		// Bank the frame (T-052): per-point curvature → a roll angle, smoothed, then the (perp, up) axes are
+		// rotated about the tangent so the swept profile tilts into the turn. `right`/`up` replace the flat
+		// `perp`/world-up below; on a straight they equal them, so a straight track is unchanged.
+		var bank = new float[pts.Count];
+		for ( int i = 0; i < pts.Count; i++ )
+		{
+			var tin = (pos[i] - pos[Math.Max( i - 1, 0 )]).Normal;
+			var tout = (pos[Math.Min( i + 1, pts.Count - 1 )] - pos[i]).Normal;
+			bank[i] = BankAngle( tin, tout, BankGain, MaxBank );
+		}
+		var right = new Vector3[pts.Count];
+		var up = new Vector3[pts.Count];
+		for ( int i = 0; i < pts.Count; i++ )
+		{
+			// Smooth the bank over a small window so it eases through the curve.
+			float sum = 0f; int cnt = 0;
+			for ( int k = -BankSmooth; k <= BankSmooth; k++ )
+			{
+				int j = i + k;
+				if ( j < 0 || j >= pts.Count ) continue;
+				sum += bank[j]; cnt++;
+			}
+			float theta = cnt > 0 ? sum / cnt : 0f;
+
+			var right0 = perp[i];                              // horizontal, ⟂ travel
+			var up0 = Vector3.Cross( tan[i], right0 ).Normal;  // ≈ world-up on the flat, tilts on slopes
+			float c = MathF.Cos( theta ), s = MathF.Sin( theta );
+			right[i] = (right0 * c + up0 * s).Normal;          // roll the frame about the tangent
+			up[i] = (up0 * c - right0 * s).Normal;
+		}
+
 		var verts = new List<Vertex>();
 		var idx = new List<uint>();
 
@@ -289,8 +328,8 @@ public sealed class CoasterTrack
 				float vTex = cum / ts;
 				foreach ( var p in crossSection )
 				{
-					var world = pos[i] + perp[i] * (p.X * scale) + Vector3.Up * (p.Y * scale);
-					verts.Add( new Vertex { Position = world, Normal = Vector3.Up, TexCoords = new Vector2( p.U, vTex ) } );
+					var world = pos[i] + right[i] * (p.X * scale) + up[i] * (p.Y * scale);
+					verts.Add( new Vertex { Position = world, Normal = up[i], TexCoords = new Vector2( p.U, vTex ) } );
 				}
 			}
 			for ( int i = 0; i < pts.Count - 1; i++ )
@@ -312,9 +351,9 @@ public sealed class CoasterTrack
 				{
 					if ( i > 0 ) cum += pts[i].Distance( pts[i - 1] );
 					float v = cum / ts;
-					var c = pos[i] + perp[i] * offset + Vector3.Up * lift;
-					verts.Add( new Vertex { Position = c + perp[i] * halfWidth, Normal = Vector3.Up, TexCoords = new Vector2( 0f, v ) } );
-					verts.Add( new Vertex { Position = c - perp[i] * halfWidth, Normal = Vector3.Up, TexCoords = new Vector2( 1f, v ) } );
+					var c = pos[i] + right[i] * offset + up[i] * lift;
+					verts.Add( new Vertex { Position = c + right[i] * halfWidth, Normal = up[i], TexCoords = new Vector2( 0f, v ) } );
+					verts.Add( new Vertex { Position = c - right[i] * halfWidth, Normal = up[i], TexCoords = new Vector2( 1f, v ) } );
 				}
 				for ( int i = 0; i < pts.Count - 1; i++ )
 				{
@@ -332,8 +371,8 @@ public sealed class CoasterTrack
 			for ( int i = 0; i < pts.Count; i += TieEvery )
 			{
 				var step = tan[i] * tieLen;
-				var l = pos[i] + perp[i] * (-tieReach) + Vector3.Up * tieLift;
-				var r = pos[i] + perp[i] * tieReach + Vector3.Up * tieLift;
+				var l = pos[i] + right[i] * (-tieReach) + up[i] * tieLift;
+				var r = pos[i] + right[i] * tieReach + up[i] * tieLift;
 				uint bi = (uint)verts.Count;
 				verts.Add( new Vertex { Position = l - step, Normal = Vector3.Up, TexCoords = new Vector2( 0f, 0f ) } );
 				verts.Add( new Vertex { Position = r - step, Normal = Vector3.Up, TexCoords = new Vector2( 1f, 0f ) } );
@@ -349,6 +388,19 @@ public sealed class CoasterTrack
 			ribbon = new ModelEntity { Model = model };
 		else
 			ribbon.Model = model;
+	}
+
+	/// <summary>The signed bank (roll) angle for a track point whose incoming/outgoing travel directions are
+	/// <paramref name="tin"/>/<paramref name="tout"/>: the horizontal heading change (curvature) scaled by
+	/// <paramref name="gain"/> and clamped to ±<paramref name="maxBank"/>. Zero on a straight; opposite signs
+	/// for left vs right turns so the track tilts into the curve. Pure (unit-tested, T-052).</summary>
+	internal static float BankAngle( Vector3 tin, Vector3 tout, float gain, float maxBank )
+	{
+		// Signed turn about the vertical axis, from the horizontal components of the two tangents.
+		float cross = tin.X * tout.Y - tin.Y * tout.X; // + = left turn, - = right turn
+		float dot = tin.X * tout.X + tin.Y * tout.Y;
+		float turn = MathF.Atan2( cross, dot );
+		return Math.Clamp( turn * gain, -maxBank, maxBank );
 	}
 
 	// Catmull-Rom through the control points → a dense, curved centre-line. For a closed ring the

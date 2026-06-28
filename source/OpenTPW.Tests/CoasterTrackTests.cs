@@ -47,4 +47,43 @@ public class CoasterTrackTests
 		var settings = new SettingsFile( new MemoryStream( Encoding.ASCII.GetBytes( "someOtherKey\t1.0\n" ) ) );
 		Assert.AreEqual( 0, CoasterTrack.ParseCrossSection( settings ).Count );
 	}
+
+	[TestMethod]
+	public void BankAngleIsZeroOnAStraight()
+	{
+		var fwd = new Vector3( 1f, 0f, 0f );
+		Assert.AreEqual( 0f, CoasterTrack.BankAngle( fwd, fwd, gain: 1.6f, maxBank: 0.6f ), 1e-5f );
+	}
+
+	[TestMethod]
+	public void BankAngleSignsOppositeForLeftVsRightTurns()
+	{
+		// Travelling +X, then turning toward +Y (a left turn) vs toward -Y (a right turn).
+		var tin = new Vector3( 1f, 0f, 0f );
+		var left = CoasterTrack.BankAngle( tin, new Vector3( 1f, 1f, 0f ).Normal, 1.6f, 0.6f );
+		var right = CoasterTrack.BankAngle( tin, new Vector3( 1f, -1f, 0f ).Normal, 1.6f, 0.6f );
+
+		Assert.IsTrue( left > 0f, "left turn banks one way" );
+		Assert.IsTrue( right < 0f, "right turn banks the other" );
+		Assert.AreEqual( left, -right, 1e-5f, "symmetric turns bank symmetrically" );
+	}
+
+	[TestMethod]
+	public void BankAngleClampsHardTurns()
+	{
+		// A near-reversal would roll past the cap; it's clamped to ±maxBank.
+		var tin = new Vector3( 1f, 0f, 0f );
+		var hardLeft = new Vector3( -1f, 0.2f, 0f ).Normal; // ~157° left
+		Assert.AreEqual( 0.6f, CoasterTrack.BankAngle( tin, hardLeft, gain: 1.6f, maxBank: 0.6f ), 1e-5f );
+	}
+
+	[TestMethod]
+	public void BankAngleScalesWithGain()
+	{
+		var tin = new Vector3( 1f, 0f, 0f );
+		var tout = new Vector3( 1f, 0.3f, 0f ).Normal;
+		float small = CoasterTrack.BankAngle( tin, tout, gain: 0.5f, maxBank: 1.5f );
+		float big = CoasterTrack.BankAngle( tin, tout, gain: 1.0f, maxBank: 1.5f );
+		Assert.AreEqual( 2f * small, big, 1e-5f, "doubling the gain doubles the (unclamped) bank" );
+	}
 }
