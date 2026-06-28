@@ -62,6 +62,10 @@ public class Level
 		ParkFinances.Current = new ParkFinances( starting: 30000f, entryFee: 10f );
 		ResearchQueue.Reset(); // fresh park-wide research queue for this level (T-044)
 
+		// In-game calendar (T-053): the single time source; finances settle once per in-game month.
+		GameClock.Current = new GameClock();
+		GameClock.Current.OnNewMonth += ParkFinances.Current.SettleMonth;
+
 		// Centre the placement grid on the terrain's dense centroid (robust to stray distant meshes).
 		var standard = new SettingsFile( "/levels/jungle/Standard.sam" );
 		var centre = terrain.Centroid;
@@ -557,7 +561,7 @@ public class Level
 		foreach ( var entity in Entity.All.ToArray() )
 			entity.Update();
 
-		ParkFinances.Current?.Tick( Time.Delta ); // monthly loan instalments + bankruptcy check (T-042)
+		GameClock.Current?.Tick( Time.Delta ); // advances the calendar; fires OnNewMonth → finances settle (T-053)
 
 		// Diagnostic: periodically report the park's balance and the cumulative income/cost flows.
 		if ( Environment.GetEnvironmentVariable( "OPENTPW_ECON_DEBUG" ) != null && ParkFinances.Current is { } f && Time.Now > nextEconLog )

@@ -42,6 +42,8 @@ internal sealed class ParkStatsPanel : HudPanel
 			$"LITTER {Litter.Active.Count}",
 			$"ADMISSION {fin.EntryFee:0}  ([ ] adjust)",
 		};
+		if ( GameClock.Current is { } clock )
+			lines.Insert( 0, $"YEAR {clock.Year}  MTH {clock.Month}  DAY {clock.Day}" ); // in-game date (T-053)
 		if ( fin.Debt > 0 )
 			lines.Add( $"DEBT {fin.Debt:0}  (L loan, K repay)" );
 		else

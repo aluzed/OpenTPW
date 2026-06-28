@@ -2,7 +2,9 @@
 
 - **Priority**: 🟡 Feature (foundation)
 - **Type**: Engine
-- **Status**: ☐ To do (proposed — RE recon done in the 2026-06 exploration pass)
+- **Status**: ✅ Done — `GameClock` (day/month/year at `SecondsPerMonth` 8 s ÷ `DaysPerMonth` 30) is the
+  single time source; `ParkFinances.SettleMonth` runs on `OnNewMonth`, the HUD shows the in-game date, and
+  `OnNewDay`/`OnNewMonth` events are ready for challenges/seasons. Unit-tested + verified in-game.
 - **Blocks**: [T-054](T-054-challenge-system.md) challenges, [T-055](T-055-golden-ticket-goals.md)
   golden-ticket goals, [T-056](T-056-weather-seasons.md) seasons. **Related**: [T-042](T-042-economy-controls-loans.md)
   (already simulates 8-second "months" for loans).

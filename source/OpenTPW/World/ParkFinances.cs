@@ -105,11 +105,9 @@ public sealed class ParkFinances
 	public float Debt => loans.Where( l => l.Bought ).Sum( l => l.Outstanding );
 
 	/// <summary>True once the balance has dropped below the bankruptcy limit.</summary>
-	public bool Bankrupt { get; private set; }
+	public bool Bankrupt => Money < BankruptLimit;
 
 	private const float BankruptLimit = -5000f;
-	private const float MonthSeconds = 8f; // one in-game "month" of loan repayment
-	private float monthTimer;
 
 	/// <summary>Take a loan: principal is credited now, repaid (principal + APR) over 12 months.</summary>
 	public void TakeLoan( int index )
@@ -138,29 +136,25 @@ public sealed class ParkFinances
 		l.Bought = false;
 	}
 
-	/// <summary>Advances time: debits monthly loan instalments and updates the bankruptcy flag.</summary>
-	public void Tick( float dt )
+	/// <summary>Settle one in-game month (T-053: called on <see cref="GameClock.OnNewMonth"/>): debit each
+	/// active loan's monthly instalment and snapshot the closing balance + this month's flows for the
+	/// finance graph (T-049).</summary>
+	public void SettleMonth()
 	{
-		monthTimer += dt;
-		while ( monthTimer >= MonthSeconds )
+		foreach ( var l in loans )
 		{
-			monthTimer -= MonthSeconds;
-			foreach ( var l in loans )
+			if ( !l.Bought )
+				continue;
+			float pay = MathF.Min( l.Monthly, l.Outstanding );
+			Money -= pay;
+			l.Outstanding -= pay;
+			if ( l.Outstanding <= 0.01f )
 			{
-				if ( !l.Bought )
-					continue;
-				float pay = MathF.Min( l.Monthly, l.Outstanding );
-				Money -= pay;
-				l.Outstanding -= pay;
-				if ( l.Outstanding <= 0.01f )
-				{
-					l.Outstanding = 0f;
-					l.Bought = false;
-				}
+				l.Outstanding = 0f;
+				l.Bought = false;
 			}
-			RecordMonth(); // snapshot the closing balance + this month's flows for the finance graph (T-049)
 		}
-		Bankrupt = Money < BankruptLimit;
+		RecordMonth();
 	}
 
 	/// <summary>A peep pays to board a ride.</summary>

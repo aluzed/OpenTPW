@@ -16,7 +16,7 @@ public class ManagementDepthTests
 		fin.PayUpkeep( 20f );      // expense
 
 		Assert.AreEqual( 0, fin.History.Count, "no sample before a month elapses" );
-		fin.Tick( 8f );            // crosses one month boundary
+		fin.SettleMonth();            // crosses one month boundary
 
 		Assert.AreEqual( 1, fin.History.Count );
 		var s = fin.History[0];
@@ -30,9 +30,9 @@ public class ManagementDepthTests
 	{
 		var fin = new ParkFinances( 0f, 0f );
 		fin.TakeRideTicket( 100f );
-		fin.Tick( 8f ); // month 1 captures 100
+		fin.SettleMonth(); // month 1 captures 100
 		fin.TakeFoodSale( 30f );
-		fin.Tick( 8f ); // month 2 captures only the new 30
+		fin.SettleMonth(); // month 2 captures only the new 30
 
 		Assert.AreEqual( 2, fin.History.Count );
 		Assert.AreEqual( 100f, fin.History[0].Income, 1e-3f );
@@ -44,7 +44,7 @@ public class ManagementDepthTests
 	{
 		var fin = new ParkFinances( 0f, 0f );
 		for ( int i = 0; i < ParkFinances.MaxHistory + 12; i++ )
-			fin.Tick( 8f );
+			fin.SettleMonth();
 
 		Assert.AreEqual( ParkFinances.MaxHistory, fin.History.Count );
 	}
