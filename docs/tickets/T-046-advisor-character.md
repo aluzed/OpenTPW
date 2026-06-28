@@ -3,8 +3,9 @@
 - **Priority**: 🟡 Feature
 - **Type**: Engine / rendering
 - **Status**: ⚠️ Implemented — functionally verified (model + 5 visemes + lip-sync + speech all confirmed
-  in logs); the on-screen placement/scale/orientation still needs a visual pass (the screenshot tooling
-  was unavailable this session). The message system (`Advisor.sam`) is not wired yet.
+  in logs); the **message system (`Advisor.sam`) is now parsed + wired** (pacing/group rules drive which tip
+  speaks — see below). The on-screen placement/scale/orientation still needs a visual pass (the screenshot
+  tooling was unavailable). Per-event score formulas + per-message clips remain.
 - **Parent**: [T-020](T-020-lip-mouth-shapes.md) (lip-sync format + wiring done — this is the render tail).
 - **Related**: [T-031](T-031-game-audio.md).
 
@@ -41,10 +42,38 @@ drawn** mouth in sync. What remains is rendering the *real* advisor.
 - **Verified (functional, in-game logs):** `Advisor.MD2 loaded: 25 mesh(es)` → `built 11 part(s)` (6 base
   + 5 visemes) → `speaking 'sp_001.mp2', 35 keyframes, 28.6s`, no exceptions.
 
+## Done (this pass — the `Advisor.sam` message system)
+
+The advisor's tip pacing/selection is now decoded + wired, so the **real `Advisor.sam` rules** decide when and
+which message the advisor speaks (not an unconditional loop):
+
+- **`AdvisorConfig`** (`source/OpenTPW/World/`): parses `Advisor/Advisor.sam` — the EA text key/value format,
+  reusing the existing `SettingsFile`/`SAMParser` (no new parser). Exposes the global pacing
+  (`MinTimeAnyMessage`/`MinTimeSameMessage`/`MinScoreForConsideration`), the per-group rules
+  (`MessageGroups[N]` → `{MinTimeSameMessage, SayOnlyOnce, DiscardAfterSlaps}`, sparse 0-5+9), and a generic
+  `Param(advice, key)` accessor over the ~200 per-advice scoring params for the future score formulas.
+  Fault-tolerant: every key has a documented default, so a missing/stripped file still yields a usable config.
+- **`AdvisorMessages`** scheduler (pure, time-injected): each tick the game `Submit`s candidate tips
+  (id + group + score); `Consider(now)` picks the single best one enforcing the named rules — global min-gap,
+  per-group same-message gap, say-once, min-score, and `Slap`/`DiscardAfterSlaps` retirement. Fully unit-tested.
+- **Wired into `Advisor`**: it loads the config + builds the scheduler, and the demo now feeds two built-in
+  candidates (a say-once `WelcomeTutorial` in tutorial group 1, a repeating `GeneralTip` in group 0) and speaks
+  whatever the scheduler returns — so the visible behaviour is governed by the real rules. The id→clip mapping
+  is by convention with a fallback to the shipped `sp_001` clip (we don't ship per-message advisor clips).
+- **Unit-tested** (`AdvisorMessagesTests`, 10 tests: config globals/groups/advice parse incl. trailing-comment
+  stripping + float params + missing-file defaults; highest-score-wins, min-score, global gap, same-message
+  gap, say-once, discard-after-slaps, zero-discard). 180 tests pass, 0 new warnings.
+- **Verified in-game** (`OPENTPW_ADVISOR_DEMO=1`, real assets): `message config: 7 group(s), minGap 5s,
+  minScore 25` (parsed the real file), then `message 'WelcomeTutorial' → speaking 'sp_001.mp2'` — the say-once
+  welcome fired first by score and drove real speech + lip-sync; 0 exceptions.
+
 ## Remaining
 
 - **Visual pass**: confirm/tune the on-screen position, scale and facing (anchoring constants in
   `Advisor.cs`) — not done this session (screenshot tooling unavailable).
+- **Per-event triggers + score formulas**: feed real game state (research available, in-the-red, congrats,
+  thirsty/hungry visitors, …) into `AdvisorMessages.Submit` using the `AdvisorConfig.Param` formulas, and
+  map each message to its own speech clip + `.LIP` (the clips aren't shipped per-message yet).
 - Textures: the `.wct` are loaded from `global/advisor/textures/` via the VFS; verify they resolve (else
   the advisor renders untextured — still geometrically correct).
 - Hook the **message system** (`Advisor.sam`: `MessageGroups`, min-time/say-once/discard-after-slaps) so
@@ -58,5 +87,7 @@ drawn** mouth in sync. What remains is rendering the *real* advisor.
 
 ## Affected files
 
-`source/OpenTPW/UI/Widgets/AdvisorPanel.cs` (or a new `World/Advisor.cs`), the model/render pipeline,
-`source/OpenTPW.Files/Formats/Model/ModelFile.cs` (named-part access if needed).
+`source/OpenTPW/World/AdvisorConfig.cs` (new — `Advisor.sam` parser), `source/OpenTPW/World/AdvisorMessages.cs`
+(new — message scheduler/rules), `source/OpenTPW/World/Advisor.cs` (loads the config + drives speech through
+the scheduler), `source/OpenTPW.Tests/AdvisorMessagesTests.cs` (new). Earlier passes:
+`source/OpenTPW/UI/Widgets/AdvisorPanel.cs`, the model/render pipeline, `ModelFile.cs` (named-part access).

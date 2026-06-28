@@ -39,6 +39,19 @@ public sealed class Advisor : Entity
 	private string clipName = "";
 	private float startTime = -1f;
 
+	// The message system (T-046): the real Advisor.sam pacing/group rules decide WHEN and WHICH tip plays.
+	// The demo feeds two built-in candidates — a say-once welcome (tutorial group 1) and a repeating general
+	// tip (group 0) — and speaks whatever the scheduler returns, so the rules govern the visible behaviour.
+	private AdvisorConfig config = null!;
+	private AdvisorMessages messages = null!;
+	private string activeMessage = "";
+
+	private static readonly (string Id, int Group, float Score)[] DemoTips =
+	{
+		("WelcomeTutorial", 1, 100f), // say-once (group 1: SayOnlyOnce) — fires first, highest score
+		("GeneralTip", 0, 50f),       // repeats per group 0's MinTimeSameMessage
+	};
+
 	// On-screen anchoring (in front of the camera).
 	private const float Distance = 26f, RightOffset = 16f, UpOffset = -9f, GroupScale = 2.4f;
 
@@ -53,7 +66,12 @@ public sealed class Advisor : Entity
 		Current = this;
 		Name = "Advisor";
 		BuildParts();
-		StartSpeech();
+
+		config = AdvisorConfig.Load();
+		messages = new AdvisorMessages( config );
+		Log.Info( $"[advisor] message config: {config.MessageGroups.Count} group(s), "
+			+ $"minGap {config.MinTimeAnyMessage:0}s, minScore {config.MinScoreForConsideration:0}" );
+		// First tip fires on the next update via the scheduler (no unconditional StartSpeech).
 	}
 
 	private void BuildParts()
@@ -144,27 +162,56 @@ public sealed class Advisor : Entity
 		}
 	}
 
-	private void StartSpeech()
+	// Speak the message with id `messageId`: load its lip-sync + clip and play it. The id→clip mapping is by
+	// convention (Advisor/<id>); we don't ship per-message advisor clips, so it falls back to the demo clip
+	// sp_001, which still drives a correct viseme track. Returns true when audio actually started.
+	private bool Speak( string messageId )
 	{
 		try
 		{
 			var speechDir = Path.Join( GameDir.GamePath, "data", "levels", "jungle", "Speech" );
-			var lipPath = Path.Join( speechDir, "lips", "sp_001.LIP" );
 			var sdtPath = Path.Join( speechDir, "speechHD.SDT" );
-			if ( !File.Exists( lipPath ) || !File.Exists( sdtPath ) )
-				return;
+			if ( !File.Exists( sdtPath ) )
+				return false;
+
+			// Per-message clip if it exists, else the shared demo clip (always present in the jungle level).
+			var archive = new SdtArchive( sdtPath );
+			var clip = archive.soundFiles.FirstOrDefault( f => f.Name.Equals( messageId, StringComparison.OrdinalIgnoreCase ) )
+				?? archive.soundFiles.FirstOrDefault( f => f.Name.StartsWith( "sp_001", StringComparison.OrdinalIgnoreCase ) );
+			if ( clip == null )
+				return false;
+
+			var lipPath = Path.Join( speechDir, "lips", $"{Path.GetFileNameWithoutExtension( clip.Name )}.LIP" );
+			if ( !File.Exists( lipPath ) )
+				lipPath = Path.Join( speechDir, "lips", "sp_001.LIP" );
+			if ( !File.Exists( lipPath ) )
+				return false;
 
 			lip = new LipSyncFile( File.OpenRead( lipPath ) );
-			var clip = new SdtArchive( sdtPath ).soundFiles
-				.FirstOrDefault( f => f.Name.StartsWith( "sp_001", StringComparison.OrdinalIgnoreCase ) );
-			if ( clip == null )
-				return;
 			clipName = clip.Name;
+			activeMessage = messageId;
 			Audio.PlaySpeech( $"advisor_{clip.Name}", clip.SoundData );
 			startTime = Time.Now;
-			Log.Info( $"[advisor] speaking '{clipName}', {lip.Keyframes.Count} keyframes, {ClipLength:0.0}s" );
+			Log.Info( $"[advisor] message '{messageId}' → speaking '{clipName}', {lip.Keyframes.Count} keyframes, {ClipLength:0.0}s" );
+			return true;
 		}
-		catch ( Exception e ) { Log.Warning( $"[advisor] speech failed: {e.Message}" ); }
+		catch ( Exception e ) { Log.Warning( $"[advisor] speech failed: {e.Message}" ); return false; }
+	}
+
+	// When the advisor is idle, ask the scheduler whether a tip should fire now. The Advisor.sam pacing/group
+	// rules (min-gap, same-message gap, say-once, min-score) decide which — if any — message speaks.
+	private void ConsiderSpeaking()
+	{
+		bool speaking = startTime >= 0f && Time.Now - startTime <= ClipLength;
+		if ( speaking )
+			return;
+
+		foreach ( var (id, group, score) in DemoTips )
+			messages.Submit( id, config.Group( group ), score );
+
+		var pick = messages.Consider( Time.Now );
+		if ( pick != null )
+			Speak( pick );
 	}
 
 	protected override void OnUpdate()
@@ -172,17 +219,15 @@ public sealed class Advisor : Entity
 		if ( parts.Count == 0 )
 			return;
 
-		// Advance lip-sync; loop the clip so the demo keeps talking.
+		// Let the message scheduler decide if/which tip fires (governed by the real Advisor.sam rules), then
+		// advance the active clip's lip-sync.
+		ConsiderSpeaking();
 		CurrentShape = MouthShape.Closed;
 		if ( lip != null && startTime >= 0f )
 		{
 			var elapsed = Time.Now - startTime;
-			if ( elapsed > ClipLength + 1f )
-			{
-				ReplaySpeech();
-				elapsed = 0f;
-			}
-			CurrentShape = lip.ShapeAt( TimeSpan.FromSeconds( elapsed ) );
+			if ( elapsed <= ClipLength )
+				CurrentShape = lip.ShapeAt( TimeSpan.FromSeconds( elapsed ) );
 		}
 
 		// Anchor the whole assembly upright, in front of and facing the camera.
@@ -210,19 +255,6 @@ public sealed class Advisor : Entity
 			part.Entity.Rotation = groupRot * part.LocalRotation;
 			part.Entity.Scale = part.LocalScale * GroupScale;
 		}
-	}
-
-	private void ReplaySpeech()
-	{
-		try
-		{
-			var sdtPath = Path.Join( GameDir.GamePath, "data", "levels", "jungle", "Speech", "speechHD.SDT" );
-			var clip = new SdtArchive( sdtPath ).soundFiles.FirstOrDefault( f => f.Name == clipName );
-			if ( clip != null )
-				Audio.PlaySpeech( $"advisor_{clipName}", clip.SoundData );
-			startTime = Time.Now;
-		}
-		catch { /* keep the visemes cycling even if audio replay fails */ }
 	}
 
 	protected override void OnDelete()
