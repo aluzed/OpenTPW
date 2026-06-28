@@ -85,6 +85,11 @@ public class Level
 
 		// Centre the placement grid on the terrain's dense centroid (robust to stray distant meshes).
 		var standard = new SettingsFile( "/levels/jungle/Standard.sam" );
+
+		// Golden-ticket goals (T-055): the level win condition; re-evaluate daily, award once all are met.
+		var goals = new GoldenTicketGoals( GoldenTicketTargets.ParseLocal( standard ) );
+		GoldenTicketGoals.Current = goals;
+		GameClock.Current.OnNewDay += goals.Evaluate;
 		var centre = terrain.Centroid;
 		var grid = PlacementGrid.FromLevelSettings( standard, tileSize: 16f, worldCenter: new Vector3( centre.X, centre.Y, 0 ) );
 

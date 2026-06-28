@@ -192,6 +192,16 @@ public sealed class ParkFinances
 	/// <summary>Award a cash prize (a completed challenge, T-054).</summary>
 	public void AwardPrize( float amount ) => Money += amount;
 
+	/// <summary>Net profit (income − expense) over the last <paramref name="months"/> recorded months — the
+	/// golden-ticket "profit per year" goal sums the last 12 (T-055).</summary>
+	public float RecentProfit( int months )
+	{
+		float sum = 0f;
+		for ( int i = Math.Max( 0, history.Count - months ); i < history.Count; i++ )
+			sum += history[i].Income - history[i].Expense;
+		return sum;
+	}
+
 	/// <summary>Ongoing ride running cost.</summary>
 	public void PayUpkeep( float amount )
 	{

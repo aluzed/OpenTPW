@@ -72,6 +72,17 @@ public sealed class Peep : ModelEntity
 	/// <summary>How many live visitors are hungrier than <paramref name="threshold"/> (0–100, T-046).</summary>
 	public static int CountHungrierThan( float threshold ) => CountNeedAbove( threshold, thirst: false );
 
+	/// <summary>How many live visitors are happier than <paramref name="threshold"/> (0–100) — feeds the
+	/// golden-ticket "this many happy people" goal (T-055).</summary>
+	public static int CountHappierThan( float threshold )
+	{
+		int n = 0;
+		foreach ( var e in Entity.All )
+			if ( e is Peep p && p.happiness > threshold )
+				n++;
+		return n;
+	}
+
 	private static int CountNeedAbove( float threshold, bool thirst )
 	{
 		int n = 0;
