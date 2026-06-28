@@ -92,6 +92,10 @@ public interface IRideEngine
 	/// back to the ride centre when the node can't be placed.</summary>
 	void SpawnParticleEffect( int effectCode, int nodeId );
 
+	/// <summary>Emit the breakdown feedback (sparks + an electrical zap) at the ride — played periodically by
+	/// a broken-down ride until it's repaired (T-039).</summary>
+	void PlayBreakdownEffect();
+
 	/// <summary>SETREVERB — set the audio reverb preset/level.</summary>
 	void SetReverb( int level );
 

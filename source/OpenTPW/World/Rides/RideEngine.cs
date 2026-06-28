@@ -451,6 +451,34 @@ public sealed class RideEngine : IRideEngine
 
 	// Particle effect at the ride centre (no addressed node) — the Repair() effect + any caller without a
 	// node. Sits high over the ride body, as before.
+	private const int EffectSparks = 1; // P_EFFECT_Sparks (par_lib.h order; the SPARK opcode's effect)
+
+	/// <summary>Breakdown feedback (T-039): a burst of <c>P_EFFECT_Sparks</c> + an electrical zap, both at the
+	/// ride body and positioned through the 3D bus (T-047), so a broken-down ride visibly + audibly sparks
+	/// until a mechanic repairs it. Called periodically by the owning <see cref="Ride"/> while it's broken.</summary>
+	public void PlayBreakdownEffect()
+	{
+		SpawnParticleEffect( EffectSparks );
+		PlayRideHdSoundAt( "ZAP", LightPosition( SelfId ), gain: 0.8f );
+	}
+
+	// Play a RideHD clip whose name starts with `stem` at a world position through the 3D bus; best-effort
+	// (no device / missing clip → silent). Shares the cached RideHD archive with PlayNamedSound.
+	private void PlayRideHdSoundAt( string stem, Vector3 pos, float gain = -1f )
+	{
+		try
+		{
+			var path = Path.Join( GameDir.GamePath, "data", "global", "sound", "RideHD.sdt" );
+			if ( !File.Exists( path ) )
+				return;
+			rideSounds ??= new SdtArchive( path );
+			var track = rideSounds.soundFiles.FirstOrDefault( f => f.Name.StartsWith( stem, StringComparison.OrdinalIgnoreCase ) );
+			if ( track != null )
+				Audio.PlaySfx3D( $"ride_{track.Name}", track.SoundData, pos, gain );
+		}
+		catch ( Exception e ) { Log.Warning( $"[ride] sound '{stem}' failed: {e.Message}" ); }
+	}
+
 	public void SpawnParticleEffect( int effectCode )
 		=> SpawnParticleEffectAt( effectCode, LightPosition( SelfId ) + Vector3.Up * 8f );
 

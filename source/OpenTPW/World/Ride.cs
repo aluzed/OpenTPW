@@ -147,6 +147,11 @@ public class Ride : Entity
 	public static int Breakdowns { get; private set; }
 	public static int Repairs { get; private set; }
 
+	// Breakdown feedback (T-039): while broken, the ride sparks + zaps on this cadence so the player sees +
+	// hears the fault (and where it is) instead of the ride just silently stopping.
+	private const float BreakdownFxPeriod = 1.8f; // seconds between spark bursts
+	private float breakdownFxTimer;
+
 	private void BreakDown()
 	{
 		if ( IsBroken )
@@ -154,8 +159,20 @@ public class Ride : Entity
 		IsBroken = true;
 		Reliability = 0f;
 		Breakdowns++;
-		SetActive( false ); // halt the ride animation/cycle
+		SetActive( false );          // halt the ride animation/cycle
+		breakdownFxTimer = 0f;       // spark immediately on the next tick
 		Log.Info( $"[ride] {Name} broke down (total {Breakdowns})" );
+	}
+
+	/// <summary>Countdown a periodic effect timer: subtract <paramref name="dt"/>, and when it reaches zero
+	/// fire (returning true) and reload it to <paramref name="period"/>. Pure (unit-tested).</summary>
+	internal static bool PeriodicDue( ref float timer, float dt, float period )
+	{
+		timer -= dt;
+		if ( timer > 0f )
+			return false;
+		timer = period;
+		return true;
 	}
 
 	/// <summary>Repair a broken-down ride (a mechanic, see <see cref="Staff"/>): restore it and play the
@@ -569,6 +586,10 @@ public class Ride : Entity
 			if ( Reliability <= 0f )
 				BreakDown();
 		}
+
+		// While broken, periodically spark + zap at the ride so the fault is visible/audible until repaired.
+		if ( IsBroken && PeriodicDue( ref breakdownFxTimer, Time.Delta, BreakdownFxPeriod ) )
+			engine.PlayBreakdownEffect();
 
 		// Researchers advance any in-progress upgrade research for this ride (T-044).
 		TickResearch( Time.Delta, Staff.ResearcherCount );

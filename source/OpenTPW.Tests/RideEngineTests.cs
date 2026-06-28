@@ -49,6 +49,8 @@ public class RideEngineTests
 			ParticleEffects.Add( effectCode );
 			ParticleEffectsAtNode.Add( (effectCode, nodeId) );
 		}
+		public int BreakdownEffects; // count of PlayBreakdownEffect calls
+		public void PlayBreakdownEffect() => BreakdownEffects++;
 		public List<string> LightCalls = new(); // light opcode trace (id + scaled values)
 		private static string F( float v ) => v.ToString( "0.00", System.Globalization.CultureInfo.InvariantCulture );
 		public void EnableLight( int id ) => LightCalls.Add( $"enable({id})" );
@@ -389,5 +391,19 @@ public class RideEngineTests
 		vm.CallOpcodeHandler( Opcode.KILLOBJ, Lit( vm, 7 ) );
 		vm.CallOpcodeHandler( Opcode.STARTSCREAM, Lit( vm, 0 ), Lit( vm, 20 ) );
 		vm.CallOpcodeHandler( Opcode.STOPSCREAM );
+	}
+
+	[TestMethod]
+	public void PeriodicDueFiresOnPeriodAndReloads()
+	{
+		// T-039 breakdown-spark cadence: a timer starting at 0 fires immediately, then only once per period.
+		float t = 0f;
+		Assert.IsTrue( Ride.PeriodicDue( ref t, 0.1f, 1f ), "timer at/under zero fires" );
+		Assert.AreEqual( 1f, t, 1e-4f, "reloads to the period" );
+
+		Assert.IsFalse( Ride.PeriodicDue( ref t, 0.4f, 1f ) ); // 0.6 left
+		Assert.IsFalse( Ride.PeriodicDue( ref t, 0.4f, 1f ) ); // 0.2 left
+		Assert.IsTrue( Ride.PeriodicDue( ref t, 0.4f, 1f ), "fires once the period elapses" );
+		Assert.AreEqual( 1f, t, 1e-4f, "reloads again" );
 	}
 }

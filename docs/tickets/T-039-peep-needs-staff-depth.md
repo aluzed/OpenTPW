@@ -2,8 +2,9 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine
-- **Status**: ⚠️ Core done (+toilets) — thirst + drink stalls, **bladder + toilets**, vandalism that
-  guards measurably reduce, a balanced long-run economy. Thoughts/ratings and ride breakdown/repair remain.
+- **Status**: ✅ Core done (+toilets, +breakdowns) — thirst + drink stalls, **bladder + toilets**, vandalism
+  that guards measurably reduce, a balanced long-run economy, peep thoughts/ratings (T-050), and **ride
+  breakdown + mechanic repair with spark/zap feedback**. Only a reliability-balance tuning pass remains.
 - **Related**: [T-034](T-034-peeps.md) (needs, economy, staff — core done).
 
 ## Context
@@ -46,8 +47,14 @@ Build clean, 74/0 tests.
 - ~~**Peep thoughts / ride ratings** (item 3)~~ — **done in [T-050](T-050-peep-simulation-depth.md)**:
   `Peep.RateRide` → satisfaction + `RideThought`, the running `Ride.Rating` reputation, and
   rating-weighted ride choice.
-- **Ride breakdown + mechanics** (rest of item 4) — rides don't break down yet, so there's nothing for a
-  mechanic to repair; needs a reliability/breakdown model first.
+- ~~**Ride breakdown + mechanics** (rest of item 4)~~ — **done**: rides have a `Reliability` that wears down
+  while carrying riders and `BreakDown()`s at zero (stops boarding + running), a mechanic (`Staff.DoMechanic`)
+  heads to the nearest broken ride and `Repair()`s it (repair particle effect), and a broken ride now gives
+  **breakdown feedback** — it periodically emits `P_EFFECT_Sparks` + an electrical `ZAP` (RideHD) at the ride
+  through the 3D audio bus (`RideEngine.PlayBreakdownEffect`, on a `Ride.PeriodicDue` cadence), so the fault
+  is visible + audible + locatable until repaired. Pure cadence helper unit-tested; verified in-game (10 forced
+  breakdowns → 65 spark bursts, ZAP resolves, 0 exceptions). A reliability **balance** pass (scale wear by
+  upgrade level / age) remains a tuning nicety.
 
 ## Acceptance criteria
 
