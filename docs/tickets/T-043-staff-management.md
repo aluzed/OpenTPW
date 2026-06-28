@@ -2,9 +2,9 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine / UI
-- **Status**: ⚠️ Core done — hire (charge cost) + place-on-tile for all four staff types via the build
-  catalog, wages drawn per head, verified in-game. Pick-up/re-place, fire, and patrol-zone assignment
-  remain.
+- **Status**: ✅ Core done — hire (charge cost) + place-on-tile for all four staff types, wages drawn per
+  head, **fire + patrol-zone assignment** (T-049), all verified. Only a pick-up/re-place nicety remains
+  (per-role hire-cost config has no source data in the install — see Remaining).
 - **Parent**: [T-038](T-038-park-management-ui.md). **Needs**: [T-040](T-040-build-mode-foundation.md).
   **Related**: [T-039](T-039-peep-needs-staff-depth.md).
 
@@ -23,9 +23,13 @@
 
 ## Remaining (follow-up)
 
-- **Fire / pick-up / re-place** (needs staff selection + teardown — like T-041 sell).
-- **Patrol-zone assignment** (links to [T-039](T-039-peep-needs-staff-depth.md)); hire cost/wage from
-  the real `AllStaffConstants` config rather than fixed defaults.
+- ~~**Fire**~~ + ~~**patrol-zone assignment**~~ — done in [T-049](T-049-management-ui-depth.md)
+  (`ManagePanel` FIRE / ZONE±/SET-ZONE/FREE-ROAM when a staffer is selected).
+- **Re-place** a placed staffer (pick up + drop elsewhere) — minor nice-to-have.
+- ~~hire cost/wage from a real `AllStaffConstants` config~~ — **no source data**: there is no such file in
+  the install. The level's `Staff.sam` is the *staff-room object* definition (Info.Id 1411 + upgrades/
+  particles), not per-role hire costs/wages (verified by dumping the wad), so the fixed catalog costs +
+  `WagePerSecond` stand. Nothing to wire.
 
 ## Context
 

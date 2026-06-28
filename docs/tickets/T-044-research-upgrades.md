@@ -2,9 +2,10 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine / UI
-- **Status**: ⚠️ Core done — the full `Upgrades[*]` table is parsed; researchers advance research; an
-  applied upgrade raises capacity (and the live queue). Verified in-game. Per-ride UI + research
-  duration from the `.sam` remain.
+- **Status**: ✅ Core done — the full `Upgrades[*]` table is parsed; researchers advance research; an
+  applied upgrade raises capacity (and the live queue); the per-ride `ManagePanel` has a clickable
+  RESEARCH/UPGRADE button with a live progress gauge. Verified in-game. (Research duration isn't `.sam` data
+  — see Remaining; only a global research queue is left, a nicety.)
 - **Parent**: [T-038](T-038-park-management-ui.md).
   **Needs**: [T-041](T-041-ride-shop-placement.md) + [T-042](T-042-economy-controls-loans.md);
   **researchers** from [T-043](T-043-staff-management.md).
@@ -24,9 +25,12 @@
 
 ## Remaining (follow-up)
 
-- A proper per-ride research/upgrade **panel** (progress bar, level list); source the research
-  **duration** from the `.sam` (`DurationOfUpgrade`) instead of the fixed constant; global research
-  queue across rides.
+- ~~A per-ride research/upgrade **panel** (progress bar)~~ — done: `ManagePanel.ResearchButton` (RESEARCH →
+  RESEARCHING n% gauge → UPGRADE → MAX LEVEL).
+- ~~source the research **duration** from the `.sam` (`DurationOfUpgrade`)~~ — **no source data**: dumping a
+  ride `.sam` shows `Upgrades[*]` carries `CostOfResearch`/`CostOfUpgrade`/`InitCapacity`/
+  `QueueWaitTimeConstant` but **no research-duration key**, so the researcher-seconds constant stands.
+- **Global research queue** across rides (research one at a time park-wide) — a nicety, not started.
 
 ## Context
 

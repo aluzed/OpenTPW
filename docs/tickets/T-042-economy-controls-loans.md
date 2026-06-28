@@ -2,9 +2,9 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine / UI
-- **Status**: ⚠️ Core done — settable ride prices + admission fee, a loan system (take/repay, monthly
-  instalments, bankruptcy flag), and a HUD readout are in and verified in-game. A richer clickable
-  finance panel + history graph remain.
+- **Status**: ✅ Done — settable ride prices + admission fee, a loan system (take/repay, monthly
+  instalments, bankruptcy flag), HUD readout, the **F11 finance history graph** (T-049), a per-ride price
+  panel, and **one clickable button per loan offer** (Small/Large) are all in and verified.
 - **Parent**: [T-038](T-038-park-management-ui.md). **Needs**: [T-040](T-040-build-mode-foundation.md).
 
 ## Done
@@ -21,8 +21,14 @@
 
 ## Remaining (follow-up)
 
-- A clickable finance **panel** (buttons/sliders) + balance **history graph**; loan UI to pick which
-  offer; per-ride price panel instead of `,`/`.`.
+- ~~A clickable finance **panel**~~ — done: `FinancePanel` + the **F11 balance history graph** (T-049).
+- ~~per-ride **price panel**~~ — done: `ManagePanel` has per-ride `PRICE-`/`PRICE+` when a ride is selected.
+- ~~**loan UI to pick which offer**~~ — **done**: `ManagePanel` now renders **one button per loan offer**
+  (`LOAN $5k` / `LOAN $15k`, the principal distinguishing the Small/Large offer), each taking or repaying its
+  offer independently by index — previously only the first (`TakeLoan(0)`) was reachable. Unit-tested
+  (`EachLoanOfferTakenAndRepaidIndependently`), verified on-screen.
+
+Nothing actionable remains — the economy controls are complete.
 
 ## Context
 

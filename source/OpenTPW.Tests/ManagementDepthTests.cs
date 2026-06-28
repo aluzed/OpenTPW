@@ -49,6 +49,36 @@ public class ManagementDepthTests
 		Assert.AreEqual( ParkFinances.MaxHistory, fin.History.Count );
 	}
 
+	[TestMethod]
+	public void EachLoanOfferTakenAndRepaidIndependently()
+	{
+		// T-042: the UI exposes one button per offer, so both loans must work by index (not just the first).
+		var fin = new ParkFinances( starting: 0f, entryFee: 0f );
+		Assert.AreEqual( 2, fin.Loans.Count, "small + large offers" );
+		Assert.AreEqual( 0f, fin.Debt, 1e-3f );
+
+		// Take the large (index 1): debt = principal × (1 + APR).
+		fin.TakeLoan( 1 );
+		var large = fin.Loans[1];
+		Assert.IsTrue( large.Bought );
+		Assert.AreEqual( large.Principal * (1f + large.Apr / 100f), fin.Debt, 1e-2f );
+
+		// Re-taking the same offer is a no-op.
+		float debtAfter = fin.Debt;
+		fin.TakeLoan( 1 );
+		Assert.AreEqual( debtAfter, fin.Debt, 1e-3f );
+
+		// The small offer is independent and still available → debt is the sum of both.
+		fin.TakeLoan( 0 );
+		Assert.IsTrue( fin.Loans[0].Bought );
+		Assert.AreEqual( fin.Loans[0].Outstanding + fin.Loans[1].Outstanding, fin.Debt, 1e-2f );
+
+		// Repay the large in full → its debt clears, the small remains.
+		fin.RepayLoan( 1 );
+		Assert.IsFalse( fin.Loans[1].Bought );
+		Assert.AreEqual( fin.Loans[0].Outstanding, fin.Debt, 1e-2f );
+	}
+
 	// Patrol zones (T-049): a pure circular zone tested in the XY plane (height ignored), boundary inclusive.
 
 	[TestMethod]
