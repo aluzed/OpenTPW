@@ -44,6 +44,17 @@ internal sealed class ParkStatsPanel : HudPanel
 		};
 		if ( GameClock.Current is { } clock )
 			lines.Insert( 0, $"YEAR {clock.Year}  MTH {clock.Month}  DAY {clock.Day}" ); // in-game date (T-053)
+
+		// Challenge status (T-054): offered (Y/N), active (progress + days), or the last result.
+		if ( ChallengeManager.Current is { } cm )
+		{
+			if ( cm.State == ChallengeManager.Phase.Offered && cm.Active is { } off )
+				lines.Add( $"CHALLENGE: {ChallengeMetrics.Describe( off )}  (Y accept / N decline)" );
+			else if ( cm.State == ChallengeManager.Phase.Active && cm.Active is { } act )
+				lines.Add( $"CHALLENGE: {ChallengeMetrics.Describe( act )}  [{cm.Progress:0}/{act.TargetVal}, {cm.DaysLeft}d left]" );
+			else if ( cm.LastResult is { } r )
+				lines.Add( r.Won ? $"CHALLENGE WON! +${r.Challenge.Prize:0}" : "CHALLENGE FAILED" );
+		}
 		if ( fin.Debt > 0 )
 			lines.Add( $"DEBT {fin.Debt:0}  (L loan, K repay)" );
 		else

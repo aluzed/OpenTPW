@@ -66,6 +66,23 @@ public class Level
 		GameClock.Current = new GameClock();
 		GameClock.Current.OnNewMonth += ParkFinances.Current.SettleMonth;
 
+		// Challenges (T-054): load the level's goals, keep the ones we can track, run them on the daily clock.
+		try
+		{
+			using var cs = FileSystem.OpenRead( "Challenges.sam" );
+			if ( cs != null )
+			{
+				var challenges = Challenge.ParseAll( new SettingsFile( cs ).Entries )
+					.Where( c => ChallengeMetrics.IsSupported( c.Type ) ).ToList();
+				var mgr = new ChallengeManager( challenges, ChallengeMetrics.Current,
+					prize => ParkFinances.Current?.AwardPrize( prize ) );
+				ChallengeManager.Current = mgr;
+				GameClock.Current.OnNewDay += mgr.OnNewDay;
+				Log.Info( $"[challenge] loaded {challenges.Count} trackable challenge(s)" );
+			}
+		}
+		catch ( Exception e ) { Log.Warning( $"[challenge] load failed: {e.Message}" ); }
+
 		// Centre the placement grid on the terrain's dense centroid (robust to stray distant meshes).
 		var standard = new SettingsFile( "/levels/jungle/Standard.sam" );
 		var centre = terrain.Centroid;

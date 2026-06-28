@@ -213,6 +213,12 @@ public sealed class BuildMode : Entity
 			// Admission fee.
 			if ( Hit( Key.BracketLeft ) ) fin.EntryFee = MathF.Max( 0f, fin.EntryFee - 1f );
 			if ( Hit( Key.BracketRight ) ) fin.EntryFee += 1f;
+			// Challenge accept (Y) / decline (N) while one is offered (T-054).
+			if ( ChallengeManager.Current is { State: ChallengeManager.Phase.Offered } ch )
+			{
+				if ( Hit( Key.Y ) ) ch.Accept();
+				if ( Hit( Key.N ) ) ch.Decline();
+			}
 			// Selected ride: ticket price (, .), research next upgrade (R), apply it (U) — T-042 / T-044.
 			// Only in the Default tool (Selected < 0); while placing (Selected ≥ 0), R rotates instead.
 			if ( SelectedRide is { } sel && Selected < 0 )

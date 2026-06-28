@@ -157,11 +157,19 @@ public sealed class ParkFinances
 		RecordMonth();
 	}
 
+	// Cumulative counts (T-054 challenge metrics): how many rides ridden, drinks/food sold, and visitors
+	// admitted over the level — the things challenges count toward.
+	public int RidesRidden { get; private set; }
+	public int FoodSold { get; private set; }
+	public int DrinkSold { get; private set; }
+	public int VisitorsTotal { get; private set; }
+
 	/// <summary>A peep pays to board a ride.</summary>
 	public void TakeRideTicket( float price )
 	{
 		Money += price;
 		RideRevenue += price;
+		RidesRidden++;
 	}
 
 	/// <summary>A fresh visitor pays the gate entry fee.</summary>
@@ -169,14 +177,20 @@ public sealed class ParkFinances
 	{
 		Money += EntryFee;
 		EntryRevenue += EntryFee;
+		VisitorsTotal++;
 	}
 
-	/// <summary>A hungry visitor buys a snack from a shop.</summary>
-	public void TakeFoodSale( float price )
+	/// <summary>A visitor buys from a concession (<paramref name="drink"/> distinguishes a drink stall from a
+	/// food stall, for the challenge counters).</summary>
+	public void TakeFoodSale( float price, bool drink = false )
 	{
 		Money += price;
 		FoodRevenue += price;
+		if ( drink ) DrinkSold++; else FoodSold++;
 	}
+
+	/// <summary>Award a cash prize (a completed challenge, T-054).</summary>
+	public void AwardPrize( float amount ) => Money += amount;
 
 	/// <summary>Ongoing ride running cost.</summary>
 	public void PayUpkeep( float amount )

@@ -228,7 +228,7 @@ public sealed class Peep : ModelEntity
 				switch ( shopTarget.Kind )
 				{
 					case ShopKind.Drink:
-						ParkFinances.Current?.TakeFoodSale( shopTarget.Price );
+						ParkFinances.Current?.TakeFoodSale( shopTarget.Price, drink: true );
 						thirst = 0f;
 						bladder = MathF.Min( 100f, bladder + DrinkBladderBump );
 						break;

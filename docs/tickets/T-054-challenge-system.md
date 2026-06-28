@@ -2,7 +2,13 @@
 
 - **Priority**: 🟡 Feature (headline gameplay)
 - **Type**: Engine / UI
-- **Status**: ☐ To do (proposed — RE recon done; **data fully present, no blockers**)
+- **Status**: ⚠️ Core done — `Challenges.sam` parses; a `ChallengeManager` state machine offers/accepts/
+  declines, tracks the metric gain vs `TargetVal` over `TargetTime` days (on `GameClock.OnNewDay`), wins/loses,
+  pays the prize and chains `FollowupType`; the HUD shows the challenge (Y accept / N decline). Verified
+  in-game (load → offer → accept → day countdown → timeout → next). **Metric mapping is partial**: only the
+  confidently-RE'd Types (1 visitors / 2 food / 3 drinks) are tracked + offered — the other ~25 Types need the
+  `.str` descriptions or a Ghidra dispatch trace (see `ChallengeMetrics`). A dedicated clickable panel + the
+  advisor delivering offers remain (polish).
 - **Needs**: [T-053](T-053-ingame-clock.md) (in-game days). **Related**: [T-055](T-055-golden-ticket-goals.md),
   [T-046](T-046-advisor-character.md) (advisor delivers challenge offers).
 
