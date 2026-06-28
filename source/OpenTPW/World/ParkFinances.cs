@@ -192,6 +192,13 @@ public sealed class ParkFinances
 	/// <summary>Award a cash prize (a completed challenge, T-054).</summary>
 	public void AwardPrize( float amount ) => Money += amount;
 
+	/// <summary>Restore the balance + admission fee from a loaded save (T-059).</summary>
+	public void RestoreMoney( float money, float entryFee )
+	{
+		Money = money;
+		EntryFee = entryFee;
+	}
+
 	/// <summary>Net profit (income − expense) over the last <paramref name="months"/> recorded months — the
 	/// golden-ticket "profit per year" goal sums the last 12 (T-055).</summary>
 	public float RecentProfit( int months )

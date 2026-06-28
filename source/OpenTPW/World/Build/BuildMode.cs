@@ -207,6 +207,10 @@ public sealed class BuildMode : Entity
 		if ( Hit( Key.R ) && Selected >= 0 && Catalog[Selected].RidePath != null )
 			Rotation = (Rotation + 1) % 4;
 
+		// Save (F5) / load (F9) the park to the default slot (T-059).
+		if ( Hit( Key.F5 ) ) Level.CaptureSave().WriteToFile( SaveGame.DefaultPath );
+		if ( Hit( Key.F9 ) && SaveGame.ReadFromFile( SaveGame.DefaultPath ) is { } loaded ) Level.ApplySave( loaded );
+
 		var fin = ParkFinances.Current;
 		if ( fin != null )
 		{

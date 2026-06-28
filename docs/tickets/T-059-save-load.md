@@ -2,7 +2,13 @@
 
 - **Priority**: 🟡 Feature (high impact)
 - **Type**: Engine / RE
-- **Status**: ☐ To do (proposed — RE recon done; **two paths, see below**)
+- **Status**: ⚠️ Core done (Route A) — a native versioned-JSON save: `SaveGame` (balance + loans + clock +
+  placed rides/shops) with fault-tolerant file I/O; `Level.CaptureSave`/`ApplySave` snapshot + rebuild the
+  park (demolish → restore finances/clock → rebuild placements for free via `CommitPlacement(charge:false)`);
+  **F5 saves, F9 loads** the default slot. Round-trip unit-tested + verified in-game (7 placements captured,
+  money restored, 5 rides/2 shops rebuilt, 0 exceptions). **Remaining (v1.x)**: staff + coaster tracks +
+  fine progression (research-in-progress, the active challenge/goal state — the restored clock keeps timing
+  aligned), and a save-slot UI. **Route B** (original `.TPWS` compat) is unchanged (needs a real sample).
 - **Related**: [T-017](T-017-tpws-saves.md) (the `.TPWS` container is already RE'd + writable; the `SAD_*`
   module payloads are not).
 

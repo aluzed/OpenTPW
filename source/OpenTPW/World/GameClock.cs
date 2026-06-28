@@ -41,6 +41,15 @@ public sealed class GameClock
 	/// <summary>Fired once for each in-game month crossed (finances settle on this).</summary>
 	public event Action? OnNewMonth;
 
+	/// <summary>Restore the clock to <paramref name="elapsedSeconds"/> (a loaded save, T-059) without firing any
+	/// boundary events for the skipped time.</summary>
+	public void SetElapsed( float elapsedSeconds )
+	{
+		seconds = MathF.Max( 0f, elapsedSeconds );
+		firedDays = TotalDays;
+		firedMonths = TotalMonths;
+	}
+
 	/// <summary>Advance the clock by <paramref name="dt"/> real seconds, firing day/month boundaries crossed.</summary>
 	public void Tick( float dt )
 	{

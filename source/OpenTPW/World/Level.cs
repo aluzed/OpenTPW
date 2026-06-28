@@ -109,6 +109,8 @@ public class Level
 		// left-click places it, charging its cost). Rides register their queue so peeps can use them.
 		parkQueues = new List<RideQueue>();
 		var catalog = BuildCatalog();
+		// Keep the placement context so a loaded save can rebuild placements (T-059).
+		saveGrid = grid; saveTerrain = terrain; saveCatalog = catalog;
 		_ = new BuildMode( grid, terrain, catalog,
 			( item, tx, ty, rot ) => CommitPlacement( item, grid, terrain, tx, ty, rot ),
 			ride => DemolishRide( ride, grid ),
@@ -262,6 +264,85 @@ public class Level
 	// The park's ride queues — placed rides register here so peeps (which hold this list) can use them.
 	private static List<RideQueue> parkQueues = new();
 
+	// Placement context captured for save/load (T-059): a loaded save rebuilds rides/shops through these.
+	private static PlacementGrid? saveGrid;
+	private static ParkTerrain? saveTerrain;
+	private static IReadOnlyList<BuildCatalogItem>? saveCatalog;
+
+	/// <summary>Snapshot the park into a <see cref="SaveGame"/> (T-059): balance + loans, the in-game clock,
+	/// and the placed rides/shops.</summary>
+	public static SaveGame CaptureSave()
+	{
+		var s = new SaveGame();
+		if ( ParkFinances.Current is { } fin )
+		{
+			s.Money = fin.Money;
+			s.EntryFee = fin.EntryFee;
+			foreach ( var l in fin.Loans )
+				s.Loans.Add( new SaveGame.LoanState { Name = l.Name, Bought = l.Bought, Outstanding = l.Outstanding, Monthly = l.Monthly } );
+		}
+		s.ClockSeconds = GameClock.Current?.ElapsedSeconds ?? 0f;
+
+		foreach ( var r in Entity.All.OfType<Ride>() )
+			s.Placements.Add( new SaveGame.Placement
+			{
+				Kind = "ride", Name = Path.GetFileName( r.Archive ),
+				TileX = r.TileX, TileY = r.TileY, Rotation = r.Rotation, TicketPrice = r.TicketPrice,
+			} );
+		foreach ( var sh in Shop.Stalls )
+			s.Placements.Add( new SaveGame.Placement
+			{
+				Kind = "shop", Name = ShopCatalogName( sh.Kind ), TileX = sh.TileX, TileY = sh.TileY,
+			} );
+		return s;
+	}
+
+	/// <summary>Restore a park from a <see cref="SaveGame"/> (T-059): clear the current rides/shops, restore the
+	/// balance + clock, then rebuild each placement for free (the balance is already restored).</summary>
+	public static void ApplySave( SaveGame s )
+	{
+		if ( saveGrid is not { } grid || saveTerrain is not { } terrain || saveCatalog is not { } catalog )
+			return;
+
+		foreach ( var r in Entity.All.OfType<Ride>().ToList() )
+			DemolishRide( r, grid );
+		foreach ( var sh in Shop.Stalls.ToList() )
+			DemolishShop( sh, grid );
+
+		if ( ParkFinances.Current is { } fin )
+		{
+			fin.RestoreMoney( s.Money, s.EntryFee );
+			foreach ( var saved in s.Loans )
+				foreach ( var l in fin.Loans )
+					if ( l.Name == saved.Name )
+					{
+						l.Bought = saved.Bought; l.Outstanding = saved.Outstanding; l.Monthly = saved.Monthly;
+					}
+		}
+		GameClock.Current?.SetElapsed( s.ClockSeconds );
+
+		foreach ( var p in s.Placements )
+		{
+			var item = catalog.FirstOrDefault( c => c.Name == p.Name );
+			if ( item.Name == null )
+				continue;
+			if ( !CommitPlacement( item, grid, terrain, p.TileX, p.TileY, p.Rotation, charge: false ) )
+				continue;
+			if ( p.Kind == "ride" )
+				if ( Entity.All.OfType<Ride>().FirstOrDefault( r => r.TileX == p.TileX && r.TileY == p.TileY ) is { } ride )
+					ride.TicketPrice = p.TicketPrice;
+		}
+		Log.Info( $"[save] restored {s.Placements.Count} placement(s)" );
+	}
+
+	// The build-catalog item name for a shop kind (the inverse of ShopKindOf).
+	private static string ShopCatalogName( ShopKind kind ) => kind switch
+	{
+		ShopKind.Drink => "drink",
+		ShopKind.Toilet => "toilet",
+		_ => "shop",
+	};
+
 	// Build catalog: jungle rides (footprint from RideShape, cost from the .sam) + a food shop + hireable
 	// staff (no footprint — placed on a tile and charged a hire cost, T-043).
 	private static List<BuildCatalogItem> BuildCatalog()
@@ -318,10 +399,11 @@ public class Level
 
 	// Commit a placement at tile (tx,ty) with an orientation (rotation in 90° CW steps): validate +
 	// (for rides/shops) reserve the grid, spawn, charge. A rotated ride footprint swaps W/H on odd turns.
-	private static bool CommitPlacement( BuildCatalogItem item, PlacementGrid grid, ParkTerrain terrain, int tx, int ty, int rotation = 0 )
+	// charge=false rebuilds a placement for free (a loaded save already restored the balance — T-059).
+	private static bool CommitPlacement( BuildCatalogItem item, PlacementGrid grid, ParkTerrain terrain, int tx, int ty, int rotation = 0, bool charge = true )
 	{
 		var fin = ParkFinances.Current;
-		if ( fin != null && !fin.CanAfford( item.Cost ) )
+		if ( charge && fin != null && !fin.CanAfford( item.Cost ) )
 			return false;
 
 		// Staff are mobile — hire + drop at the tile, no grid reservation.
@@ -331,7 +413,7 @@ public class Level
 			// A wide patrol radius so staff actually cover the park — guards reach the queue backs where
 			// unhappy peeps vandalise, handymen reach far litter, entertainers cover more of the crowd (T-039).
 			_ = new Staff( role, terrain, c.WithZ( 0 ), roam: 160f );
-			fin?.PayBuild( item.Cost );
+			if ( charge ) fin?.PayBuild( item.Cost );
 			return true;
 		}
 
@@ -355,7 +437,7 @@ public class Level
 			grid.Clear( tx, ty, footprint );
 			return false;
 		}
-		fin?.PayBuild( item.Cost );
+		if ( charge ) fin?.PayBuild( item.Cost );
 		return true;
 	}
 

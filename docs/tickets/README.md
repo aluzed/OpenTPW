@@ -97,7 +97,7 @@ All format/VM decoding and the core gameplay loop are done. Open work falls into
 | [T-056](T-056-weather-seasons.md) | 🟢 Low | ☐ To do | **Weather + seasons** (proposed) — `Seasons[*]`/`Weather.*` in `Standard.sam`, sim fields + `Weather/*.tga` RE'd; rain/snow overlay + fog tint |
 | [T-057](T-057-minimap.md) | 🟢 Low | ☐ To do | **Minimap (2dmap)** (proposed) — `data/2dmap/` 6 category sprites + index; sprite/UI infra exists |
 | [T-058](T-058-sideshow-rides.md) | 🟢 Low | ☐ To do | **Sideshow rides** (proposed) — 5 `sideshow/*.wad` per level, ride engine reusable; `SideshowTakings`/`EventSideshowWin` stubs exist |
-| [T-059](T-059-save-load.md) | 🟡 Feature | ☐ To do | **Save / load games** (proposed) — `.TPWS` container RE'd; 17 `SAD_*` payload modules RE'd. Route A: native save (no blockers); Route B: original-save compat (needs a sample) |
+| [T-059](T-059-save-load.md) | 🟡 Feature | ⚠️ Core done | **Save / load games** (Route A) — native versioned-JSON `SaveGame` (balance+loans+clock+rides/shops), `Level.CaptureSave`/`ApplySave` rebuild the park, **F5 save / F9 load**. Round-trip unit-tested + verified in-game. Remaining: staff/coaster-tracks/fine-progression + slot UI; Route B (`.TPWS` compat) needs a sample |
 | [T-060](T-060-peep-decision-scorer.md) | 🟡 Feature | ☐ To do | **Peep ride-choice scorer** (proposed) — authored `DecisionVar*` weight vector + "option score" scorer RE'd; replaces the excitement-only heuristic |
 
 Priority legend: 🔴 blocking · 🟠 important · 🟡 desirable/feature · ⚪ technical debt/polish.
