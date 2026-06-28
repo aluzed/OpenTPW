@@ -191,12 +191,12 @@ public sealed class RideEngine : IRideEngine
 			Entity.All.Remove( entity );
 		particleProxies.Clear();
 
-		foreach ( var (_, e) in headProxies.Values )
-			Entity.All.Remove( e );
+		foreach ( var (_, marker) in headProxies.Values )
+			Entity.All.Remove( marker.Entity );
 		headProxies.Clear();
 
-		foreach ( var e in walkProxies.Values )
-			Entity.All.Remove( e );
+		foreach ( var marker in walkProxies.Values )
+			Entity.All.Remove( marker.Entity );
 		walkProxies.Clear();
 	}
 
@@ -522,12 +522,13 @@ public sealed class RideEngine : IRideEngine
 	// Walk + head node visuals (T-048). The VM's WALKON/ADDHEAD families keep pure slot tables (RideVM.Walk
 	// / RideVM.Heads); the *visual* placement was the gap. The engine mirrors those tables each frame from
 	// the ride's node positions (RideNodePositions): a walk peep glides between its two walk nodes, a head
-	// sits at its head node. Like the light/particle proxies, the markers are simple emissive stand-ins (no
-	// peep/head mesh here) — verifiable + driven by real node positions; the art swap is a renderer follow-up.
+	// sits at its head node. The figures are **real peep sprites** (RideSpriteMarker, the same esprites.wad
+	// kid art + directional walk cycle the crowd peeps use), driven by real node positions; a flat billboard
+	// is the headless fallback. (Previously emissive cube stand-ins — the art swap is this pass.)
 	//
 
-	private readonly Dictionary<int, (int Value, ModelEntity Entity)> headProxies = new(); // by VM head-slot
-	private readonly Dictionary<int, ModelEntity> walkProxies = new();                       // by VM walk-slot
+	private readonly Dictionary<int, (int Value, RideSpriteMarker Marker)> headProxies = new(); // by VM head-slot
+	private readonly Dictionary<int, RideSpriteMarker> walkProxies = new();                       // by VM walk-slot
 
 	/// <summary>Mirror the VM head table to head-node positions: show a head marker for each occupied slot at
 	/// its head node, hide vacated ones. <paramref name="slots"/> is <c>RideVM.HeadSlots</c> (0 = empty).</summary>
@@ -544,34 +545,30 @@ public sealed class RideEngine : IRideEngine
 				{
 					if ( shown )
 					{
-						Entity.All.Remove( cur.Entity );
+						Entity.All.Remove( cur.Marker.Entity );
 						headProxies.Remove( slot );
 					}
 					continue;
 				}
 
-				// (Re)create the marker on first show or when the head value changes (the value picks the head
-				// graphic once real art lands).
+				// (Re)create the marker on first show or when the head value changes (the value picks which
+				// kid sprite shows, so the head figure varies with the script's head graphic id).
 				if ( !shown || cur.Value != value )
 				{
 					if ( shown )
-						Entity.All.Remove( cur.Entity );
+						Entity.All.Remove( cur.Marker.Entity );
 
-					cur.Entity = new ModelEntity
-					{
-						Model = Primitives.Cube.GenerateModel( SolidMaterial( 90, 200, 250 ) ), // head marker
-						Scale = new Vector3( 1.6f ),
-					};
-					headProxies[slot] = (value, cur.Entity);
+					cur.Marker = new RideSpriteMarker( Peep.KidSpriteDir, Peep.KidSpriteName( value ),
+						height: 15f, 90, 200, 250 );
+					headProxies[slot] = (value, cur.Marker);
 				}
 
 				// Track the head node every frame (it rides the animated body — real per-frame transform):
-				// position from the node field, facing from the node's forward direction (yaw about Z).
+				// stand the figure at the node, facing its forward direction (the directional sprite frame).
 				int nodeId = HeadNodeId( slot );
-				cur.Entity.Position = HeadNodePosition( slot ) + Vector3.Up * 6f;
-				if ( nodeId >= 0 && NodeField != null && NodeField.TryResolveFacing( nodeId, out var fwd ) )
-					cur.Entity.Rotation = System.Numerics.Quaternion.CreateFromAxisAngle(
-						System.Numerics.Vector3.UnitZ, MathF.Atan2( fwd.Y, fwd.X ) );
+				var headFwd = nodeId >= 0 && NodeField != null && NodeField.TryResolveFacing( nodeId, out var fwd )
+					? fwd : Vector3.Zero;
+				cur.Marker.Update( HeadNodePosition( slot ), headFwd, moving: false );
 			}
 		}
 		catch ( Exception ex ) { Log.Warning( $"[ride] head sync failed: {ex.Message}" ); }
@@ -591,7 +588,7 @@ public sealed class RideEngine : IRideEngine
 				{
 					if ( walkProxies.TryGetValue( slot, out var dead ) )
 					{
-						Entity.All.Remove( dead );
+						Entity.All.Remove( dead.Entity );
 						walkProxies.Remove( slot );
 					}
 					continue;
@@ -599,20 +596,18 @@ public sealed class RideEngine : IRideEngine
 
 				var from = NodePosition( s.StartNode );
 				var to = NodePosition( s.EndNode );
-				var (pos, yaw) = WalkSample( from, to, s.StartTime, s.EndTime, gameTime,
-					atEnd: s.State is RideVM.WalkState.Arrived or RideVM.WalkState.Done );
+				bool atEnd = s.State is RideVM.WalkState.Arrived or RideVM.WalkState.Done;
+				var (pos, _) = WalkSample( from, to, s.StartTime, s.EndTime, gameTime, atEnd );
 
-				if ( !walkProxies.TryGetValue( slot, out var e ) )
+				if ( !walkProxies.TryGetValue( slot, out var marker ) )
 				{
-					e = new ModelEntity
-					{
-						Model = Primitives.Cube.GenerateModel( SolidMaterial( 250, 250, 250 ) ), // walking peep
-						Scale = new Vector3( 1.4f, 1.4f, 3f ),
-					};
-					walkProxies[slot] = e;
+					marker = new RideSpriteMarker( Peep.KidSpriteDir, Peep.KidSpriteName( slot ),
+						height: 15f, 250, 250, 250 );
+					walkProxies[slot] = marker;
 				}
-				e.Position = pos + Vector3.Up * 3f;
-				e.Rotation = System.Numerics.Quaternion.CreateFromAxisAngle( System.Numerics.Vector3.UnitZ, yaw );
+				// The peep glides along its travel direction (drives the directional frame + walk cycle); it
+				// holds the standing frame once Arrived/Done (atEnd). The marker faces the camera itself.
+				marker.Update( pos, to - from, moving: !atEnd );
 			}
 		}
 		catch ( Exception ex ) { Log.Warning( $"[ride] walk sync failed: {ex.Message}" ); }

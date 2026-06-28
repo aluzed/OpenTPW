@@ -121,6 +121,35 @@ public class RideEngineTests
 	}
 
 	[TestMethod]
+	public void FrameForSelectsDirectionalCycleAndLoopsPhase()
+	{
+		// T-048 art swap: the walk/head peep marker picks the directional cycle for its facing sector, then
+		// the looped walk phase inside that cycle (so sector 1 → its anim; phase wraps the cycle length).
+		var anims = new List<SpriteSheet.Anim>
+		{
+			new( Start: 0, Count: 4 ),   // sector 0
+			new( Start: 10, Count: 4 ),  // sector 1
+			new( Start: 20, Count: 4 ),  // sector 2
+		};
+
+		Assert.AreEqual( 0, RideSpriteMarker.FrameFor( anims, facing: 0, walkPhase: 0f ), "cycle start" );
+		Assert.AreEqual( 12, RideSpriteMarker.FrameFor( anims, facing: 1, walkPhase: 2.7f ), "sector 1, phase 2 → 10 + 2" );
+		Assert.AreEqual( 11, RideSpriteMarker.FrameFor( anims, facing: 1, walkPhase: 5f ), "phase 5 wraps the 4-frame cycle → 10 + 1" );
+	}
+
+	[TestMethod]
+	public void FrameForWrapsFacingAndHandlesEmpty()
+	{
+		var anims = new List<SpriteSheet.Anim> { new( 0, 2 ), new( 5, 2 ) };
+		// Facing wraps modulo the available cycles (a sheet with fewer than 8 directional anims), staying
+		// non-negative so a negative sector never indexes out of range.
+		Assert.AreEqual( 5, RideSpriteMarker.FrameFor( anims, facing: 3, walkPhase: 0f ), "3 % 2 → cycle 1" );
+		Assert.AreEqual( 0, RideSpriteMarker.FrameFor( anims, facing: -2, walkPhase: 0f ), "negative facing wraps to cycle 0" );
+		// No directional anims → frame 0 (the single standing frame), never an index fault.
+		Assert.AreEqual( 0, RideSpriteMarker.FrameFor( new List<SpriteSheet.Anim>(), facing: 4, walkPhase: 9f ) );
+	}
+
+	[TestMethod]
 	public void ParticleOpcodesPassTheirTargetNode()
 	{
 		// T-048/T-047: REPAIREFFECT/SPARK resolve a ride node before spawning — the first operand is the

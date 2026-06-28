@@ -230,6 +230,32 @@ completing the runtime transform:
   ride's part 0 resolved raised at Z=10 with yaw −90° — i.e. tracking an elevated, rotated mesh part, not the
   flat footprint ring); EVENT effects resolve to live node positions. Diagnostic reverted after the run.
 
+## Done (this pass — art swap: WALKON peeps + ADDHEAD heads now render as real peep sprites)
+
+The last visual stand-in was the emissive **cubes** the walk/head markers drew. They're now **real
+animated peep sprites** — the same `esprites.wad` kid art (directional walk cycles) the crowd peeps use —
+driven by the existing real node positions, so a ride's walk/head nodes show people instead of boxes:
+
+- **New `RideSpriteMarker`** (`source/OpenTPW/World/Rides/`): wraps a shared `SpriteSheet` (a kid sprite)
+  exactly like `Peep` does — a camera-facing billboard showing the **directional walk-cycle frame** for the
+  travel/forward direction, advancing the cycle while moving and holding the standing frame when idle. Falls
+  back to a flat-colour billboard when the sprite can't decode (headless / missing assets), so the pure
+  node-positioning path is unchanged and the engine always has something to draw.
+- **`RideEngine.SyncWalk`** now drives a marker per walk slot: it **glides between the two walk nodes**
+  (position from the unchanged pure `WalkSample`), the directional frame + walk cycle follow the **travel
+  direction**, and it holds the standing frame once Arrived/Done. **`SyncHeads`** stands a marker at each
+  head node, facing the node's resolved **forward** (the directional sprite frame), tracking the animated
+  body node every frame; the head graphic id (`value`) picks which kid sprite shows, so the figure varies.
+- The kid art is shared via `Peep.KidSpriteDir`/`Peep.KidSpriteName(index)` (no duplicated sprite list);
+  the markers vary their figure by walk slot / head value.
+- **Frame selection is a pure helper** (`RideSpriteMarker.FrameFor`) — picks the directional cycle for the
+  facing sector then the looped walk phase, wrapping facing modulo the available cycles (fewer than 8 anims)
+  and guarding the no-anim sheet. Unit-tested (`RideEngineTests.FrameForSelectsDirectionalCycleAndLoopsPhase`
+  / `FrameForWrapsFacingAndHandlesEmpty`). 170 tests pass, 0 new warnings.
+- **Verified in-game** (real jungle assets, `OPENTPW_AUTOPLACE`, 45 s): all 11 rides/staff place; the eight
+  `esprites/Generic/Kids` sprite sheets (the marker art) load; `SyncHeads`/`SyncWalk` run every frame across
+  every placed ride with **0 sync failures / 0 exceptions** — the sprite marker path executes cleanly.
+
 ## Remaining
 
 1. **Exact authored track shape / car-path node positions.** The **car/seat** nodes are driven by the
@@ -238,8 +264,9 @@ completing the runtime transform:
    the car **waypoint geometry** (footprint loop / arena rectangle) and the node→surface **binding** (ordered,
    not file-decoded) — both because the authored data is bound at runtime, not stored. `RideVehicle`'s
    `loop`/`Sample` is shape-agnostic, so real waypoint positions drop straight in if a future RE recovers them.
-2. **Art swap.** WALKON peeps + ADDHEAD heads are placed + animated (position + facing) as marker proxies;
-   rendering the real peep sprite / head sub-mesh at those positions is a renderer follow-up.
+2. ~~**Art swap.** WALKON peeps + ADDHEAD heads as marker proxies.~~ **Done** (this pass): both render as
+   real animated peep sprites (`RideSpriteMarker`) at the node positions. A bespoke decorative head *mesh*
+   per `ADDHEAD value` (vs. reusing the kid sprite) would need a value→mesh decode that isn't in the files.
 
 ## Acceptance criteria
 
@@ -247,13 +274,16 @@ completing the runtime transform:
   real walk nodes; heads (ADDHEAD) appear at head nodes. *(Node-table decode + the runtime resolver +
   node-positioned effects + WALKON/ADDHEAD placement + a footprint-shaped car path done; the "rig" is now
   proven to be **runtime sim, not a file structure** — the exact node motion needs the car/keyframe sim
-  re-implemented, and the real peep/head art remains.)*
+  re-implemented. WALKON peeps + ADDHEAD heads now render as **real animated peep sprites** at the node
+  positions; the only remaining stand-in is the runtime-bound car waypoint geometry.)*
 
 ## Affected files
 
 `source/OpenTPW/World/Rides/RideNodePositions.cs` (body regime + facing: `PublishBody`/`ClearBody`/
 `BodyNodeIds`/`TryResolveFacing`), `RidePath.cs` (new), `RideVehicle.cs` (publishes seat facing),
-`RideEngine.cs` (`PublishBodyNodes`/`AnimatedSurfaceIndices`/`HeadNodeId`, per-frame `SyncHeads` tracking),
+`RideSpriteMarker.cs` (new — peep-sprite walk/head markers + pure `FrameFor`),
+`RideEngine.cs` (`PublishBodyNodes`/`AnimatedSurfaceIndices`/`HeadNodeId`, `SyncHeads`/`SyncWalk` now drive
+peep-sprite markers), `source/OpenTPW/World/Peep.cs` (`KidSpriteDir`/`KidSpriteName` shared sprite picker),
 `IRideEngine.cs`, `source/OpenTPW/World/Ride.cs`, `source/OpenTPW/World/Level.cs`,
 `source/OpenTPW/VM/RideVM.Walk.cs`/`RideVM.Heads.cs` (head-capacity setter), `source/OpenTPW/VM/Handlers/Particles.cs`,
 `source/OpenTPW.Files/Formats/Model/ModelFile.cs` (node-graph access).

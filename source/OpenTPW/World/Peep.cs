@@ -77,6 +77,14 @@ public sealed class Peep : ModelEntity
 	private static readonly string[] KidSprites =
 		{ "SPR_BE", "SPR_BI", "SPR_CH", "SPR_FR", "SPR_KI", "SPR_SA", "SPR_SU", "SPR_TA" };
 
+	/// <summary>The directory the kid sprites live in (shared with the ride walk/head markers, T-048).</summary>
+	internal const string KidSpriteDir = "esprites/Generic/Kids";
+
+	/// <summary>A kid sprite name picked deterministically by <paramref name="index"/> (wraps), so ride
+	/// markers vary their figure by slot/head value while reusing the same crowd art.</summary>
+	internal static string KidSpriteName( int index ) =>
+		KidSprites[((index % KidSprites.Length) + KidSprites.Length) % KidSprites.Length];
+
 	private readonly SpriteSheet? sheet;
 
 	private readonly ParkTerrain terrain;
@@ -132,7 +140,7 @@ public sealed class Peep : ModelEntity
 		// Prefer a real decoded peep sprite (per-frame models, directional walk cycles), a random kid for
 		// crowd variety; fall back to a flat-colour billboard if it can't load.
 		spriteHeight = 15f + (float)Random.Shared.NextDouble() * 3f;
-		sheet = SpriteSheet.Load( "esprites/Generic/Kids", KidSprites[Random.Shared.Next( KidSprites.Length )] );
+		sheet = SpriteSheet.Load( KidSpriteDir, KidSprites[Random.Shared.Next( KidSprites.Length )] );
 		if ( sheet != null )
 		{
 			billboard = sheet.FrameModel( 0 );
