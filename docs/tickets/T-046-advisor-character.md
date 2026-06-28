@@ -2,10 +2,10 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine / rendering
-- **Status**: ⚠️ Implemented — functionally verified (model + 5 visemes + lip-sync + speech all confirmed
-  in logs); the **message system (`Advisor.sam`) is now parsed + wired** (pacing/group rules drive which tip
-  speaks — see below). The on-screen placement/scale/orientation still needs a visual pass (the screenshot
-  tooling was unavailable). Per-event score formulas + per-message clips remain.
+- **Status**: ⚠️ Implemented — functionally verified (model + 5 visemes + lip-sync + speech); the **message
+  system (`Advisor.sam`) is parsed + wired** with **per-event triggers** firing tips on real park state, and
+  the **on-screen visual pass is done** (the bug head now reads as a clean bottom-right corner overlay,
+  screenshot-tuned). Per-message speech clips remain (not shipped in this install).
 - **Parent**: [T-020](T-020-lip-mouth-shapes.md) (lip-sync format + wiring done — this is the render tail).
 - **Related**: [T-031](T-031-game-audio.md).
 
@@ -90,14 +90,26 @@ list. New `AdvisorAdvice` (pure rule-engine) + the state sources feeding it:
   chain end-to-end: the say-once `WelcomeTutorial` opens, and once it finishes the real `InTheRedThreeMonths`
   tip is elected by the scheduler and spoken. Diagnostic reverted; 0 exceptions.
 
+## Done (this pass — the on-screen visual pass)
+
+Screenshot tooling now works (display + GPU), so the advisor's placement was tuned against real jungle
+assets by iterating screenshot → adjust the anchoring constants in `Advisor.cs`:
+
+- **Result**: the bug head sits as a small **bottom-right corner overlay** (`Distance 24`, `RightOffset 8.5`,
+  `UpOffset -3.5`, `GroupScale 0.28`) at ~⅓ screen height, fully on-screen (no clipping), facing the camera,
+  lip-syncing — down from the initial state where the model filled ~70% of the screen.
+- **Body part hidden**: the `body` mesh hung off-axis below the head and cluttered the corner, so `BaseParts`
+  now shows just the **head + eyes + antennae** (+ the active viseme mouth) — a clean "talking head". The
+  body/hands/spatula/hats stay hidden as before.
+- Verified across 8 screenshot iterations (final reviewed, not committed); 0 exceptions, build 0-warning,
+  208 tests still pass.
+
 ## Remaining
 
-- **Visual pass**: confirm/tune the on-screen position, scale and facing (anchoring constants in
-  `Advisor.cs`) — screenshot tooling now works, so this is unblocked.
 - **Per-message speech clips**: map each message id to its own clip + `.LIP` (today they fall back to the
   shipped `sp_001`); the per-message advisor clips aren't shipped in this install.
-- The advisor still only runs under `OPENTPW_ADVISOR_DEMO=1` pending the visual pass; flip it on by default
-  once placement is tuned.
+- The advisor still only spawns under `OPENTPW_ADVISOR_DEMO=1`; flipping it on by default in normal play is a
+  one-line change once we want it always present.
 - Textures: the `.wct` are loaded from `global/advisor/textures/` via the VFS; verify they resolve (else
   the advisor renders untextured — still geometrically correct).
 - Hook the **message system** (`Advisor.sam`: `MessageGroups`, min-time/say-once/discard-after-slaps) so

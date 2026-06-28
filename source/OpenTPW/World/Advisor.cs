@@ -16,11 +16,12 @@ public sealed class Advisor : Entity
 {
 	public static Advisor? Current { get; private set; }
 
-	// Base parts always shown (the bug face + body); everything else (hats, hands, spatula, shut-eyes,
-	// the inactive mouths) is hidden so the character reads cleanly.
+	// Base parts always shown (the bug face: head + eyes + antennae); everything else (the body — which hangs
+	// off-axis and just clutters a corner overlay — hats, hands, spatula, shut-eyes, inactive mouths) is
+	// hidden so the talking head reads cleanly.
 	private static readonly string[] BaseParts =
 	{
-		"bug head", "right eye", "left eye", "body", "right antennae", "left antennae",
+		"bug head", "right eye", "left eye", "right antennae", "left antennae",
 	};
 
 	private sealed class Part
@@ -46,8 +47,10 @@ public sealed class Advisor : Entity
 	private AdvisorMessages messages = null!;
 	private string activeMessage = "";
 
-	// On-screen anchoring (in front of the camera).
-	private const float Distance = 26f, RightOffset = 16f, UpOffset = -9f, GroupScale = 2.4f;
+	// On-screen anchoring: the bug head sits as a small bottom-right corner overlay, a fixed distance in
+	// front of the camera and offset right + down, scaled down to ~⅓ screen height (tuned on real jungle
+	// assets — see T-046's visual pass). The body part is hidden (BaseParts) so the talking head reads clean.
+	private const float Distance = 24f, RightOffset = 8.5f, UpOffset = -3.5f, GroupScale = 0.28f;
 
 	/// <summary>The viseme currently shown (for the HUD label); Closed when not speaking.</summary>
 	public MouthShape CurrentShape { get; private set; } = MouthShape.Closed;
