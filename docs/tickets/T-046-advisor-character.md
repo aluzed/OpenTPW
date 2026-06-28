@@ -67,13 +67,37 @@ which message the advisor speaks (not an unconditional loop):
   minScore 25` (parsed the real file), then `message 'WelcomeTutorial' → speaking 'sp_001.mp2'` — the say-once
   welcome fired first by score and drove real speech + lip-sync; 0 exceptions.
 
+## Done (this pass — per-event triggers fire tips on real park state)
+
+The scheduler now consumes **live park state**, so the advisor speaks on real events instead of a fixed demo
+list. New `AdvisorAdvice` (pure rule-engine) + the state sources feeding it:
+
+- **`ParkSnapshot`** + **`AdvisorAdvice.Evaluate(snapshot, config)`** map the park state → scored candidate
+  tips, scoring each from the decoded `Advisor.sam` params (`AdvisorConfig.Param`): escalating **in-the-red**
+  warnings by `MonthsInRed` (`InTheRedMonthLeft/ThreeMonths/SixMonths`), **thirsty/hungry visitors**
+  (`ScorePer*Person` × count, threshold from the `.sam`), **research ready**, and a **happy-park congrats**.
+  The advice→group mapping mirrors the original's hardcoded grouping (general/tutorial/congrats/research).
+  Pure, fully unit-tested.
+- **State sources**: `ParkFinances.MonthsInRed` (consecutive months closed in the red) + `Peep.CountThirstierThan`
+  / `CountHungrierThan` aggregates. `Advisor.BuildSnapshot` gathers them each tick (thresholds read from the
+  `.sam`) and submits the candidates after the say-once welcome; the scheduler's rules pick what actually speaks.
+- **Unit-tested** (`AdvisorAdviceTests`, 6: healthy-park-is-silent, in-the-red escalation, solvent-ignores-stale-
+  counter, thirsty/hungry per-visitor scoring, research+congrats firing + below-threshold, missing-param defaults).
+  208 tests pass, 0 new warnings.
+- **Verified in-game** (`OPENTPW_ADVISOR_DEMO=1` + `OPENTPW_AUTOPLACE`): a temporary diagnostic confirmed the
+  snapshot reads the **live evolving state** (`money 1729→1777`, `happy 12→25`, thirsty/hungry resolved each
+  frame, 0 candidates while the park is healthy → advisor stays quiet). Forcing a deficit then showed the full
+  chain end-to-end: the say-once `WelcomeTutorial` opens, and once it finishes the real `InTheRedThreeMonths`
+  tip is elected by the scheduler and spoken. Diagnostic reverted; 0 exceptions.
+
 ## Remaining
 
 - **Visual pass**: confirm/tune the on-screen position, scale and facing (anchoring constants in
-  `Advisor.cs`) — not done this session (screenshot tooling unavailable).
-- **Per-event triggers + score formulas**: feed real game state (research available, in-the-red, congrats,
-  thirsty/hungry visitors, …) into `AdvisorMessages.Submit` using the `AdvisorConfig.Param` formulas, and
-  map each message to its own speech clip + `.LIP` (the clips aren't shipped per-message yet).
+  `Advisor.cs`) — screenshot tooling now works, so this is unblocked.
+- **Per-message speech clips**: map each message id to its own clip + `.LIP` (today they fall back to the
+  shipped `sp_001`); the per-message advisor clips aren't shipped in this install.
+- The advisor still only runs under `OPENTPW_ADVISOR_DEMO=1` pending the visual pass; flip it on by default
+  once placement is tuned.
 - Textures: the `.wct` are loaded from `global/advisor/textures/` via the VFS; verify they resolve (else
   the advisor renders untextured — still geometrically correct).
 - Hook the **message system** (`Advisor.sam`: `MessageGroups`, min-time/say-once/discard-after-slaps) so
@@ -87,7 +111,8 @@ which message the advisor speaks (not an unconditional loop):
 
 ## Affected files
 
-`source/OpenTPW/World/AdvisorConfig.cs` (new — `Advisor.sam` parser), `source/OpenTPW/World/AdvisorMessages.cs`
-(new — message scheduler/rules), `source/OpenTPW/World/Advisor.cs` (loads the config + drives speech through
-the scheduler), `source/OpenTPW.Tests/AdvisorMessagesTests.cs` (new). Earlier passes:
+`source/OpenTPW/World/AdvisorConfig.cs` (`Advisor.sam` parser), `AdvisorMessages.cs` (message scheduler/rules),
+`AdvisorAdvice.cs` (new — `ParkSnapshot` + rule-engine), `Advisor.cs` (builds the snapshot + drives speech
+through the scheduler), `ParkFinances.cs` (`MonthsInRed`), `Peep.cs` (`CountThirstierThan`/`CountHungrierThan`),
+`source/OpenTPW.Tests/AdvisorMessagesTests.cs` + `AdvisorAdviceTests.cs` (new). Earlier passes:
 `source/OpenTPW/UI/Widgets/AdvisorPanel.cs`, the model/render pipeline, `ModelFile.cs` (named-part access).

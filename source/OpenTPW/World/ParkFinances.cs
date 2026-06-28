@@ -38,6 +38,10 @@ public sealed class ParkFinances
 	/// <summary>Rolling per-month finance history, oldest first (drives the finance graph).</summary>
 	public IReadOnlyList<FinanceSample> History => history;
 
+	/// <summary>Consecutive in-game months the park has closed in the red (Money &lt; 0); 0 when solvent.
+	/// Drives the advisor's escalating "in the red" warnings (T-046).</summary>
+	public int MonthsInRed { get; private set; }
+
 	private float TotalIncome => RideRevenue + EntryRevenue + FoodRevenue;
 	private float TotalExpense => UpkeepPaid + WagesPaid + BuildSpent;
 
@@ -52,6 +56,8 @@ public sealed class ParkFinances
 		history.Add( new FinanceSample( Money, income, expense ) );
 		if ( history.Count > MaxHistory )
 			history.RemoveRange( 0, history.Count - MaxHistory );
+
+		MonthsInRed = Money < 0f ? MonthsInRed + 1 : 0;
 	}
 
 	public ParkFinances( float starting, float entryFee )

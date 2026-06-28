@@ -65,6 +65,22 @@ public sealed class Peep : ModelEntity
 		}
 	}
 
+	/// <summary>How many live visitors are thirstier than <paramref name="threshold"/> (0–100) — feeds the
+	/// advisor's "visitors thirsty" advice (T-046).</summary>
+	public static int CountThirstierThan( float threshold ) => CountNeedAbove( threshold, thirst: true );
+
+	/// <summary>How many live visitors are hungrier than <paramref name="threshold"/> (0–100, T-046).</summary>
+	public static int CountHungrierThan( float threshold ) => CountNeedAbove( threshold, thirst: false );
+
+	private static int CountNeedAbove( float threshold, bool thirst )
+	{
+		int n = 0;
+		foreach ( var e in Entity.All )
+			if ( e is Peep p && (thirst ? p.thirst : p.hunger) > threshold )
+				n++;
+		return n;
+	}
+
 	// A small palette of clothing colours so the crowd reads as varied people.
 	private static readonly (byte R, byte G, byte B)[] Palette =
 	{

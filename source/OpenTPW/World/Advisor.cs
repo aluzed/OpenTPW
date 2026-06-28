@@ -40,17 +40,11 @@ public sealed class Advisor : Entity
 	private float startTime = -1f;
 
 	// The message system (T-046): the real Advisor.sam pacing/group rules decide WHEN and WHICH tip plays.
-	// The demo feeds two built-in candidates — a say-once welcome (tutorial group 1) and a repeating general
-	// tip (group 0) — and speaks whatever the scheduler returns, so the rules govern the visible behaviour.
+	// A say-once welcome (tutorial group) opens; thereafter the advisor speaks whatever the live park state
+	// justifies (AdvisorAdvice maps the state → scored candidates), so tips fire on real events.
 	private AdvisorConfig config = null!;
 	private AdvisorMessages messages = null!;
 	private string activeMessage = "";
-
-	private static readonly (string Id, int Group, float Score)[] DemoTips =
-	{
-		("WelcomeTutorial", 1, 100f), // say-once (group 1: SayOnlyOnce) — fires first, highest score
-		("GeneralTip", 0, 50f),       // repeats per group 0's MinTimeSameMessage
-	};
 
 	// On-screen anchoring (in front of the camera).
 	private const float Distance = 26f, RightOffset = 16f, UpOffset = -9f, GroupScale = 2.4f;
@@ -206,12 +200,30 @@ public sealed class Advisor : Entity
 		if ( speaking )
 			return;
 
-		foreach ( var (id, group, score) in DemoTips )
+		// A say-once welcome opens; then real park-state advice (each scored from the .sam params).
+		messages.Submit( "WelcomeTutorial", config.Group( AdvisorAdvice.GroupTutorial ), 100f );
+		foreach ( var (id, group, score) in AdvisorAdvice.Evaluate( BuildSnapshot(), config ) )
 			messages.Submit( id, config.Group( group ), score );
 
 		var pick = messages.Consider( Time.Now );
 		if ( pick != null )
 			Speak( pick );
+	}
+
+	// Gather the park figures the advice rules key off (T-046). The thirst/hunger thresholds come from the
+	// .sam, so a level that retunes them retunes who counts as thirsty/hungry without code changes.
+	private ParkSnapshot BuildSnapshot()
+	{
+		var fin = ParkFinances.Current;
+		float thirstThresh = config.Param( "VisitorsThirsty", "ThirstierThan" ) ?? 99f;
+		float hungerThresh = config.Param( "VisitorsHungry", "HungrierThan" ) ?? 99f;
+		return new ParkSnapshot(
+			Money: fin?.Money ?? 0f,
+			MonthsInRed: fin?.MonthsInRed ?? 0,
+			ThirstyVisitors: Peep.CountThirstierThan( thirstThresh ),
+			HungryVisitors: Peep.CountHungrierThan( hungerThresh ),
+			AverageHappiness: Peep.AverageHappiness,
+			ResearchAvailable: Entity.All.OfType<Ride>().Any( r => r.NextResearched ) );
 	}
 
 	protected override void OnUpdate()
