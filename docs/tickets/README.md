@@ -18,6 +18,14 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 ## Remaining work (open tickets)
 
 All format/VM decoding and the core gameplay loop are done. Open work falls into:
+- **🆕 Next steps (proposed — from the 2026-06 RE pass, T-053–T-060)**: a 4-agent recon pass (assets + the
+  named-symbol no-CD binary) surfaced the **meta-game** layer that's authored-but-unimplemented. The
+  highest-value cluster is **progression**: an in-game clock (**T-053**, foundation) → the **challenge system**
+  (**T-054**, `Challenges.sam` = 35 challenges, scorer RE'd) + **golden-ticket goals** (**T-055**, targets in
+  `Standard.sam`, `CGoldenTicketControl` RE'd). Then **save/load** (**T-059**, `.TPWS` `SAD_*` modules RE'd, or
+  a native save), the **peep decision scorer** (**T-060**, `DecisionVar*` weights RE'd), and lower-value
+  atmosphere/UX: **weather/seasons** (**T-056**), **minimap** (**T-057**), **sideshows** (**T-058**). All have
+  the data present; see each ticket for the RE evidence.
 - **Active feature tails**: remaining items are all low-value/blocked — **T-047** COAST/ADDOBJ residue (needs
   the `.MAP` code→asset catalog), **T-048** car-waypoint positions (runtime-bound, no file data), per-message
   advisor clips (not shipped). The headline tails (T-046/47/48/52) are otherwise done.
@@ -82,6 +90,15 @@ All format/VM decoding and the core gameplay loop are done. Open work falls into
 | [T-050](T-050-peep-simulation-depth.md) | 🟡 Feature | ✅ Done | **Ride ratings & thoughts** (`Peep.RateRide` → satisfaction + `RideThought`, feeding mood / `Ride.Rating` reputation / rating-weighted ride choice), **water-aware pathfinding** (`PlacementGrid` water layer — impassable & unbuildable; A* routes around lakes), and the **real entrance gate** (`Level.ReadEntranceTile` from `FixedItemInfo.EntranceA/B` — peeps enter/leave through the gate) — all unit-tested |
 | [T-051](T-051-audio-polish.md) | 🟡 Feature | ✅ Core done | Audio polish: **looping ambient bed** (`AmbientHD.sdt` under the music, on its own source) + **persistent `GameSettings`** (JSON, fault-tolerant, clamped) + a **dedicated speech bus** (advisor lines) + an **F10 options overlay with draggable music/SFX/speech sliders** (persist on release; `-`/`+` keys persist too). Unit-tested (`GameSettingsTests`). Per-area ambience selection remains (nice-to-have) |
 | [T-052](T-052-coaster-track-polish.md) | 🟢 Low | ⚠️ Partial | **`.hmp` decoded** — general footprint/height template (cols×rows, per-tile 5×5 code sub-grids, code grid + footprint grid; magic `0x0005AB1E`), used game-wide (coaster/queue/fence/sideshow/upgrade). New `HmpFile` parser, unit-tested + verified on real files. **`.hmp` footprints now drive placement**: new `PlacementFootprint` mask (`Rectangle`/`FromHmp`) + masked `PlacementGrid.CanPlace/TryPlace/Clear` reserving only solid tiles (passable cells stay walkable/buildable), wired through `CommitPlacement` (optional `BuildCatalogItem.HmpPath`), unit-tested (`PlacementFootprintTests`). **Track now banks into its curves** (`CoasterTrack.BankAngle` + a banked sweep frame — the spline realization of per-segment rotation; pure-helper unit-tested, verified in-game on the autoplace loop). Remaining: discrete curved-piece meshes (low value — `.hmp` is a footprint template, not a curve library) |
+
+| [T-053](T-053-ingame-clock.md) | 🟡 Feature | ☐ To do | **In-game clock / time progression** (proposed) — a single day/month/year clock (foundation for challenges/goals/seasons); routes the existing loan "months". Data: `.sam` balance is in days |
+| [T-054](T-054-challenge-system.md) | 🟡 Feature | ☐ To do | **Challenge / scenario system** (proposed) — `Challenges.sam` = 35 typed timed goals + prizes + `FollowupType` chains; scorer RE'd (`GetCurrentChallenge`/`mChallengeOn`). No blockers; needs T-053 |
+| [T-055](T-055-golden-ticket-goals.md) | 🟡 Feature | ☐ To do | **Golden-ticket goals / level objectives** (proposed) — `GoldenTicketLocal.*` targets in `Standard.sam`, `CGoldenTicketControl` RE'd, `P_EFFECT_GoldenTicket` present |
+| [T-056](T-056-weather-seasons.md) | 🟢 Low | ☐ To do | **Weather + seasons** (proposed) — `Seasons[*]`/`Weather.*` in `Standard.sam`, sim fields + `Weather/*.tga` RE'd; rain/snow overlay + fog tint |
+| [T-057](T-057-minimap.md) | 🟢 Low | ☐ To do | **Minimap (2dmap)** (proposed) — `data/2dmap/` 6 category sprites + index; sprite/UI infra exists |
+| [T-058](T-058-sideshow-rides.md) | 🟢 Low | ☐ To do | **Sideshow rides** (proposed) — 5 `sideshow/*.wad` per level, ride engine reusable; `SideshowTakings`/`EventSideshowWin` stubs exist |
+| [T-059](T-059-save-load.md) | 🟡 Feature | ☐ To do | **Save / load games** (proposed) — `.TPWS` container RE'd; 17 `SAD_*` payload modules RE'd. Route A: native save (no blockers); Route B: original-save compat (needs a sample) |
+| [T-060](T-060-peep-decision-scorer.md) | 🟡 Feature | ☐ To do | **Peep ride-choice scorer** (proposed) — authored `DecisionVar*` weight vector + "option score" scorer RE'd; replaces the excitement-only heuristic |
 
 Priority legend: 🔴 blocking · 🟠 important · 🟡 desirable/feature · ⚪ technical debt/polish.
 Status legend: ✅ done · ⚠️ partial · ☐ to do · 🗂️ split into focused tickets · ⏸️ deferred.
