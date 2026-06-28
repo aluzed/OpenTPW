@@ -154,7 +154,7 @@ public sealed class RideEngine : IRideEngine
 				Log.Warning( $"[ride] SPAWNSOUND '{name}' not found in RideHD" );
 				return;
 			}
-			Audio.PlaySfx( $"ride_{track.Name}", track.SoundData );
+			Audio.PlaySfx3D( $"ride_{track.Name}", track.SoundData, LightPosition( SelfId ) ); // ride-positioned (T-047)
 			Log.Info( $"[ride] SPAWNSOUND '{name}' -> {track.Name}" );
 		}
 		catch ( Exception e )
@@ -384,10 +384,10 @@ public sealed class RideEngine : IRideEngine
 			return;
 		if ( EventDebounced( $"snd:{category}:{code}" ) )
 			return;
-		// The node world position is resolved (T-048) so positional playback can use it once the audio
-		// bus is 3D; the current mixer is 2D, so it's recorded rather than spatialised.
+		// Play the category sound at the addressed node's world position (T-048 resolver) through the 3D
+		// audio bus (T-047), so it pans + attenuates from the moving car/seat or footprint node.
 		var pos = NodePosition( node );
-		Audio.PlaySfx( $"ev_{track.Name}", track.SoundData );
+		Audio.PlaySfx3D( $"ev_{track.Name}", track.SoundData, pos );
 		Log.Trace( $"[ride] EVENT t{type} cat={category} code={code} node={node}@{pos} -> {track.Name}" );
 	}
 
@@ -775,7 +775,7 @@ public sealed class RideEngine : IRideEngine
 				return;
 
 			var track = peepSounds.soundFiles[screamIndices[Random.Shared.Next( screamIndices.Length )]];
-			Audio.PlaySfx( $"scream_{track.Name}", track.SoundData, gain );
+			Audio.PlaySfx3D( $"scream_{track.Name}", track.SoundData, LightPosition( SelfId ), gain ); // riders at the ride (T-047)
 			Log.Info( $"[ride] scream -> {track.Name}" );
 		}
 		catch ( Exception e )

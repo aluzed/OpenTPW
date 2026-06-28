@@ -5,12 +5,10 @@
 - **Status**: ⚠️ Mostly done — the "7 particle pools / per-pool library" model was **wrong** (single
   particle library; the pools are **sound categories** in a unified effect manager), and the EVENT type
   routing is now **split per that corrected RE**: types 3-4 & 10 → particle, 5-9 → category sounds (each
-  its own `cat_*BANK.map`). **3D node positioning is now wired**: EVENT's `node` operand + REPAIREFFECT/
-  SPARK's node operand resolve through the runtime resolver `RideNodePositions` (T-048), so effects spawn
-  at the addressed node (a moving car/seat, or the footprint layout) instead of the ride centre, and
-  category sounds resolve + record the node position for a future 3D audio bus. Unit-tested. The
-  `COAST`/`BUMP`/`ADDOBJ` sound residue remains, and the audible result is still **display/install-blocked**
-  to confirm end to end.
+  its own `cat_*BANK.map`). **3D node positioning is wired**, and the **positional audio bus now exists**:
+  a camera-tracked OpenAL listener + a world-positioned `PlaySfx3D` pool, so EVENT category sounds play at
+  the addressed node and the ride cycle/scream sounds at the ride — verified in-game (the `cat_ridesBANK`
+  resolves and plays at the node position). Remaining: the `COAST`/`BUMP`/`ADDOBJ` direct-sound residue.
 - **Parent**: [T-037](T-037-ride-cycle-sound.md) (EVENT type switch decoded — this is the residue).
 - **Related**: [T-019](T-019-plb-parameter-fields.md), [T-032](T-032-ride-engine.md), [T-048](T-048-ride-node-geometry-movement.md).
 
@@ -74,12 +72,35 @@ EVENT/effect spawn is wired to it:
   unresolved node falls back to the ride body, so scripts with no decoded node graph are unchanged.
 - Unit-tested (`RideNodePositionsTests`, `RideEngineTests.ParticleOpcodesPassTheirTargetNode`).
 
+## Done (this pass — the 3D positional audio bus)
+
+The node position was already resolved + recorded; the missing layer was a **spatial mixer**. OpenAL is 3D-
+native, so a positional bus dropped in cleanly (`source/OpenTPW/Audio/Audio.cs`):
+
+- **`Audio.PlaySfx3D(key, mpegData, position, gain)`** — a dedicated round-robin source pool whose sources
+  carry a world `AL_POSITION` and attenuate with distance (`ReferenceDistance` 40, `MaxDistance` 700,
+  `RolloffFactor` 1, inverse-distance-clamped). Shares the existing decode/buffer cache (refactored into
+  `TryGetBuffer`).
+- **`Audio.UpdateListener()`** — moves the listener (position + forward/up orientation) onto the camera every
+  frame, wired in the main loop (`Render.OnUpdate += Audio.UpdateListener`). So positioned sounds pan + fade
+  as the view orbits/moves.
+- **2D sounds stay 2D**: music, the ambient bed, and the 2D SFX pool are made **head-relative**
+  (`SourceRelative = true`, origin) at init, so moving the listener never pans or fades them — only the 3D
+  pool is spatialised.
+- **Ride sounds now spatialised** through it: EVENT category sounds at the addressed **node** position
+  (`PlayEventSound` → the T-048 resolver), and the ride **cycle sound** (`SPAWNSOUND`) + rider **screams** at
+  the ride body position (`LightPosition(SelfId)`).
+- **Verified in-game** (real jungle assets, `OPENTPW_AUTOPLACE`): `OpenAL audio initialized`, then
+  `EVENT t2 cat=rides code=22 node=1@(526, 278, 0) -> nl_creak_5.mp2` (the `cat_ridesBANK.map` resolves the
+  code and the sound plays at the node world position via the 3D bus) plus positioned screams
+  (`myell4`/`screemboy003`/`whoop002`); 0 listener/3D-SFX warnings, 0 exceptions. Closes remaining #1 and the
+  audible-path half of #3 (the split routes correctly and the category bank actually resolves + plays).
+
 ## Remaining
 
-1. **3D audio**: the node position is resolved + recorded for sounds, but the mixer is 2D — spatialised
-   playback waits on a positional audio bus.
-2. **`COAST`/`BUMP`/`ADDOBJ` sound residue** (their direct sound triggers, e.g. `FUN_00473270` in BUMP).
-3. End-to-end audible verify of the 3-4-vs-5-9 split once the renderer/display is back.
+1. **`COAST`/`BUMP`/`ADDOBJ` sound residue** (their direct sound triggers, e.g. `FUN_00473270` in BUMP).
+2. A finer pass on the 3-4-vs-5-9 split's *audible* character (e.g. per-category gain/reverb buses) and on
+   positioning the scream at the moving car/seat node rather than the ride body.
 
 ## Acceptance criteria
 
@@ -89,6 +110,8 @@ EVENT/effect spawn is wired to it:
 
 ## Affected files
 
-`source/OpenTPW/World/Rides/RideEngine.cs`, `RideNodePositions.cs` (new), `IRideEngine.cs`,
-`source/OpenTPW/VM/Handlers/Particles.cs`, `source/OpenTPW/World/Ride.cs`/`Level.cs`,
+`source/OpenTPW/Audio/Audio.cs` (3D bus: `PlaySfx3D`/`UpdateListener`/`TryGetBuffer`/head-relative 2D pool),
+`source/OpenTPW/Client/Game.cs` (listener wired into the loop),
+`source/OpenTPW/World/Rides/RideEngine.cs` (EVENT/cycle/scream → `PlaySfx3D`), `RideNodePositions.cs` (new),
+`IRideEngine.cs`, `source/OpenTPW/VM/Handlers/Particles.cs`, `source/OpenTPW/World/Ride.cs`/`Level.cs`,
 `source/OpenTPW.Files/Formats/Particle/ParticleLibraryFile.cs`.

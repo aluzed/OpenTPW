@@ -167,6 +167,7 @@ internal static class Game
 		// Run game loop
 		//
 		Render.OnUpdate += level.Update;
+		Render.OnUpdate += Audio.UpdateListener; // keep the 3D-audio listener on the camera (T-047)
 		Render.OnRender += level.Render;
 		Render.Run();
 	}

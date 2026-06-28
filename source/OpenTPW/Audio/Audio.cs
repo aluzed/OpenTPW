@@ -42,6 +42,17 @@ internal static unsafe class Audio
 	private static int sfxNext;
 	private static readonly Dictionary<string, uint> sfxBuffers = new();
 
+	// 3D positional bus (T-047): a dedicated round-robin pool whose sources carry a world AL_POSITION and
+	// attenuate with distance from the listener (which tracks the camera each frame, UpdateListener). The
+	// music / ambient / speech + 2D SFX sources are made head-relative at init, so moving the listener never
+	// pans or fades them — only these 3D sources are spatialised. Shares the sfxBuffers decode cache.
+	private const int Sfx3dSourceCount = 8;
+	private static readonly uint[] sfx3dSources = new uint[Sfx3dSourceCount];
+	private static int sfx3dNext;
+	private const float RefDistance = 40f;    // world units within which a 3D sound is at full volume
+	private const float MaxDistance = 700f;   // past this, no further attenuation
+	private const float RolloffFactor = 1f;   // attenuation steepness
+
 	private static bool triedInit;
 	private static bool available;
 
@@ -112,17 +123,8 @@ internal static unsafe class Audio
 
 		try
 		{
-			if ( !sfxBuffers.TryGetValue( key, out var buffer ) )
-			{
-				if ( !TryDecode( mpegData, out var pcm, out var sampleRate, out var channels ) || pcm.Length == 0 )
-					return;
-
-				buffer = al.GenBuffer();
-				var fmt = channels >= 2 ? BufferFormat.Stereo16 : BufferFormat.Mono16;
-				fixed ( short* data = pcm )
-					al.BufferData( buffer, fmt, data, pcm.Length * sizeof( short ), sampleRate );
-				sfxBuffers[key] = buffer;
-			}
+			if ( !TryGetBuffer( key, mpegData, out var buffer ) )
+				return;
 
 			var src = sfxSources[sfxNext];
 			sfxNext = ( sfxNext + 1 ) % SfxSourceCount;
@@ -135,6 +137,81 @@ internal static unsafe class Audio
 		catch ( Exception e )
 		{
 			Log.Warning( $"SFX playback failed: {e.Message}" );
+		}
+	}
+
+	// Decode (once, cached by key) an MPEG buffer into an OpenAL buffer handle. Returns false on decode
+	// failure / empty PCM. Caller must hold the device (EnsureInitialized).
+	private static bool TryGetBuffer( string key, byte[] mpegData, out uint buffer )
+	{
+		if ( sfxBuffers.TryGetValue( key, out buffer ) )
+			return true;
+
+		if ( !TryDecode( mpegData, out var pcm, out var sampleRate, out var channels ) || pcm.Length == 0 )
+		{
+			buffer = 0;
+			return false;
+		}
+
+		buffer = al.GenBuffer();
+		var fmt = channels >= 2 ? BufferFormat.Stereo16 : BufferFormat.Mono16;
+		fixed ( short* data = pcm )
+			al.BufferData( buffer, fmt, data, pcm.Length * sizeof( short ), sampleRate );
+		sfxBuffers[key] = buffer;
+		return true;
+	}
+
+	/// <summary>
+	/// Plays a one-shot sound effect positioned at a world point (T-047): same decode caching as
+	/// <see cref="PlaySfx"/>, but on the dedicated 3D source pool, so it pans + attenuates relative to the
+	/// listener (the camera). Rides the <see cref="SfxVolume"/> bus. No device → silent no-op.
+	/// </summary>
+	public static void PlaySfx3D( string key, byte[] mpegData, Vector3 position, float gain = -1f )
+	{
+		if ( !EnsureInitialized() )
+			return;
+
+		try
+		{
+			if ( !TryGetBuffer( key, mpegData, out var buffer ) )
+				return;
+
+			var src = sfx3dSources[sfx3dNext];
+			sfx3dNext = ( sfx3dNext + 1 ) % Sfx3dSourceCount;
+
+			al.SourceStop( src );
+			al.SetSourceProperty( src, SourceInteger.Buffer, (int)buffer );
+			al.SetSourceProperty( src, SourceFloat.Gain, gain < 0f ? sfxVolume : Math.Clamp( gain, 0f, 1f ) * sfxVolume );
+			al.SetSourceProperty( src, SourceVector3.Position, position.X, position.Y, position.Z );
+			al.SourcePlay( src );
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( $"3D SFX playback failed: {e.Message}" );
+		}
+	}
+
+	/// <summary>
+	/// Moves the 3D-audio listener to the camera each frame (T-047): position + orientation (forward/up), so
+	/// positioned effects (<see cref="PlaySfx3D"/>) pan and fade as the view moves. No device → no-op.
+	/// </summary>
+	public static void UpdateListener()
+	{
+		if ( !available )
+			return;
+
+		try
+		{
+			var p = Camera.Position;
+			var fwd = Camera.Rotation.Forward;
+			var up = Camera.Rotation.Up;
+			al.SetListenerProperty( ListenerVector3.Position, p.X, p.Y, p.Z );
+			float* orientation = stackalloc float[6] { fwd.X, fwd.Y, fwd.Z, up.X, up.Y, up.Z };
+			al.SetListenerProperty( ListenerFloatArray.Orientation, orientation );
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( $"Listener update failed: {e.Message}" );
 		}
 	}
 
@@ -264,6 +341,13 @@ internal static unsafe class Audio
 		}
 	}
 
+	// Pin a source to the listener (head-relative, at the origin) so the 3D listener never affects it.
+	private static void MakeHeadRelative( uint src )
+	{
+		al.SetSourceProperty( src, SourceBoolean.SourceRelative, true );
+		al.SetSourceProperty( src, SourceVector3.Position, 0f, 0f, 0f );
+	}
+
 	private static bool EnsureInitialized()
 	{
 		if ( triedInit )
@@ -289,6 +373,23 @@ internal static unsafe class Audio
 			ambientSource = al.GenSource();
 			for ( var i = 0; i < SfxSourceCount; i++ )
 				sfxSources[i] = al.GenSource();
+
+			// Music / ambient / 2D SFX are head-relative: pinned to the listener at the origin so moving the
+			// 3D listener (UpdateListener) never pans or fades them — only the 3D pool below is spatialised.
+			MakeHeadRelative( musicSource );
+			MakeHeadRelative( ambientSource );
+			for ( var i = 0; i < SfxSourceCount; i++ )
+				MakeHeadRelative( sfxSources[i] );
+
+			// 3D positional pool (T-047): world-positioned, distance-attenuated sources for ride effects/sounds.
+			for ( var i = 0; i < Sfx3dSourceCount; i++ )
+			{
+				var src = sfx3dSources[i] = al.GenSource();
+				al.SetSourceProperty( src, SourceBoolean.SourceRelative, false );
+				al.SetSourceProperty( src, SourceFloat.ReferenceDistance, RefDistance );
+				al.SetSourceProperty( src, SourceFloat.MaxDistance, MaxDistance );
+				al.SetSourceProperty( src, SourceFloat.RolloffFactor, RolloffFactor );
+			}
 
 			// Adopt the persisted volume buses (T-051) so the first sound already plays at the player's
 			// saved levels rather than the hardcoded defaults.
