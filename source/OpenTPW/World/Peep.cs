@@ -599,13 +599,15 @@ public sealed class Peep : ModelEntity
 		if ( candidates.Count == 0 )
 			candidates = queues.ToList();
 
-		// Weight by the ride's live rating (its reputation), not raw excitement — a well-rated ride draws
-		// more peeps, a poorly-rated (overpriced/unreliable) one fewer (T-050).
-		int Weight( RideQueue q ) => Math.Max( 1, (int)q.Ride.Rating );
-		int roll = Random.Shared.Next( candidates.Sum( Weight ) );
-		route = candidates[^1];
-		foreach ( var q in candidates )
-			if ( ( roll -= Weight( q ) ) < 0 ) { route = q; break; }
+		// Score each ride by the authored weighted-utility scorer — excitement vs distance vs queue length
+		// (T-060) — then pick one weighted by score (so a better ride draws more peeps, but not all of them).
+		var w = RideChoiceScorer.Weights;
+		var scores = candidates
+			.Select( q => RideChoiceScorer.Score(
+				new RideOption( q.Ride.Excitement, Position.Distance( q.Ride.Position ), q.LineLength, IsNew: false ), w ) )
+			.ToList();
+		int idx = RideChoiceScorer.ChooseWeighted( scores, (float)Random.Shared.NextDouble() );
+		route = idx >= 0 ? candidates[idx] : candidates[^1];
 
 		lastRoute = route;
 		route.Enqueue( this );

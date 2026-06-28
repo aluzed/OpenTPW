@@ -86,6 +86,10 @@ public class Level
 		// Centre the placement grid on the terrain's dense centroid (robust to stray distant meshes).
 		var standard = new SettingsFile( "/levels/jungle/Standard.sam" );
 
+		// Peep ride-choice weights (T-060): the authored DecisionVar* weights drive which ride peeps pick.
+		try { RideChoiceScorer.Weights = DecisionWeights.Load( new SettingsFile( "/levels/Standard.sam" ) ); }
+		catch ( Exception e ) { Log.Warning( $"[peep] decision weights load failed: {e.Message}" ); }
+
 		// Golden-ticket goals (T-055): the level win condition; re-evaluate daily, award once all are met.
 		var goals = new GoldenTicketGoals( GoldenTicketTargets.ParseLocal( standard ) );
 		GoldenTicketGoals.Current = goals;

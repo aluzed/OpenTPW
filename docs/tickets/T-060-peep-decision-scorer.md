@@ -2,7 +2,13 @@
 
 - **Priority**: 🟡 Feature (simulation fidelity)
 - **Type**: Engine / RE
-- **Status**: ☐ To do (proposed — RE recon done; **weight vector + scorer identified in the binary**)
+- **Status**: ⚠️ Core done — the authored `PeepInfo.DecisionVar*` weights load from `levels/Standard.sam`
+  (`DecisionWeights`); a pure `RideChoiceScorer` scores each ride by excitement vs distance vs queue length
+  (+ a new-ride bonus), and `Peep.PickRoute` now picks a ride **weighted by that score** instead of the
+  excitement/rating-only heuristic. 6 unit tests; verified in-game (weights load, peeps choose + ride, 0
+  exceptions). **Remaining (polish)**: per-peep *preferred-excitement* match (`PeepTypes[*].PreferredExcitement`)
+  + the new-ride bonus needs ride-age tracking (in-scorer but `IsNew=false` for now); the need weights
+  (thirst/hunger/…) steer shop choice, not rides.
 - **Related**: [T-034](T-034-peeps.md)/[T-050](T-050-peep-simulation-depth.md) (peep sim — currently uses a
   simpler excitement-weighted choice).
 
