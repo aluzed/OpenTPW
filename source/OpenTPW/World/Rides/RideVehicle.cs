@@ -50,6 +50,14 @@ public sealed class RideVehicle : Entity
 	private float carAnimT;
 	private const float CarAnimFps = 6f;
 
+	// Dodgem collision sound (T-047): the original BUMP branch plays a knock on each car-vs-car hit
+	// (FUN_00473270). The arena sim (CarSim) already resolves those collisions, so a real knock spawns a
+	// positioned bump sound through the 3D audio bus, rate-limited so a pile-up doesn't machine-gun the clip.
+	private float lastBumpAt = float.NegativeInfinity;
+	private const float BumpCooldown = 0.12f; // min seconds between bump sounds
+	private static byte[]? bumpClip;
+	private static bool bumpClipLoaded;
+
 	public RideVehicle( Ride ride, float tileSize, ParkTerrain terrain )
 	{
 		this.ride = ride;
@@ -202,7 +210,10 @@ public sealed class RideVehicle : Entity
 	private void UpdateArena()
 	{
 		if ( DemoAllCars || (ride.Riders > 0 && !ride.IsBroken) )
+		{
 			carSim!.Step( Time.Delta );
+			PlayBumps();
+		}
 
 		car.Position = Offscreen; // no lead car in bumper mode
 
@@ -237,6 +248,51 @@ public sealed class RideVehicle : Entity
 				seats[i].Position = Offscreen;
 			}
 		}
+	}
+
+	// Play a positioned bump sound for the strongest car-vs-car knock this frame (rate-limited). The impact's
+	// local-arena point maps to world like the cars do, and the closing speed scales the gain so a hard hit
+	// is louder. Routed through the 3D audio bus (T-047), so it pans from where the dodgems actually collide.
+	private void PlayBumps()
+	{
+		var hits = carSim!.Impacts;
+		if ( hits.Count == 0 || Time.Now - lastBumpAt < BumpCooldown )
+			return;
+
+		var strongest = hits[0];
+		for ( int i = 1; i < hits.Count; i++ )
+			if ( hits[i].Speed > strongest.Speed )
+				strongest = hits[i];
+
+		var clip = BumpClip();
+		if ( clip == null )
+			return;
+
+		var ctr = ride.Position;
+		float wx = ctr.X + strongest.Pos.X, wy = ctr.Y + strongest.Pos.Y;
+		var world = new Vector3( wx, wy, 0 ).WithZ( terrain.SampleHeight( wx, wy ) + 2f );
+		float gain = Math.Clamp( strongest.Speed / 12f, 0.3f, 1f );
+		Audio.PlaySfx3D( "ride_bump_crunch", clip, world, gain );
+		lastBumpAt = Time.Now;
+	}
+
+	// The dodgem collision clip (Crunch.mp2 from the global RideHD) — loaded once, shared across all bumpers.
+	// (Crunch is exactly the knock the original plays on a bump; it was only "wrong" when misused as an
+	// ADDOBJ object sound — see RideEngine.SpawnObject.)
+	private static byte[]? BumpClip()
+	{
+		if ( bumpClipLoaded )
+			return bumpClip;
+		bumpClipLoaded = true;
+		try
+		{
+			var path = Path.Join( GameDir.GamePath, "data", "global", "sound", "RideHD.sdt" );
+			if ( File.Exists( path ) )
+				bumpClip = new SdtArchive( path ).soundFiles
+					.FirstOrDefault( f => f.Name.StartsWith( "Crunch", StringComparison.OrdinalIgnoreCase ) )?.SoundData;
+		}
+		catch ( Exception e ) { Log.Warning( $"[ride] bump sound load failed: {e.Message}" ); }
+		return bumpClip;
 	}
 
 	// A closed loop tracing the ride's authored footprint perimeter (its .sam shape), pulled slightly

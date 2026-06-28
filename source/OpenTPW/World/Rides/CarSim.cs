@@ -28,6 +28,19 @@ public sealed class CarSim
 		public float Heading;
 	}
 
+	/// <summary>A car-vs-car bump resolved this <see cref="Step"/>: the local-arena contact point + the
+	/// closing speed along the contact normal (the impact strength — drives the bump sound's gain, T-047).</summary>
+	public readonly record struct Impact( SVec2 Pos, float Speed );
+
+	// Min closing speed (world units/s) for a pair to count as an audible bump — filters cars merely resting
+	// against each other or drifting apart, so only real knocks fire a sound.
+	private const float ImpactSpeed = 2f;
+
+	private readonly List<Impact> impacts = new();
+
+	/// <summary>The car-vs-car bumps resolved in the most recent <see cref="Step"/> (cleared each step).</summary>
+	public IReadOnlyList<Impact> Impacts => impacts;
+
 	private static readonly Random Shared = new();
 
 	private readonly Car[] cars;
@@ -70,6 +83,8 @@ public sealed class CarSim
 	{
 		if ( dt <= 0f )
 			return;
+
+		impacts.Clear();
 
 		for ( int i = 0; i < cars.Length; i++ )
 		{
@@ -129,6 +144,13 @@ public sealed class CarSim
 				// Reflect each car's velocity component along the normal (swap of normal momentum, damped).
 				float vi = SVec2.Dot( cars[i].Vel, n );
 				float vj = SVec2.Dot( cars[j].Vel, n );
+
+				// Closing speed along the normal (vi pushes toward j, vj away): a real knock, not resting
+				// contact, records a bump at the contact midpoint for the sound layer (T-047).
+				float closing = vi - vj;
+				if ( closing > ImpactSpeed )
+					impacts.Add( new Impact( (cars[i].Pos + cars[j].Pos) * 0.5f, closing ) );
+
 				cars[i].Vel += n * (vj - vi) * 0.8f;
 				cars[j].Vel += n * (vi - vj) * 0.8f;
 			}

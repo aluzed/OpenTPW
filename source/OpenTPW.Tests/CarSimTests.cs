@@ -75,4 +75,49 @@ public class CarSimTests
 		Assert.IsTrue( sim.Cars[0].Pos.X <= 5f + 1e-3f, "clamped inside the right wall" );
 		Assert.IsTrue( sim.Cars[0].Vel.X <= 0f, "velocity reversed off the wall (heading back inward)" );
 	}
+
+	[TestMethod]
+	public void HardCollisionRecordsAnImpact()
+	{
+		// Two cars closing head-on (each targeting far past the other) collide → one bump at the midpoint (T-047).
+		var sim = new CarSim( 2, 20f, 20f, radius: 2f, speed: 14f, rng: Cycle( 0.5f ) );
+		sim.PlaceForTest( 0, new SVec2( -1.5f, 0f ), new SVec2( 50f, 0f ) );  // driving +X toward car 1
+		sim.PlaceForTest( 1, new SVec2( 1.5f, 0f ), new SVec2( -50f, 0f ) );  // driving -X toward car 0
+
+		sim.Step( 0.1f );
+
+		Assert.AreEqual( 1, sim.Impacts.Count, "a head-on knock records one impact" );
+		Assert.IsTrue( sim.Impacts[0].Speed > 2f, $"closing speed above the audible threshold ({sim.Impacts[0].Speed})" );
+		Assert.AreEqual( 0f, sim.Impacts[0].Pos.X, 0.7f, "impact near the contact midpoint" );
+	}
+
+	[TestMethod]
+	public void RestingContactDoesNotBump()
+	{
+		// Two overlapping but motionless cars (speed 0, sitting on their targets) bounce apart geometrically
+		// but record NO impact — only a real closing knock fires a sound.
+		var sim = new CarSim( 2, 20f, 20f, radius: 2f, speed: 0f, rng: Cycle( 0.5f ) );
+		sim.PlaceForTest( 0, new SVec2( 0f, 0f ), new SVec2( 0f, 0f ) );
+		sim.PlaceForTest( 1, new SVec2( 1f, 0f ), new SVec2( 1f, 0f ) );
+
+		sim.Step( 0.1f );
+
+		Assert.AreEqual( 0, sim.Impacts.Count, "resting contact is not an audible bump" );
+	}
+
+	[TestMethod]
+	public void ImpactsClearBetweenSteps()
+	{
+		var sim = new CarSim( 2, 20f, 20f, radius: 2f, speed: 14f, rng: Cycle( 0.5f ) );
+		sim.PlaceForTest( 0, new SVec2( -1.5f, 0f ), new SVec2( 50f, 0f ) );
+		sim.PlaceForTest( 1, new SVec2( 1.5f, 0f ), new SVec2( -50f, 0f ) );
+		sim.Step( 0.1f );
+		Assert.AreEqual( 1, sim.Impacts.Count );
+
+		// Pull them far apart so the next step has no collision → the impact list is cleared.
+		sim.PlaceForTest( 0, new SVec2( -15f, 0f ), new SVec2( -15f, 0f ) );
+		sim.PlaceForTest( 1, new SVec2( 15f, 0f ), new SVec2( 15f, 0f ) );
+		sim.Step( 0.1f );
+		Assert.AreEqual( 0, sim.Impacts.Count, "impacts are recomputed each step, not accumulated" );
+	}
 }

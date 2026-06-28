@@ -96,9 +96,29 @@ native, so a positional bus dropped in cleanly (`source/OpenTPW/Audio/Audio.cs`)
   (`myell4`/`screemboy003`/`whoop002`); 0 listener/3D-SFX warnings, 0 exceptions. Closes remaining #1 and the
   audible-path half of #3 (the split routes correctly and the category bank actually resolves + plays).
 
+## Done (this pass — the BUMP collision sound)
+
+The `BUMP` branch's direct sound trigger (`FUN_00473270` — the dodgem knock) is now wired, riding the new 3D
+bus. The arena sim (`CarSim`) already resolves the car-vs-car collisions, so the sound falls out of the
+existing physics:
+
+- **`CarSim` exposes impacts**: `ResolveCollisions` now records an `Impact { localPos, closingSpeed }` for
+  each pair whose **closing speed** along the contact normal exceeds a threshold (so resting/grazing contact
+  doesn't fire) — cleared each `Step`, so they're per-frame. Unit-tested (`HardCollisionRecordsAnImpact`,
+  `RestingContactDoesNotBump`, `ImpactsClearBetweenSteps`).
+- **`RideVehicle` plays the knock**: after stepping the arena it takes the **strongest** impact that frame,
+  maps its local point to world (as the cars are), and plays **`Crunch.mp2`** (the global RideHD clip — the
+  knock the original uses; it was only "wrong" when misused as an ADDOBJ object sound) through `PlaySfx3D` at
+  that point, **gain scaled by impact strength**, rate-limited (`BumpCooldown` 0.12 s) so a pile-up doesn't
+  machine-gun the clip.
+- **Verified in-game** (`OPENTPW_BUMPER_DEMO=1`): a temporary diagnostic logged **129 positioned bumps over
+  40 s** at real arena coordinates (X≈460–466), gain tracking strength (`speed 4.7→0.41`, `26.9→1.00`),
+  debounced to ≤ ~3/s; OpenAL initialised, 0 exceptions. Diagnostic reverted.
+
 ## Remaining
 
-1. **`COAST`/`BUMP`/`ADDOBJ` sound residue** (their direct sound triggers, e.g. `FUN_00473270` in BUMP).
+1. **`COAST`/`ADDOBJ` sound residue**: COAST's direct triggers + the ADDOBJ object-sound binding (needs the
+   `.MAP`/EventMap code→asset catalog — T-016/T-032).
 2. A finer pass on the 3-4-vs-5-9 split's *audible* character (e.g. per-category gain/reverb buses) and on
    positioning the scream at the moving car/seat node rather than the ride body.
 
@@ -112,6 +132,8 @@ native, so a positional bus dropped in cleanly (`source/OpenTPW/Audio/Audio.cs`)
 
 `source/OpenTPW/Audio/Audio.cs` (3D bus: `PlaySfx3D`/`UpdateListener`/`TryGetBuffer`/head-relative 2D pool),
 `source/OpenTPW/Client/Game.cs` (listener wired into the loop),
+`source/OpenTPW/World/Rides/CarSim.cs` (`Impact`/`Impacts`), `RideVehicle.cs` (`PlayBumps` → positioned bump
+sound), `source/OpenTPW.Tests/CarSimTests.cs` (impact tests),
 `source/OpenTPW/World/Rides/RideEngine.cs` (EVENT/cycle/scream → `PlaySfx3D`), `RideNodePositions.cs` (new),
 `IRideEngine.cs`, `source/OpenTPW/VM/Handlers/Particles.cs`, `source/OpenTPW/World/Ride.cs`/`Level.cs`,
 `source/OpenTPW.Files/Formats/Particle/ParticleLibraryFile.cs`.
