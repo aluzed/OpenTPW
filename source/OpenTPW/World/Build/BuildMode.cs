@@ -68,6 +68,7 @@ public sealed class BuildMode : Entity
 		{
 			s.Fire();
 			SelectedStaff = null;
+			movingStaff = null;
 		}
 	}
 
@@ -87,6 +88,16 @@ public sealed class BuildMode : Entity
 
 	/// <summary>Lift the selected staff member's patrol zone (back to free roam). T-049.</summary>
 	public void ClearSelectedStaffZone() => SelectedStaff?.ClearPatrolZone();
+
+	// A staffer picked up to be re-placed: the next click on a tile relocates it there (T-043).
+	private Staff? movingStaff;
+
+	/// <summary>True while a selected staffer is being moved — the next tile click drops it (T-043).</summary>
+	public bool IsMovingStaff => movingStaff != null;
+
+	/// <summary>Pick up the selected staffer to relocate it: the next valid click moves it (T-043). Toggles
+	/// off if already moving.</summary>
+	public void BeginMoveSelectedStaff() => movingStaff = movingStaff == null ? SelectedStaff : null;
 
 	/// <summary>Sell/demolish the selected ride or shop: refunds part of its cost and tears it out of the
 	/// park (T-041). No-op if nothing is selected. Exposed for the manage UI + the Delete shortcut.</summary>
@@ -262,6 +273,15 @@ public sealed class BuildMode : Entity
 
 		if ( Input.MouseLeftPressed )
 		{
+			// Re-placing a picked-up staffer: this click drops it on the hovered tile instead of selecting (T-043).
+			if ( movingStaff is { } ms )
+			{
+				ms.Relocate( c.WithZ( 0 ) );
+				Log.Info( $"[build] moved {ms.Role} to ({tx},{ty})" );
+				movingStaff = null;
+				return;
+			}
+
 			SelectedRide = Entity.All.OfType<Ride>().FirstOrDefault( r => r.Covers( tx, ty ) );
 			SelectedShop = SelectedRide == null ? Shop.Stalls.FirstOrDefault( s => s.Covers( tx, ty ) ) : null;
 			// Staff have no footprint, so pick the nearest one to the clicked point (T-049). A ride/shop

@@ -92,16 +92,20 @@ internal sealed class ManagePanel : HudPanel
 		{
 			bool zoned = staff.HasPatrolZone;
 			float radius = staff.Zone?.Radius ?? 0f;
-			list.Add( new Btn( new Rectangle( 16f, RideY, 64f, BtnH ), "FIRE", true,
+			bool moving = BuildMode.Current?.IsMovingStaff == true;
+			list.Add( new Btn( new Rectangle( 16f, RideY, 52f, BtnH ), "FIRE", true,
 				() => BuildMode.Current?.FireSelectedStaff(), Warned: true ) );
-			list.Add( new Btn( new Rectangle( 84f, RideY, 56f, BtnH ), "ZONE-", zoned,
+			// MOVE picks the staffer up; while armed it reads CLICK and the next tile click drops them (T-043).
+			list.Add( new Btn( new Rectangle( 72f, RideY, 70f, BtnH ), moving ? "DROP" : "MOVE", true,
+				() => BuildMode.Current?.BeginMoveSelectedStaff() ) );
+			list.Add( new Btn( new Rectangle( 146f, RideY, 48f, BtnH ), "ZONE-", zoned,
 				() => BuildMode.Current?.AdjustSelectedStaffZone( -1 ) ) );
-			list.Add( new Btn( new Rectangle( 144f, RideY, 156f, BtnH ),
-				zoned ? $"ZONE r{radius:0} (re-set)" : "SET ZONE HERE", true,
+			list.Add( new Btn( new Rectangle( 198f, RideY, 116f, BtnH ),
+				zoned ? $"ZONE r{radius:0}" : "SET ZONE", true,
 				() => BuildMode.Current?.SetSelectedStaffZoneHere() ) );
-			list.Add( new Btn( new Rectangle( 304f, RideY, 56f, BtnH ), "ZONE+", true,
+			list.Add( new Btn( new Rectangle( 318f, RideY, 48f, BtnH ), "ZONE+", true,
 				() => BuildMode.Current?.AdjustSelectedStaffZone( +1 ) ) );
-			list.Add( new Btn( new Rectangle( 364f, RideY, 88f, BtnH ), "FREE ROAM", zoned,
+			list.Add( new Btn( new Rectangle( 370f, RideY, 84f, BtnH ), "FREE ROAM", zoned,
 				() => BuildMode.Current?.ClearSelectedStaffZone() ) );
 		}
 		return list;

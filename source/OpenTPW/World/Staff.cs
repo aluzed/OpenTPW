@@ -71,7 +71,7 @@ public sealed class Staff : ModelEntity
 	private readonly StaffRole role;
 	public StaffRole Role => role;
 	private readonly ParkTerrain terrain;
-	private readonly Vector3 center;
+	private Vector3 center; // wander/roam centre — moves when the player relocates this staffer (T-043)
 	private readonly float roam;
 	private readonly float speed;
 	private Vector3 target;
@@ -95,6 +95,18 @@ public sealed class Staff : ModelEntity
 
 	/// <summary>Lift the patrol zone: the staff member returns to roaming the whole park.</summary>
 	public void ClearPatrolZone() => zone = null;
+
+	/// <summary>Move this staff member to <paramref name="pos"/> (T-043): re-anchor its wander centre there,
+	/// teleport it onto the ground, re-target, and carry its patrol zone along (keeping the radius) so a zoned
+	/// staffer relocates zone-and-all instead of immediately walking back.</summary>
+	public void Relocate( Vector3 pos )
+	{
+		center = pos.WithZ( 0 );
+		if ( zone is { } z )
+			zone = z with { Center = center };
+		Position = pos.WithZ( terrain.SampleHeight( pos.X, pos.Y ) );
+		target = PickWanderTarget();
+	}
 
 	// The effective wander area: the patrol zone if one is set, else the spawn centre + roam radius.
 	private (Vector3 Center, float Radius) WanderArea => zone is { } z ? (z.Center, z.Radius) : (center, roam);

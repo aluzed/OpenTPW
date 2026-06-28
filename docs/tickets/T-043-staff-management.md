@@ -2,9 +2,9 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Engine / UI
-- **Status**: ✅ Core done — hire (charge cost) + place-on-tile for all four staff types, wages drawn per
-  head, **fire + patrol-zone assignment** (T-049), all verified. Only a pick-up/re-place nicety remains
-  (per-role hire-cost config has no source data in the install — see Remaining).
+- **Status**: ✅ Done — hire (charge cost) + place-on-tile for all staff types, wages per head, **fire +
+  patrol-zone assignment** (T-049), and **pick-up / re-place** (MOVE) all in and verified. (Per-role
+  hire-cost config has no source data in the install — see Remaining.)
 - **Parent**: [T-038](T-038-park-management-ui.md). **Needs**: [T-040](T-040-build-mode-foundation.md).
   **Related**: [T-039](T-039-peep-needs-staff-depth.md).
 
@@ -25,7 +25,11 @@
 
 - ~~**Fire**~~ + ~~**patrol-zone assignment**~~ — done in [T-049](T-049-management-ui-depth.md)
   (`ManagePanel` FIRE / ZONE±/SET-ZONE/FREE-ROAM when a staffer is selected).
-- **Re-place** a placed staffer (pick up + drop elsewhere) — minor nice-to-have.
+- ~~**Re-place** a placed staffer (pick up + drop elsewhere)~~ — **done**: `ManagePanel` has a **MOVE**
+  button on the selected-staff row; it arms a move (`BuildMode.BeginMoveSelectedStaff`, button reads `DROP`)
+  and the next tile click relocates the staffer there (`Staff.Relocate` — re-anchors its wander centre,
+  teleports onto the ground, and carries its patrol zone along, radius kept). Verified in-game (a staffer +
+  its r60 zone relocated +80,+80 with terrain-sampled height, 0 exceptions).
 - ~~hire cost/wage from a real `AllStaffConstants` config~~ — **no source data**: there is no such file in
   the install. The level's `Staff.sam` is the *staff-room object* definition (Info.Id 1411 + upgrades/
   particles), not per-role hire costs/wages (verified by dumping the wad), so the fixed catalog costs +
