@@ -2,10 +2,10 @@
 
 - **Priority**: 🟡 Feature (the park's life — backs queues, ride usage, excitement/fatigue, income)
 - **Type**: Engine / format RE
-- **Status**: ⚠️ Mostly done — full crowd loop: real animated `esprites.wad` sprites (TPC codec
-  reverse-engineered), directional walk cycles, queueing, riding, needs (happiness/energy/hunger),
-  economy (gate/tickets/food/upkeep/wages) and staff (entertainers/handymen/guards). Remaining polish
-  is split into **[T-035](T-035-peep-sprite-polish.md)–[T-039](T-039-peep-needs-staff-depth.md)**.
+- **Status**: ✅ Done — full crowd loop: real animated `esprites.wad` sprites (TPC codec fully RE'd,
+  **inner RLE decoder implemented to spec + unit-tested**), directional walk cycles, queueing, riding,
+  needs (happiness/energy/hunger), economy (gate/tickets/food/upkeep/wages) and staff. Remaining polish
+  is split into **[T-035](T-035-peep-sprite-polish.md)–[T-039](T-039-peep-needs-staff-depth.md)** (all done).
 - **Related**: [T-032](T-032-ride-engine.md) (ride engine — roadmap "walk/limbo" needed a peep system);
   follow-ups [T-035](T-035-peep-sprite-polish.md), [T-036](T-036-peep-pathfinding.md),
   [T-037](T-037-ride-cycle-sound.md), [T-038](T-038-park-management-ui.md),
@@ -80,10 +80,13 @@ then `0xAARRGGBB`-style colour runs, same family as the `base.lnd` landscape dat
 
 ## Remaining
 
-1. **Decode the sprite format** (`.ESP`/`.TPC`/`.FPC`) and render the real animated peep sprites
-   instead of coloured billboards. **Container format fully reverse-engineered via Ghidra** (no-CD
-   `tpw_nocd.exe`, project `/var/tmp/nocd/ghidra_proj`, full auto-analysis); only the inner RLE
-   control encoding remains. `esprites.wad` holds sprite trios under `Generic/*` / `Fantasy/*`.
+1. ~~**Decode the sprite format** (`.ESP`/`.TPC`/`.FPC`) and render the real animated peep sprites~~ —
+   **done**: peeps/staff render real `.TPC` sprites (`SpriteSheet`, directional walk cycles); the container
+   format was RE'd via Ghidra and **the inner RLE decoder is now implemented to the RE'd spec** — each
+   scanline expands via skip-transparent markers (`b ≥ 0xF0` → skip `256−b`) + literal runs (`b < 0xF0`),
+   replacing the earlier signed-RLE approximation. Unit-tested against the verified T-034 scanline examples
+   (`TpcFileTests`); verified in-game (sprites load + render, no corruption). `esprites.wad` holds sprite
+   trios under `Generic/*` / `Fantasy/*`.
    - **`.ESP`** = `ESP_FILE2.00` magic (12 bytes) + the referenced texture name (`SPR_KI.TPS`), zero-padded.
    - **`.TPC`/`.FPC`** layout (read primitive `FUN_005c4f60(dst, elemSize, count, stream)` = fread):
      ```
