@@ -112,7 +112,9 @@ internal sealed class ManagePanel : HudPanel
 	{
 		var rect = new Rectangle( 176f, RideY, 170f, BtnH );
 		if ( ride.IsResearching )
-			return new Btn( rect, $"RESEARCHING {ride.ResearchFraction * 100f:0}%", false, () => { }, Progress: ride.ResearchFraction );
+			return ride.IsResearchActive
+				? new Btn( rect, $"RESEARCHING {ride.ResearchFraction * 100f:0}%", false, () => { }, Progress: ride.ResearchFraction )
+				: new Btn( rect, $"QUEUED #{ride.ResearchQueuePosition}", false, () => { } ); // waiting behind another ride
 		if ( ride.NextResearched )
 			return new Btn( rect, $"UPGRADE ${ride.NextUpgradeCost:0}", fin.CanAfford( ride.NextUpgradeCost ),
 				() => { fin.PayBuild( ride.NextUpgradeCost ); ride.ApplyUpgrade(); }, Warned: true );

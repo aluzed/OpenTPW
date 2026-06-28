@@ -60,6 +60,7 @@ public class Level
 
 		// The park starts with a budget; peeps pay a gate fee + ride tickets, rides cost upkeep (see Ride / Peep).
 		ParkFinances.Current = new ParkFinances( starting: 30000f, entryFee: 10f );
+		ResearchQueue.Reset(); // fresh park-wide research queue for this level (T-044)
 
 		// Centre the placement grid on the terrain's dense centroid (robust to stray distant meshes).
 		var standard = new SettingsFile( "/levels/jungle/Standard.sam" );

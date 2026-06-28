@@ -30,7 +30,15 @@
 - ~~source the research **duration** from the `.sam` (`DurationOfUpgrade`)~~ — **no source data**: dumping a
   ride `.sam` shows `Upgrades[*]` carries `CostOfResearch`/`CostOfUpgrade`/`InitCapacity`/
   `QueueWaitTimeConstant` but **no research-duration key**, so the researcher-seconds constant stands.
-- **Global research queue** across rides (research one at a time park-wide) — a nicety, not started.
+- ~~**Global research queue** across rides~~ — **done**: a park-wide `ResearchQueue` (a pure FIFO-no-dupes
+  `FifoSet<Ride>`) processes **one ride at a time** — `Ride.StartResearch` enqueues, only the queue head
+  advances each frame (`OnUpdate` gates `TickResearch` on `ResearchQueue.Active == this`), completion dequeues
+  and promotes the next, and a sold/demolished ride drops out (`Despawn`). `ManagePanel` shows `RESEARCHING n%`
+  for the active ride and `QUEUED #n` for waiting ones. Reset per level. Replaces every researching ride
+  soaking up the whole research team in parallel. Unit-tested (`FifoSetTests`), verified in-game (rides
+  complete in FIFO order, queue 3→0). 
+
+Nothing actionable remains — research & upgrades are complete.
 
 ## Context
 

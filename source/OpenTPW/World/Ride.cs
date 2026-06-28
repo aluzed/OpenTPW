@@ -45,6 +45,11 @@ public class Ride : Entity
 	public bool NextResearched => ResearchedLevel > UpgradeLevel;
 	public bool IsResearching => researching;
 	public float ResearchFraction => researching ? Math.Clamp( researchProgress / ResearchDuration, 0f, 1f ) : 0f;
+
+	/// <summary>True while this ride is the one the research team is actively working on (the queue head, T-044).</summary>
+	public bool IsResearchActive => researching && ResearchQueue.Active == this;
+	/// <summary>Rides ahead of this one in the research queue (≥1 while waiting; 0 when active/not queued).</summary>
+	public int ResearchQueuePosition => Math.Max( 0, ResearchQueue.Position( this ) );
 	public float NextResearchCost => HasNextLevel ? upgrades[UpgradeLevel + 1].CostResearch : 0f;
 	public float NextUpgradeCost => HasNextLevel ? upgrades[UpgradeLevel + 1].CostUpgrade : 0f;
 
@@ -55,6 +60,7 @@ public class Ride : Entity
 		{
 			researching = true;
 			researchProgress = 0f;
+			ResearchQueue.Enqueue( this ); // join the park-wide queue; only the head actually advances (T-044)
 		}
 	}
 
@@ -69,6 +75,7 @@ public class Ride : Entity
 			ResearchedLevel = UpgradeLevel + 1;
 			researching = false;
 			researchProgress = 0f;
+			ResearchQueue.Dequeue( this ); // done → the next queued ride becomes the active one
 		}
 	}
 
@@ -239,6 +246,7 @@ public class Ride : Entity
 	{
 		if ( VM != null )
 			VM.IsRunning = false;
+		ResearchQueue.Dequeue( this ); // sold/demolished mid-research → drop out of the queue (T-044)
 		engine.Despawn();
 		Track?.Despawn();           // coaster: pylons + ribbon + train (no-op if none)
 		Vehicle?.Despawn();         // car rides: the moving wagon (no-op if none)
@@ -591,7 +599,9 @@ public class Ride : Entity
 		if ( IsBroken && PeriodicDue( ref breakdownFxTimer, Time.Delta, BreakdownFxPeriod ) )
 			engine.PlayBreakdownEffect();
 
-		// Researchers advance any in-progress upgrade research for this ride (T-044).
-		TickResearch( Time.Delta, Staff.ResearcherCount );
+		// Researchers advance only the queue's active ride (one at a time park-wide), so the team concentrates
+		// instead of every researching ride progressing in parallel (T-044).
+		if ( ResearchQueue.Active == this )
+			TickResearch( Time.Delta, Staff.ResearcherCount );
 	}
 }
