@@ -132,6 +132,22 @@ WeatherEffects.QualityForLightningHigh	15
 	}
 
 	[TestMethod]
+	public void ComfortPenaltyIsZeroWhenClearAndWorseInStorms()
+	{
+		Assert.AreEqual( 0f, Weather.ComfortPenaltyPerSec( new WeatherState( WeatherKind.Clear, false ) ), 1e-3f );
+
+		float rain = Weather.ComfortPenaltyPerSec( new WeatherState( WeatherKind.Rain, false ) );
+		float snow = Weather.ComfortPenaltyPerSec( new WeatherState( WeatherKind.Snow, false ) );
+		float storm = Weather.ComfortPenaltyPerSec( new WeatherState( WeatherKind.Rain, true ) );
+
+		Assert.IsTrue( rain > 0f, "rain is uncomfortable" );
+		Assert.IsTrue( snow > rain, "snow is worse than rain" );
+		Assert.IsTrue( storm > rain, "a lightning storm adds extra discomfort" );
+		// A bare Lightning flag with no rain/snow (Clear kind) still reads as clear → no penalty.
+		Assert.AreEqual( 0f, Weather.ComfortPenaltyPerSec( new WeatherState( WeatherKind.Clear, true ) ), 1e-3f );
+	}
+
+	[TestMethod]
 	public void SimRollsFreshWeatherOnTheChangeInterval()
 	{
 		// The manager logs on weather changes; give it a real logger so the static Log isn't null in tests.

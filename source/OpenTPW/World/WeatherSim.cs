@@ -88,6 +88,28 @@ public static class Weather
 		return new WeatherState( kind, lightning );
 	}
 
+	// Happiness lost per second by an exposed (outdoor, not-sheltered) peep, by weather. Tuned against the
+	// other mood penalties (wait 1/s, litter 1.5/s) so bad weather is a steady nudge home, not an instant wipe.
+	private const float RainDiscomfort = 1.5f;
+	private const float SnowDiscomfort = 2.0f;
+	private const float LightningDiscomfort = 1.0f; // extra, on top of rain/snow, during a storm
+
+	/// <summary>How fast the current weather sours an exposed peep's mood (happiness/second). Clear = 0; rain
+	/// and snow each have a base rate, with an extra bite during a lightning storm. Pure — peeps multiply this
+	/// by <c>Time.Delta</c> while outdoors (T-056). Sheltered peeps (riding / under an indoor stall) are exempt.</summary>
+	public static float ComfortPenaltyPerSec( WeatherState state )
+	{
+		float penalty = state.Kind switch
+		{
+			WeatherKind.Rain => RainDiscomfort,
+			WeatherKind.Snow => SnowDiscomfort,
+			_ => 0f,
+		};
+		if ( penalty > 0f && state.Lightning )
+			penalty += LightningDiscomfort;
+		return penalty;
+	}
+
 	/// <summary>Roll a new weather quality for a season. <paramref name="uniform"/> and
 	/// <paramref name="exceptionalRoll"/> are both in [0,1) (the caller supplies the randomness, keeping this
 	/// pure). The roll is the season average ± its tolerance; an "exceptional" roll (chance =

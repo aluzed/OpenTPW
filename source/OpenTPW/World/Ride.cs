@@ -239,6 +239,10 @@ public class Ride : Entity
 	public int SideshowChanceOfLoosing { get; private set; }
 	private readonly Random sideshowRng = new();
 
+	/// <summary>True if this attraction is under cover (<c>UsageInfo.ISIndoors</c>) — peeps shelter here from
+	/// rain/snow, so it draws extra interest in bad weather (T-056/T-058). Most sideshows are indoors.</summary>
+	public bool IsIndoors { get; private set; }
+
 	/// <summary>Run one sideshow play (T-058): roll win/lose against the authored odds and return the park's net
 	/// takings + whether the peep won. The peep-play path calls this; the pure maths live in
 	/// <see cref="SideshowEconomy"/>.</summary>
@@ -347,6 +351,7 @@ public class Ride : Entity
 			Excitement = Math.Max( 1, ReadInt( settings, "UsageInfo.ExcitementLevel", 50 ) );
 			Attraction = ReadInt( settings, "Info.AttractionValue", 25 );
 			TicketPrice = MathF.Max( 1f, MathF.Round( Excitement / 10f ) );
+			IsIndoors = ReadInt( settings, "UsageInfo.ISIndoors", 0 ) != 0; // under cover → shelter in bad weather
 
 			// Sideshow takings (T-058): a stall is pay-to-play with a chance of winning a prize; load its
 			// authored odds and let the play price drive the ticket/price model.

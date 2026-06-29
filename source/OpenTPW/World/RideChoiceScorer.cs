@@ -27,8 +27,8 @@ public readonly record struct DecisionWeights( float Distance, float Queue, floa
 }
 
 /// <summary>One ride a peep is weighing: its excitement (0–100), the world distance to it, how many peeps are
-/// already queued, and whether it's still "new".</summary>
-public readonly record struct RideOption( float Excitement, float Distance, int QueueLength, bool IsNew );
+/// already queued, whether it's still "new", and whether it's an indoor (sheltered) attraction.</summary>
+public readonly record struct RideOption( float Excitement, float Distance, int QueueLength, bool IsNew, bool IsIndoors = false );
 
 /// <summary>
 /// The weighted-utility ride scorer (T-060): the original picks a ride by a score over distance / queue /
@@ -46,8 +46,9 @@ public static class RideChoiceScorer
 	private const float RefQueue = 10f;     // queued peeps that count as a "full" queue penalty
 
 	/// <summary>The desirability of <paramref name="o"/> under <paramref name="w"/> (higher = more appealing;
-	/// can be negative when a ride is far / heavily queued).</summary>
-	public static float Score( RideOption o, DecisionWeights w )
+	/// can be negative when a ride is far / heavily queued). <paramref name="indoorBonus"/> (≥0) is added for an
+	/// indoor attraction — the caller raises it in bad weather so peeps seek shelter (T-056).</summary>
+	public static float Score( RideOption o, DecisionWeights w, float indoorBonus = 0f )
 	{
 		float excitement = o.Excitement / 100f;
 		float score = w.Excitement * excitement
@@ -55,6 +56,8 @@ public static class RideChoiceScorer
 			- w.Queue * (o.QueueLength / RefQueue);
 		if ( o.IsNew )
 			score += w.NewRideMultiplier * excitement; // a new ride draws extra interest
+		if ( o.IsIndoors && indoorBonus > 0f )
+			score += indoorBonus; // shelter appeal in rain/snow
 		return score;
 	}
 

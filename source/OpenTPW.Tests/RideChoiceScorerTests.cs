@@ -55,6 +55,22 @@ PeepInfo.DecisionVariable2				5
 	}
 
 	[TestMethod]
+	public void IndoorBonusAppliesOnlyToIndoorRidesAndOnlyWhenPositive()
+	{
+		var outdoor = new RideOption( 60f, 50f, 0, IsNew: false, IsIndoors: false );
+		var indoor = outdoor with { IsIndoors = true };
+
+		// With no bonus (clear weather), the indoor flag changes nothing.
+		Assert.AreEqual( RideChoiceScorer.Score( outdoor, W ), RideChoiceScorer.Score( indoor, W ), 1e-4f );
+
+		// With a bad-weather bonus, the indoor ride scores higher; the outdoor one is unaffected.
+		float bonus = 1.5f;
+		Assert.AreEqual( RideChoiceScorer.Score( outdoor, W ), RideChoiceScorer.Score( outdoor, W, bonus ), 1e-4f );
+		Assert.AreEqual( RideChoiceScorer.Score( indoor, W ) + bonus, RideChoiceScorer.Score( indoor, W, bonus ), 1e-4f );
+		Assert.IsTrue( RideChoiceScorer.Score( indoor, W, bonus ) > RideChoiceScorer.Score( outdoor, W, bonus ) );
+	}
+
+	[TestMethod]
 	public void ChooseWeightedFavoursHigherScoreButNotExclusively()
 	{
 		var scores = new[] { 1f, 3f }; // total 4

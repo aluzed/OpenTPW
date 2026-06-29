@@ -39,6 +39,7 @@ public sealed class Peep : ModelEntity
 	private const float BladderThreshold = 60f;        // detour to a toilet at this point
 	private const float DrinkBladderBump = 35f;        // a drink fills the bladder noticeably (T-039)
 	private const float BurstPenaltyPerSec = 3f;       // happiness lost while desperate with no toilet reachable
+	private const float IndoorShelterBias = 1.5f;      // ride-choice bonus for an indoor attraction in bad weather (T-056)
 	private const float VandalHappiness = 28f;        // a peep this unhappy may vandalise (well above LeaveHappiness, so there's a window to act before giving up)
 	private const float VandalChancePerSec = 0.14f;   // ~1 act every ~7 s while unhappy and unwatched
 	private const float WalkFps = 8f;                // walk-cycle frames per second
@@ -292,6 +293,12 @@ public sealed class Peep : ModelEntity
 				VandalismActs++;
 			}
 		}
+
+		// Bad weather sours an exposed peep's mood (T-056): steady discomfort outdoors in rain/snow (worse in a
+		// storm). Heading to an indoor stall (a sideshow) counts as seeking shelter, so it's exempt; riding peeps
+		// already returned above. The soured mood feeds WantsToLeave below, so crowds thin out in foul weather.
+		if ( WeatherSim.Current is { State.IsClear: false } weather && !route.Ride.IsIndoors )
+			happiness = Math.Max( 0f, happiness - Weather.ComfortPenaltyPerSec( weather.State ) * Time.Delta );
 
 		if ( WantsToLeave() )
 		{
@@ -609,9 +616,11 @@ public sealed class Peep : ModelEntity
 		// Score each ride by the authored weighted-utility scorer — excitement vs distance vs queue length
 		// (T-060) — then pick one weighted by score (so a better ride draws more peeps, but not all of them).
 		var w = RideChoiceScorer.Weights;
+		// In bad weather, indoor attractions (sideshows) gain shelter appeal so peeps seek cover (T-056).
+		float indoorBonus = WeatherSim.Current is { } weather && !weather.State.IsClear ? IndoorShelterBias : 0f;
 		var scores = candidates
 			.Select( q => RideChoiceScorer.Score(
-				new RideOption( q.Ride.Excitement, Position.Distance( q.Ride.Position ), q.LineLength, IsNew: false ), w ) )
+				new RideOption( q.Ride.Excitement, Position.Distance( q.Ride.Position ), q.LineLength, IsNew: false, q.Ride.IsIndoors ), w, indoorBonus ) )
 			.ToList();
 		int idx = RideChoiceScorer.ChooseWeighted( scores, (float)Random.Shared.NextDouble() );
 		route = idx >= 0 ? candidates[idx] : candidates[^1];
