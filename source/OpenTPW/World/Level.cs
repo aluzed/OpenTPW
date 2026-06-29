@@ -14,9 +14,13 @@ public class Level
 
 	public SettingsFile Global { get; private init; }
 
+	/// <summary>The level's folder name (e.g. <c>jungle</c>) — locates per-level assets like the minimap image.</summary>
+	public string Name { get; private init; }
+
 	public Level( string levelName )
 	{
 		LoadProgress.Report( "Loading level settings...", 0.03f );
+		Name = levelName;
 		Global = new SettingsFile( $"/levels/{levelName}/global.sam" );
 		Current = this;
 
@@ -661,6 +665,7 @@ public class Level
 			Hud.AddChild( new BuildPanel() );     // clickable build catalog (T-038)
 			Hud.AddChild( new ManagePanel() );    // clickable economy/ride manage buttons (T-038)
 			Hud.AddChild( new FinancePanel() );   // F11 income/expense graph (T-049)
+			Hud.AddChild( new MinimapPanel() );   // corner minimap (M toggles, click pans) (T-057)
 		}
 		else
 		{

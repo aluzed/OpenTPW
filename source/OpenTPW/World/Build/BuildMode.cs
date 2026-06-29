@@ -41,6 +41,9 @@ public sealed class BuildMode : Entity
 	/// <summary>The build catalog (rides + shops).</summary>
 	public IReadOnlyList<BuildCatalogItem> Catalog { get; }
 
+	/// <summary>The park's placement grid — its world bounds drive the minimap projection (T-057).</summary>
+	public PlacementGrid Grid => grid;
+
 	/// <summary>Index of the selected catalog item, or -1 when no placement tool is active.</summary>
 	public int Selected { get; private set; } = -1;
 
