@@ -55,6 +55,8 @@ public sealed class Advisor : Entity
 	/// <summary>The viseme currently shown (for the HUD label); Closed when not speaking.</summary>
 	public MouthShape CurrentShape { get; private set; } = MouthShape.Closed;
 	public string ClipName => clipName;
+	/// <summary>The id of the advice currently being spoken (for the HUD tip text); empty when idle.</summary>
+	public string ActiveMessage => activeMessage;
 	public float Elapsed => startTime < 0f ? 0f : Time.Now - startTime;
 	public float ClipLength => (float)(lip?.Duration.TotalSeconds ?? 0);
 
