@@ -117,6 +117,15 @@ public class Level
 			}
 		}
 		catch ( Exception e ) { Log.Warning( $"[weather] load failed: {e.Message}" ); }
+
+		// Day/night ambient (T-056): the level's ThemeEngine.AmbientLightLevel (packed ARGB) is the dim colour
+		// the park drifts toward at night; darken it a touch so the night wash reads as dusk-blue, not flat grey.
+		if ( uint.TryParse( standard["ThemeEngine.AmbientLightLevel"], out var ambient ) )
+		{
+			byte R( int shift ) => (byte)(((ambient >> shift) & 0xFF) * 0.4f);
+			DayNightOverlay.NightColor = (R( 16 ), R( 8 ), R( 0 ));
+		}
+		DayNightCycle.Reset( Time.Now ); // start the visual day/night cycle at midday for this park
 		var centre = terrain.Centroid;
 		var grid = PlacementGrid.FromLevelSettings( standard, tileSize: 16f, worldCenter: new Vector3( centre.X, centre.Y, 0 ) );
 
@@ -672,6 +681,7 @@ public class Level
 		// in the lobby (they were drawing over the loaded park), and the build/manage HUD only in a park.
 		if ( InPark )
 		{
+			Hud.AddChild( new DayNightOverlay() ); // day/night wash beneath the weather + HUD (T-056)
 			Hud.AddChild( new WeatherOverlay() );  // rain/snow tint + precipitation under the rest of the HUD (T-056)
 			Hud.AddChild( new ParkStatsPanel() ); // live park finances/visitors readout
 			Hud.AddChild( new BuildPanel() );     // clickable build catalog (T-038)

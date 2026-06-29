@@ -44,7 +44,7 @@ internal sealed class ParkStatsPanel : HudPanel
 			$"ADMISSION {fin.EntryFee:0}  ([ ] adjust)",
 		};
 		if ( GameClock.Current is { } clock )
-			lines.Insert( 0, $"YEAR {clock.Year}  MTH {clock.Month}  DAY {clock.Day}" ); // in-game date (T-053)
+			lines.Insert( 0, $"YEAR {clock.Year}  MTH {clock.Month}  DAY {clock.Day}  {DayNightTint.Phase( DayNightCycle.Phase01 )}" ); // in-game date + visual day phase (T-053/T-056)
 
 			// Weather + season (T-056): current sky state derived from the level's authored weather model.
 			if ( WeatherSim.Current is { } weather )
