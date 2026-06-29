@@ -696,9 +696,12 @@ public class Level
 			layout.OnInit();
 		}
 
-		// Advisor lip-sync demo (T-046): the real bug-head model lip-syncing a speech clip (its .LIP drives
-		// which "Mouth - *" viseme sub-mesh shows), plus a small HUD label.
-		if ( Environment.GetEnvironmentVariable( "OPENTPW_ADVISOR_DEMO" ) == "1" )
+		// Advisor (T-046): the real bug-head character that gives the player tips — driven by the live park
+		// state + the Advisor.sam pacing rules, lip-syncing the speech clip via its .LIP. On by default in a
+		// park (GameSettings.AdvisorEnabled, the original's AdvisorOn); the env var forces it on anywhere
+		// (lobby / testing) regardless of the setting.
+		if ( Environment.GetEnvironmentVariable( "OPENTPW_ADVISOR_DEMO" ) == "1"
+			|| (InPark && GameSettings.Current.AdvisorEnabled) )
 		{
 			_ = new Advisor();
 			Hud.AddChild( new AdvisorPanel() );

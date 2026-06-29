@@ -21,6 +21,16 @@ public class GameSettingsTests
 	}
 
 	[TestMethod]
+	public void AdvisorEnabledDefaultsTrueAndRoundTrips()
+	{
+		Assert.IsTrue( new GameSettings().AdvisorEnabled, "the advisor is on by default" );
+		Assert.IsTrue( GameSettings.Deserialize( "{}" ).AdvisorEnabled, "a file without the key keeps the default" );
+
+		var off = GameSettings.Deserialize( new GameSettings { AdvisorEnabled = false }.Serialize() );
+		Assert.IsFalse( off.AdvisorEnabled, "switching it off persists" );
+	}
+
+	[TestMethod]
 	public void OutOfRangeVolumesAreClamped()
 	{
 		var s = new GameSettings { MusicVolume = 5f, SfxVolume = -2f, SpeechVolume = 1.5f };

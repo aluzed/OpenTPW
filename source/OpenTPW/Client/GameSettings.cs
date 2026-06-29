@@ -14,6 +14,10 @@ internal sealed class GameSettings
 	public float SfxVolume { get; set; } = 0.8f;
 	public float SpeechVolume { get; set; } = 0.9f;
 
+	/// <summary>Whether the advisor character appears in a park and gives tips (the original's <c>AdvisorOn</c>);
+	/// on by default. Persisted so the player can switch the bug head off and have it stay off.</summary>
+	public bool AdvisorEnabled { get; set; } = true;
+
 	/// <summary>
 	/// Where the settings JSON lives. Defaults to the local <c>./.opentpw</c> cache dir (the same place
 	/// <see cref="Game"/> keeps its cache). Settable so tests can point it at a temp file.
