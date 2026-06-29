@@ -107,7 +107,20 @@ assets by iterating screenshot → adjust the anchoring constants in `Advisor.cs
 ## Remaining
 
 - **Per-message speech clips**: map each message id to its own clip + `.LIP` (today they fall back to the
-  shipped `sp_001`); the per-message advisor clips aren't shipped in this install.
+  shipped `sp_001`). **RE finding (Ghidra, no-CD `tp.exe`):** the binding is a *runtime-assembled message
+  database*, not a data-file manifest, so there's no quick table to lift:
+  - Assets: `data/global/Speech/speechHD.SDT` holds 641 clips `sp_001..sp_641.mp2` (+ per-level
+    `LocalSpeech`), indexed by the `cat_speech*.map` banks; `Advisor.sam` has **no** clip field per message and
+    `advisor.wad` is model-only — so the mapping is purely in code.
+  - Architecture: the advisor singleton array is `DAT_0079039c` (stride `0xb0`). Ctor `FUN_00429ba0` loads
+    `Advisor[%s].md2` + inits the message system `FUN_00473e30`, which walks **12 message groups** at
+    `advisor+0x1c` (each `{count, ptr, _}` 0xc bytes); every message is an **8-byte entry whose `+4` is the
+    clip/presentation handle**, registered via `FUN_00470a00`. Dispatch: `FUN_00429e90` ("Initial advisor
+    call") → `FUN_004732a0(advisor, type, msgId, flags, score)` (scheduler/scorer) → `FUN_00472f60` indexes
+    `[advisor+(group+2)*0xc+8][msgId].+4` → `FUN_00472d70` drives the talking-head node visibility.
+  - The clip handles in those entries are loaded a layer deeper (the message-centre / localized resource),
+    which still needs tracing; the exact `sp_NNN` numbers weren't recovered. **Not worth a deep dig** unless
+    real per-message voice becomes a priority — a positional/heuristic clip pick is the cheap alternative.
 - The advisor still only spawns under `OPENTPW_ADVISOR_DEMO=1`; flipping it on by default in normal play is a
   one-line change once we want it always present.
 - Textures: the `.wct` are loaded from `global/advisor/textures/` via the VFS; verify they resolve (else
