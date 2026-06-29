@@ -35,6 +35,12 @@ internal static unsafe class Audio
 	private static uint ambientBuffer;
 	private const float AmbientBaseGain = 0.55f;
 
+	// Weather bed (T-056): a third looping source for the rain loop, on top of the ambient bed so the two
+	// coexist (rain over the level ambience). Rides the SFX bus like the ambient bed.
+	private static uint weatherSource;
+	private static uint weatherBuffer;
+	private const float WeatherBaseGain = 0.6f;
+
 	// One-shot SFX: a small round-robin pool of sources + a cache of decoded buffers keyed by name
 	// (so a sound decodes once and replays cheaply).
 	private const int SfxSourceCount = 8;
@@ -83,7 +89,10 @@ internal static unsafe class Audio
 		{
 			sfxVolume = Math.Clamp( value, 0f, 1f );
 			if ( available )
+			{
 				al.SetSourceProperty( ambientSource, SourceFloat.Gain, AmbientBaseGain * sfxVolume );
+				al.SetSourceProperty( weatherSource, SourceFloat.Gain, WeatherBaseGain * sfxVolume );
+			}
 		}
 	}
 
@@ -306,6 +315,48 @@ internal static unsafe class Audio
 		catch ( Exception e ) { Log.Warning( $"StopAmbient failed: {e.Message}" ); }
 	}
 
+	/// <summary>Plays a looping weather bed (the rain loop, T-056) on its own source, over the ambient bed.
+	/// Replaces any previous weather loop; rides the <see cref="SfxVolume"/> bus. Quiet no-op without a device.</summary>
+	public static void PlayWeatherLoop( byte[] mpegData, bool loop = true )
+	{
+		if ( !TryDecode( mpegData, out var pcm, out var sampleRate, out var channels ) || pcm.Length == 0 )
+			return;
+		if ( !EnsureInitialized() )
+			return;
+
+		try
+		{
+			al.SourceStop( weatherSource );
+			al.SetSourceProperty( weatherSource, SourceInteger.Buffer, 0 );
+			if ( weatherBuffer != 0 )
+				al.DeleteBuffer( weatherBuffer );
+
+			weatherBuffer = al.GenBuffer();
+			var format = channels >= 2 ? BufferFormat.Stereo16 : BufferFormat.Mono16;
+			fixed ( short* data = pcm )
+				al.BufferData( weatherBuffer, format, data, pcm.Length * sizeof( short ), sampleRate );
+
+			al.SetSourceProperty( weatherSource, SourceInteger.Buffer, (int)weatherBuffer );
+			al.SetSourceProperty( weatherSource, SourceBoolean.Looping, loop );
+			al.SetSourceProperty( weatherSource, SourceFloat.Gain, WeatherBaseGain * sfxVolume );
+			al.SourcePlay( weatherSource );
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( $"Weather loop playback failed: {e.Message}" );
+		}
+	}
+
+	/// <summary>Stops the weather (rain) loop (no-op if audio is unavailable).</summary>
+	public static void StopWeatherLoop()
+	{
+		if ( !available )
+			return;
+
+		try { al.SourceStop( weatherSource ); }
+		catch ( Exception e ) { Log.Warning( $"StopWeatherLoop failed: {e.Message}" ); }
+	}
+
 	private static bool TryDecode( byte[] mpegData, out short[] pcm, out int sampleRate, out int channels )
 	{
 		pcm = Array.Empty<short>();
@@ -371,13 +422,15 @@ internal static unsafe class Audio
 			alc.MakeContextCurrent( context );
 			musicSource = al.GenSource();
 			ambientSource = al.GenSource();
+			weatherSource = al.GenSource();
 			for ( var i = 0; i < SfxSourceCount; i++ )
 				sfxSources[i] = al.GenSource();
 
-			// Music / ambient / 2D SFX are head-relative: pinned to the listener at the origin so moving the
-			// 3D listener (UpdateListener) never pans or fades them — only the 3D pool below is spatialised.
+			// Music / ambient / weather / 2D SFX are head-relative: pinned to the listener at the origin so
+			// moving the 3D listener (UpdateListener) never pans or fades them — only the 3D pool below is.
 			MakeHeadRelative( musicSource );
 			MakeHeadRelative( ambientSource );
+			MakeHeadRelative( weatherSource );
 			for ( var i = 0; i < SfxSourceCount; i++ )
 				MakeHeadRelative( sfxSources[i] );
 

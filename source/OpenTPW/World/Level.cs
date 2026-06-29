@@ -126,6 +126,7 @@ public class Level
 			DayNightOverlay.NightColor = (R( 16 ), R( 8 ), R( 0 ));
 		}
 		DayNightCycle.Reset( Time.Now ); // start the visual day/night cycle at midday for this park
+		WeatherAudio.Reset();            // silence any rain loop carried over from a previous park
 		var centre = terrain.Centroid;
 		var grid = PlacementGrid.FromLevelSettings( standard, tileSize: 16f, worldCenter: new Vector3( centre.X, centre.Y, 0 ) );
 
@@ -717,6 +718,7 @@ public class Level
 			entity.Update();
 
 		GameClock.Current?.Tick( Time.Delta ); // advances the calendar; fires OnNewMonth → finances settle (T-053)
+		WeatherAudio.Update();                 // rain loop + thunder claps follow the weather (T-056)
 
 		// Diagnostic: periodically report the park's balance and the cumulative income/cost flows.
 		if ( Environment.GetEnvironmentVariable( "OPENTPW_ECON_DEBUG" ) != null && ParkFinances.Current is { } f && Time.Now > nextEconLog )
