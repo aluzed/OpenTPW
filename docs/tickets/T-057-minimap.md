@@ -2,12 +2,31 @@
 
 - **Priority**: 🟢 Low (UX)
 - **Type**: UI / rendering
-- **Status**: ☐ To do (proposed — RE recon done; **assets present, full infra exists**)
+- **Status**: ✅ Done (corner map + pins + camera box + layer toggles + click-to-pan; verified in-game)
 
 ## Context
 
 TPW shows a corner minimap built from small per-category sprites. OpenTPW has no minimap — `PlacementGrid.cs`
 notes it as "a separate, larger effort". The data is small and the sprite/UI infra already exists.
+
+## Done
+
+- **Projection** (`MinimapProjection`, pure + 6 unit tests): maps the placement grid's world bounds
+  (`Grid.Origin` + `Width/Height·TileSize`) into the minimap's on-screen rect — clamped to the edge, optional
+  Y-flip for the top-down image — with an inverse for click-to-pan.
+- **`MinimapPanel : HudPanel`**: draws the level's `2dmap.tga` (512×512, via the VFS → `Texture`) as a backdrop,
+  then one coloured pin per `Ride`/`Shop`/`Peep`/`Litter` at its projected `Position`, plus a yellow box at
+  `BuildCameraMode.Focus`. A `RIDE/SHOP/PEEP/LITR` legend toggles each layer; **M** toggles the whole map; a
+  click on the map pans the build camera (`Unproject` → `Focus`). Tucked just left of the BUILD column so the
+  two never overlap; registered in `HudPanel.PointerOverUi`.
+- Exposed `BuildMode.Grid` + `Level.Name` for the projection bounds + per-level asset path.
+- Verified in-game: jungle backdrop with blue ride / orange shop / white peep / brown litter pins and the
+  camera box; the autoplaced park renders correctly on the map.
+
+## Notes
+
+- Uses solid-colour pins keyed by category rather than the tiny `2dmap/{r,s,v,l}sprite.tga` icons — they read
+  better at the small pin size; swapping in the real sprites is a trivial follow-up if wanted.
 
 ## What we know (RE recon)
 
