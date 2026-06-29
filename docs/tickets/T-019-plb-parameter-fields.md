@@ -2,13 +2,35 @@
 
 - **Priority**: 🟡 Feature
 - **Type**: Reverse engineering
-- **Status**: ⚠️ Partial (advanced) — the **full file layout is Ghidra-confirmed and decoded** (item 2
-  done): 8-byte header, the trailing "shared block" = a real second table + two globals, all exposed typed.
-  The **particle consumer chain is now mapped** (see below): the effect array's only static xrefs are the
-  serializers, and the emit reads the record through a generic message-dispatch framework via a runtime
-  base — so per-effect *field labels* (item 1) need a dynamic capture, and have no consumer in OpenTPW's
-  (particle-less) renderer, so further work here is low-value.
+- **Status**: ✅ Done — full file layout decoded (item 2) **and** the gameplay-meaningful per-effect
+  parameter fields are now **labelled** (item 1). The earlier "needs a dynamic capture" call was wrong: while
+  the *emit* goes through a message framework, the particle **spawn** path reads the record with **static**
+  offsets. Decoded + exposed typed on `ParticleEffect`, verified against the real `Tp2.plb`.
 - **Split from**: [T-008](T-008-unimplemented-formats.md).
+
+## Field labels (Ghidra: `FUN_00521930` SpawnEffectInstance + `FUN_00520560` SpawnParticle)
+
+The spawn copies the effect record (the `short[160]`) into an active emitter, then reads these offsets (byte
+offsets into the record / `Parameters` block; the engine reads them as `short`/`int`). Verified against
+`Tp2.plb` — the values match each effect's name:
+
+| Offset | Type | Field | Evidence on Tp2.plb |
+|--------|------|-------|---------------------|
+| `0x0a` | short | **Emission mode** (0 = burst, 1 = continuous) | all sampled effects = 0 |
+| `0x40/44/48` | int×3 | **Emission velocity** x/y/z (0,0,0 → inherit emitter velocity) | Smoke y=64 (rises) |
+| `0x54` | short | **Colour mode** (0 = fixed, else cycle the ramp) | — |
+| `0x5c` | int | **Burst count** (particles released at once) | Sparks=37, ExplodeFirey=62 |
+| `0x74` | int | **Particle lifetime** (ticks, jittered ±¼) | Sparks=100, Smoke=800, Repair=2024 |
+| `0x80/84/88` | int×3 | **Acceleration / gravity** x/y/z | Smoke x=-1 (drift) |
+| `0xa8` | int | **Emission cone / spin angle** (drives a sin/cos lookup) | — |
+| `0xac` | int | **Velocity scale** (16.10 fixed-point; `>>10`) | ExplodeFirey=2048 (=2.0) |
+| `0xb0` | int | **Child effect** index spawned alongside (≤0 = none) | Smoke→12, Repair→31 |
+| `0xc1` | byte | child/disabled flag (skips the spawn when set) | — |
+
+Exposed as typed properties on `ParticleEffect` (`EmissionMode`, `EmissionVelocity`, `BurstCount`,
+`LifetimeTicks`, `Acceleration`, `EmissionConeAngle`, `VelocityScale`, `ChildEffect`/`HasChildEffect`,
+`CyclesColorRamp`). Other `short[160]` slots are emitter runtime-state (position/age/links) overwritten at
+spawn, not authored params, so they stay raw in `Parameters`.
 
 ## Context
 
@@ -61,18 +83,15 @@ Traced where the effect records (`DAT_00804370`, stride 320 = `short[160]`) are 
   to the registered particle handler, which reads `effectArray[code]`'s fields via a **runtime-computed
   base** (so still no static xref).
 
-## Remaining
+## Remaining (low value)
 
-1. **Per-effect parameter field labels** (item 1): lifetime, spawn rate/count, velocity/spread, gravity,
-   size, sprite/texture ref, blend mode. The emit handler is reached through the generic message framework
-   above and reads the record via a runtime base, so the individual `short[160]` fields need a **dynamic
-   capture** (or a deep trace through `FUN_006b8720`'s dispatch into the particle listener) — not a static
-   xref. Confirmed fields so far: `short[0]` = a runtime active flag (loader zeroes it), `short[81]`
-   (byte 162) = defaults to 1000 (a duration/lifetime), `short[128..159]` = the 16-stop RGBA colour ramp.
-   The block stays exposed raw (`ParticleEffect.Parameters`) for the rest.
-   **Note:** OpenTPW's renderer has no particle system (effects use a colour-proxy, T-007/T-037), so these
-   labels are documentation-only until a real particle simulation exists — low priority to pursue further.
-2. Label the shared table's 104-byte records (same message-handler trace requirement).
+1. The **shared table's** 104-byte records stay raw (`SharedRecords`) — they aren't read by the spawn path,
+   so labelling them needs a separate consumer trace; no gameplay consumer in OpenTPW wants them.
+2. A handful of minor `short[160]` slots (per-particle size, sprite/texture ref, blend mode) weren't isolated
+   — the spawn reads colour from the ramp region and most remaining slots are emitter runtime-state. The
+   gameplay-meaningful authored fields are labelled above.
+   **Note:** OpenTPW's renderer still uses a colour-proxy for effects (T-007/T-037), so the new fields are
+   consumed only once a real particle simulation exists — but they're now decoded and ready.
 
 ## Affected files
 

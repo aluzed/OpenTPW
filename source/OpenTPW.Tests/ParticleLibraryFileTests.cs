@@ -138,5 +138,55 @@ public class ParticleLibraryFileTests
 		Assert.IsTrue( plb.ParticleDensity is >= 10 and <= 500, "density is clamped to 10..500 by the engine" );
 		Assert.AreEqual( 1024, plb.TotalParticles, "observed total-particle budget on Tp2.plb" );
 		Assert.AreEqual( 0, plb.TrailingData.Length, "the whole file is now accounted for" );
+
+		// Labelled per-effect fields (T-019, RE'd from FUN_00521930/FUN_00520560) — the values match each
+		// effect's name/behaviour on the real Tp2.plb.
+		var sparks = plb.Effects[1];
+		Assert.AreEqual( ParticleEmissionMode.Burst, sparks.EmissionMode );
+		Assert.AreEqual( 37, sparks.BurstCount, "Sparks throws a burst of many particles" );
+		Assert.AreEqual( 100, sparks.LifetimeTicks, "sparks are short-lived" );
+
+		var smokeFx = plb.Effects[2];
+		Assert.AreEqual( 800, smokeFx.LifetimeTicks, "smoke lingers" );
+		Assert.AreEqual( 64, smokeFx.EmissionVelocity.Y, "smoke rises" );
+		Assert.IsTrue( smokeFx.HasChildEffect && smokeFx.ChildEffect == 12, "smoke spawns a child effect" );
+
+		Assert.AreEqual( 31, plb.Effects[51].ChildEffect, "Repair spawns child effect 31" );
+		Assert.AreEqual( 62, plb.Effects[4].BurstCount, "ExplodeFirey bursts a big cloud" );
+	}
+
+	[TestMethod]
+	public void DecodesLabelledFieldsFromAFullRecord()
+	{
+		// A single full-size (320-byte) record with known values at the RE'd field offsets.
+		const int rs = 320;
+		var buf = new byte[8 + rs];
+		BinaryPrimitives.WriteUInt32LittleEndian( buf.AsSpan( 0, 4 ), 1 );
+		BinaryPrimitives.WriteUInt32LittleEndian( buf.AsSpan( 4, 4 ), rs );
+		void S16( int off, short v ) => BinaryPrimitives.WriteInt16LittleEndian( buf.AsSpan( 8 + off, 2 ), v );
+		void S32( int off, int v ) => BinaryPrimitives.WriteInt32LittleEndian( buf.AsSpan( 8 + off, 4 ), v );
+		S16( 0x0a, 1 );    // continuous
+		S16( 0x54, 1 );    // cycles the ramp
+		S32( 0x5c, 42 );   // burst count
+		S32( 0x74, 1500 ); // lifetime
+		S32( 0x40, 7 ); S32( 0x44, -8 ); S32( 0x48, 9 ); // velocity
+		S32( 0x80, 1 ); S32( 0x84, 2 ); S32( 0x88, 3 );  // acceleration
+		S32( 0xa8, 256 ); // cone angle
+		S32( 0xac, 2048 ); // velocity scale
+		S32( 0xb0, 31 );   // child effect
+
+		using var stream = new MemoryStream( buf );
+		var fx = new ParticleLibraryFile( stream ).Effects[0];
+
+		Assert.AreEqual( ParticleEmissionMode.Continuous, fx.EmissionMode );
+		Assert.IsTrue( fx.CyclesColorRamp );
+		Assert.AreEqual( 42, fx.BurstCount );
+		Assert.AreEqual( 1500, fx.LifetimeTicks );
+		Assert.AreEqual( new ParticleVec3( 7, -8, 9 ), fx.EmissionVelocity );
+		Assert.AreEqual( new ParticleVec3( 1, 2, 3 ), fx.Acceleration );
+		Assert.AreEqual( 256, fx.EmissionConeAngle );
+		Assert.AreEqual( 2048, fx.VelocityScale );
+		Assert.AreEqual( 31, fx.ChildEffect );
+		Assert.IsTrue( fx.HasChildEffect );
 	}
 }

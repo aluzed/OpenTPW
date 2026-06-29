@@ -29,9 +29,9 @@ All format/VM decoding and the core gameplay loop are done. Open work falls into
   the `.MAP` code→asset catalog), **T-048** car-waypoint positions (runtime-bound, no file data), per-message
   advisor clips (not shipped). The headline tails (T-046/47/48/52) are otherwise done.
 - **Blocked / deferred** (need an external sample or have no consumer): **T-017** (`SAD_*` save stream —
-  no sample), **T-022** (EA-ADPCM mono waveform — no sample), **T-019** (`.PLB` per-effect field labels —
-  no particle system to consume them; needs a dynamic capture), **T-021** (`.TQI` exact dequant — decoder
-  already renders correctly).
+  no sample), **T-022** (EA-ADPCM mono waveform — no sample), **T-021** (`.TQI` exact dequant — decoder
+  already renders correctly). *(T-019 `.PLB` field labels — now **done**: the spawn path reads the record
+  with static offsets, so no dynamic capture was needed after all.)*
 
 ## Index
 
@@ -55,7 +55,7 @@ All format/VM decoding and the core gameplay loop are done. Open work falls into
 | [T-016](T-016-map-entry-records.md) | 🟡 Feature | ✅ Decoded | `.MAP`: variant + BANK names + SFX category header + **SFX per-sound 20-byte records** decoded; BANK records RE'd as serialized pointers (not data); only the SFX mixing-curve blob stays raw |
 | [T-017](T-017-tpws-saves.md) | 🟡 Feature | ⚠️ Partial | `.TPWS`: container Ghidra-corrected (leading bytes = **version 500**, not magic; full header layout) + read + **write/round-trip**; inner `SAD_*` module stream stays opaque, real sample still unavailable |
 | [T-018](T-018-mtr-material-semantics.md) | 🟡 Feature | ✅ Done | `.MTR` not runtime-used (Ghidra); `.MD2` carries texture binding (decoded + tested) |
-| [T-019](T-019-plb-parameter-fields.md) | 🟡 Feature | ⚠️ Partial | `.PLB`: **layout Ghidra-confirmed & fully decoded** (8-byte header fix + the trailing block is a 2nd 20×104 table + density/total globals, all typed; whole file accounted for). Per-effect param **field labels** still need the consumer traced |
+| [T-019](T-019-plb-parameter-fields.md) | 🟡 Feature | ✅ Done | `.PLB`: layout fully decoded **+ per-effect param fields now labelled** — the spawn path (`FUN_00521930`/`FUN_00520560`) reads the record with static offsets: lifetime, burst count, emission velocity, acceleration/gravity, cone angle, velocity scale, child-effect, colour mode. Exposed typed on `ParticleEffect`, verified vs real `Tp2.plb` (Sparks = 37-burst @100 ticks, Smoke rises+drifts @800, …) |
 | [T-020](T-020-lip-mouth-shapes.md) | 🟡 Feature | ⚠️ Mostly done | `.LIP` semantics resolved (Ghidra): shapes **not in the file** — engine has 5 visemes (`FUN_0044b2e0`), picked per keyframe interval; viseme→advisor mesh-part names RE'd (`mouth - normal/aah/eee/ooh/sss`). **Lip-sync wired to real speech**: `AdvisorPanel` (`OPENTPW_ADVISOR_DEMO=1`) plays `sp_001.mp2` + drives a viseme mouth from its `.LIP` in sync (verified in-game). Only rendering the real advisor model's named sub-meshes remains |
 | [T-021](T-021-tqi-exact-dequant.md) | ⚪ Polish | ⏸️ Deferred | `.TQI`: float AAN IDCT confirmed (Ghidra); exact port deferred (decoder already renders correctly) |
 | [T-022](T-022-ea-adpcm-mono.md) | 🟡 Feature | ⚠️ Implemented | EA-ADPCM **mono** path added (channel dispatch + `DecodeScdlMono`, two samples/byte per FFmpeg adpcm_ea) + synthesised test; waveform verification awaits a real mono sample (none in install) |

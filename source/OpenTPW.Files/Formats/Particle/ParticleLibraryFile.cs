@@ -9,6 +9,16 @@ namespace OpenTPW;
 /// </summary>
 public readonly record struct ParticleColor( byte R, byte G, byte B, byte A );
 
+/// <summary>A 3-component fixed-point vector from a particle effect record (the engine stores these as
+/// 16.16-ish fixed-point ints; consumers shift by 4/10). Exposed raw — sign + relative magnitude are the
+/// meaningful part.</summary>
+public readonly record struct ParticleVec3( int X, int Y, int Z );
+
+/// <summary>How a particle effect emits its particles (<c>short</c> at record byte 0x0a). RE'd from the
+/// spawn path <c>FUN_00521930</c>: 0 releases <see cref="ParticleEffect.BurstCount"/> particles in one go,
+/// 1 emits continuously.</summary>
+public enum ParticleEmissionMode { Burst = 0, Continuous = 1 }
+
 /// <summary>
 /// A single particle effect within a <see cref="ParticleLibraryFile"/>.
 /// </summary>
@@ -31,11 +41,63 @@ public sealed class ParticleEffect
 
 	/// <summary>
 	/// The raw per-effect parameter block — the bytes before the <see cref="ColorRamp"/> (216 bytes on
-	/// <c>Tp2.plb</c>). The engine treats the record as a <c>short[160]</c>; one field (byte 162 / short 81)
-	/// defaults to 1000 when zero (from the loader's post-read fix-up). The individual fields (lifetime,
-	/// spawn rate, velocity, …) still need the particle *consumer* code traced — see T-019.
+	/// <c>Tp2.plb</c>). The engine treats the record as a <c>short[160]</c>. The typed properties below label
+	/// the fields the particle *consumer* reads (RE'd from the spawn path <c>FUN_00521930</c> /
+	/// <c>FUN_00520560</c> in the no-CD <c>tp.exe</c>); the remaining bytes stay raw here. See T-019.
 	/// </summary>
 	public byte[] Parameters { get; init; } = Array.Empty<byte>();
+
+	// Field offsets within the record/parameter block (byte offsets; the engine reads them as short/int).
+	// RE'd from FUN_00521930 (SpawnEffectInstance) + FUN_00520560 (SpawnParticle).
+	private const int OffEmissionMode = 0x0a;  // short: 0 = burst, 1 = continuous
+	private const int OffVelocityX = 0x40;     // int×3: initial particle velocity / emission direction
+	private const int OffColorMode = 0x54;     // short: 0 = fixed colour, else cycle the ramp
+	private const int OffBurstCount = 0x5c;    // int: particles released per burst
+	private const int OffLifetime = 0x74;      // int: particle lifetime in ticks (±25% jitter)
+	private const int OffAccelX = 0x80;        // int×3: per-tick acceleration / gravity
+	private const int OffConeAngle = 0xa8;     // int: emission cone / spin angle (drives a sin/cos lookup)
+	private const int OffVelocityScale = 0xac; // int: scales the spawn-velocity argument
+	private const int OffChildEffect = 0xb0;   // int: index of a child effect spawned alongside (-1 = none)
+
+	private short S16( int off )
+		=> off >= 0 && off + 2 <= Parameters.Length ? BinaryPrimitives.ReadInt16LittleEndian( Parameters.AsSpan( off, 2 ) ) : (short)0;
+	private int S32( int off )
+		=> off >= 0 && off + 4 <= Parameters.Length ? BinaryPrimitives.ReadInt32LittleEndian( Parameters.AsSpan( off, 4 ) ) : 0;
+
+	/// <summary>Whether this effect releases its particles in one burst or emits continuously (record byte 0x0a).</summary>
+	public ParticleEmissionMode EmissionMode => (ParticleEmissionMode)S16( OffEmissionMode );
+
+	/// <summary>How many particles a <see cref="ParticleEmissionMode.Burst"/> effect releases at once (the spawn
+	/// loop count in <c>FUN_00521930</c>; record int at 0x5c).</summary>
+	public int BurstCount => S32( OffBurstCount );
+
+	/// <summary>Particle lifetime in engine ticks before it expires; the spawn jitters it by ±¼ (record int at
+	/// 0x74). 0 means "use the loader's 1000-tick default".</summary>
+	public int LifetimeTicks => S32( OffLifetime );
+
+	/// <summary>Initial particle velocity / emission direction (record ints at 0x40/0x44/0x48). When all three
+	/// are zero the particle inherits the emitter's own velocity.</summary>
+	public ParticleVec3 EmissionVelocity => new( S32( OffVelocityX ), S32( OffVelocityX + 4 ), S32( OffVelocityX + 8 ) );
+
+	/// <summary>Per-tick acceleration applied to each live particle — gravity/drift (record ints at 0x80/0x84/0x88).</summary>
+	public ParticleVec3 Acceleration => new( S32( OffAccelX ), S32( OffAccelX + 4 ), S32( OffAccelX + 8 ) );
+
+	/// <summary>Emission cone / spin angle that rotates the spawn velocity via the engine's sin/cos table
+	/// (record int at 0xa8).</summary>
+	public int EmissionConeAngle => S32( OffConeAngle );
+
+	/// <summary>Scales the spawn-velocity argument the emitter is fired with (record int at 0xac).</summary>
+	public int VelocityScale => S32( OffVelocityScale );
+
+	/// <summary>True when this effect spawns a linked child effect; see <see cref="ChildEffect"/> for its index.</summary>
+	public bool HasChildEffect => S32( OffChildEffect ) >= 0 && S32( OffChildEffect ) != 0;
+
+	/// <summary>Index of a child effect spawned alongside this one (record int at 0xb0); negative/zero = none.</summary>
+	public int ChildEffect => S32( OffChildEffect );
+
+	/// <summary>Whether the particle keeps a fixed colour (0) or cycles the <see cref="ColorRamp"/> over its life
+	/// (record short at 0x54).</summary>
+	public bool CyclesColorRamp => S16( OffColorMode ) != 0;
 }
 
 /// <summary>
@@ -61,9 +123,12 @@ public sealed class ParticleEffect
 ///     +4 : 4   total particles      (observed: 1024)
 /// </code>
 /// The effect names decode exactly to par_lib.h (NULL, Sparks, Smoke, …) and the ramps are
-/// semantically correct (Fire ramps dark-red→bright, Smoke is white with an alpha fade-in). The rest of
-/// the per-effect parameter block, and the shared table's fields, need the particle *consumer* code
-/// traced (the loader has no static xref the field meanings can be read from). See docs/tickets/T-019.
+/// semantically correct (Fire ramps dark-red→bright, Smoke is white with an alpha fade-in). The
+/// gameplay-meaningful per-effect fields are now labelled (<see cref="ParticleEffect.LifetimeTicks"/>,
+/// <see cref="ParticleEffect.BurstCount"/>, <see cref="ParticleEffect.EmissionVelocity"/>,
+/// <see cref="ParticleEffect.Acceleration"/>, <see cref="ParticleEffect.ChildEffect"/>, …), RE'd from the
+/// particle spawn path (<c>FUN_00521930</c> / <c>FUN_00520560</c>) and verified against Tp2.plb (e.g. Sparks
+/// = a 37-particle burst lasting 100 ticks). The shared table's 104-byte records stay raw. See T-019.
 /// </summary>
 public sealed class ParticleLibraryFile : BaseFormat
 {
