@@ -121,8 +121,9 @@ assets by iterating screenshot → adjust the anchoring constants in `Advisor.cs
   - The clip handles in those entries are loaded a layer deeper (the message-centre / localized resource),
     which still needs tracing; the exact `sp_NNN` numbers weren't recovered. **Not worth a deep dig** unless
     real per-message voice becomes a priority — a positional/heuristic clip pick is the cheap alternative.
-- The advisor still only spawns under `OPENTPW_ADVISOR_DEMO=1`; flipping it on by default in normal play is a
-  one-line change once we want it always present.
+- ~~The advisor still only spawns under `OPENTPW_ADVISOR_DEMO=1`.~~ **Done**: it now spawns by default in a
+  park, gated on the persisted `GameSettings.AdvisorEnabled` (default true, the original's `AdvisorOn`); the
+  env var still force-spawns it anywhere for testing. Verified in-game (welcome tip + lip-sync, no env var).
 - Textures: the `.wct` are loaded from `global/advisor/textures/` via the VFS; verify they resolve (else
   the advisor renders untextured — still geometrically correct).
 - Hook the **message system** (`Advisor.sam`: `MessageGroups`, min-time/say-once/discard-after-slaps) so
