@@ -94,6 +94,25 @@ public class Level
 		var goals = new GoldenTicketGoals( GoldenTicketTargets.ParseLocal( standard ) );
 		GoldenTicketGoals.Current = goals;
 		GameClock.Current.OnNewDay += goals.Evaluate;
+
+		// Weather + seasons (T-056): roll the level's authored weather over the four seasons, re-rolling on the
+		// daily clock; the overlay/HUD read WeatherSim.Current. Sunny fallback if the block is missing.
+		try
+		{
+			var weather = new WeatherSim( WeatherConfig.ParseLocal( standard ) );
+			WeatherSim.Current = weather;
+			GameClock.Current.OnNewDay += weather.OnNewDay;
+
+			// Dev/demo: pin a weather state so the overlay can be seen on demand (jungle summers rarely rain).
+			switch ( Environment.GetEnvironmentVariable( "OPENTPW_WEATHER" )?.ToLowerInvariant() )
+			{
+				case "rain": weather.Force( new WeatherState( WeatherKind.Rain, false ), 30 ); break;
+				case "storm": weather.Force( new WeatherState( WeatherKind.Rain, true ), 5 ); break;
+				case "snow": weather.Force( new WeatherState( WeatherKind.Snow, false ), 10 ); break;
+				case "blizzard": weather.Force( new WeatherState( WeatherKind.Snow, true ), 2 ); break;
+			}
+		}
+		catch ( Exception e ) { Log.Warning( $"[weather] load failed: {e.Message}" ); }
 		var centre = terrain.Centroid;
 		var grid = PlacementGrid.FromLevelSettings( standard, tileSize: 16f, worldCenter: new Vector3( centre.X, centre.Y, 0 ) );
 
@@ -637,6 +656,7 @@ public class Level
 		// in the lobby (they were drawing over the loaded park), and the build/manage HUD only in a park.
 		if ( InPark )
 		{
+			Hud.AddChild( new WeatherOverlay() );  // rain/snow tint + precipitation under the rest of the HUD (T-056)
 			Hud.AddChild( new ParkStatsPanel() ); // live park finances/visitors readout
 			Hud.AddChild( new BuildPanel() );     // clickable build catalog (T-038)
 			Hud.AddChild( new ManagePanel() );    // clickable economy/ride manage buttons (T-038)

@@ -45,6 +45,19 @@ internal sealed class ParkStatsPanel : HudPanel
 		if ( GameClock.Current is { } clock )
 			lines.Insert( 0, $"YEAR {clock.Year}  MTH {clock.Month}  DAY {clock.Day}" ); // in-game date (T-053)
 
+			// Weather + season (T-056): current sky state derived from the level's authored weather model.
+			if ( WeatherSim.Current is { } weather )
+			{
+				string[] seasonName = { "SPRING", "SUMMER", "AUTUMN", "WINTER" };
+				string sky = weather.State.Kind switch
+				{
+					WeatherKind.Rain => weather.State.Lightning ? "STORM" : "RAIN",
+					WeatherKind.Snow => weather.State.Lightning ? "BLIZZARD" : "SNOW",
+					_ => "CLEAR",
+				};
+				lines.Insert( 1, $"{seasonName[weather.Season % 4]}  {sky} (q{weather.Quality})" );
+			}
+
 		// Challenge status (T-054): offered (Y/N), active (progress + days), or the last result.
 		if ( ChallengeManager.Current is { } cm )
 		{

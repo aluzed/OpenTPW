@@ -118,6 +118,7 @@ public sealed class WeatherSim
 	private readonly Random rng;
 	private int daysUntilChange;
 	private bool warned;
+	private bool forced; // a dev/demo pin (OPENTPW_WEATHER) freezes the daily roll
 
 	/// <summary>The weather right now.</summary>
 	public WeatherState State { get; private set; }
@@ -134,9 +135,21 @@ public sealed class WeatherSim
 		Roll(); // start on a season-appropriate sample rather than a hardcoded clear day
 	}
 
+	/// <summary>Force a specific weather state (a dev/demo hook — <c>OPENTPW_WEATHER</c>): pins the visible
+	/// weather regardless of the rolled quality, so the overlay can be exercised on a level that rarely produces
+	/// it (jungle summers never dip into the rain band, and never snow at all).</summary>
+	public void Force( WeatherState state, int quality )
+	{
+		State = state;
+		Quality = quality;
+		forced = true; // keep the daily roll from overwriting the pinned state
+	}
+
 	/// <summary>Advance one in-game day; rolls fresh weather when the change interval elapses.</summary>
 	public void OnNewDay()
 	{
+		if ( forced )
+			return;
 		daysUntilChange--;
 		if ( !warned && daysUntilChange == cfg.DaysOfWarning )
 		{
