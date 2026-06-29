@@ -32,11 +32,16 @@
 - Unit tests: `WeatherSimTests` (config/classify/roll/comfort), `RideChoiceScorerTests` (indoor bonus),
   `DayNightTintTests` (ramp/phase). Verified in-game: storm wash + streaks + HUD; DAY→NIGHT darkening + phase.
 
+- **Weather audio** (`WeatherAudio`): a looping rain bed (`RAIN.mp2` from `AmbientHD.sdt`) on a dedicated
+  `Audio` source while it precipitates, plus a random `Thunder2/3/4.mp2` clap every ~5–10 s during a storm;
+  polled each frame from `Level.Update`, follows the live weather + the `OPENTPW_WEATHER` pin. Verified in-game
+  (`rain loop started`, no audio errors).
+
 ## Remaining (polish)
 
 - A *true* lit fog ramp (`FogColour`/`DirectionalLightLevel`) — the day/night is a screen tint, not real
   lighting; the renderer is unlit.
-- Ambient rain sound (`mRainSoundHandle`) + the snow path on a level that actually enables it.
+- The snow audio/visual path on a level that actually enables snow (jungle disables it).
 
 ## Context
 

@@ -24,12 +24,16 @@
 - Verified in-game: the autoplaced `puzzle`/`squark` stalls drew peeps who queued + played; `SIDESHOW` takings
   accrued (`played 3, won 0 → 30`).
 
+- **Win effect**: a winning play spawns the stall's authored particle burst (`Info.CreateParticleEffect`,
+  default 80 = `Create2`) over the stand via the ride engine (verified in-game on `puzzle` + `squark`).
+- **Indoor shelter** (with T-056): sideshows are `ISIndoors 1` → `Ride.IsIndoors` exempts peeps queued there
+  from the bad-weather mood penalty and biases ride choice toward them when it's raining.
+
 ## Remaining (polish)
 
-- The VM `EVT_SIDESHOW_WIN` (212) event still only exists as a constant — wiring the script-driven win
-  sound/particle (`CreateParticleEffect 80` / `DestroyParticleEffect 76`) is a cosmetic follow-up; the economic
-  win/loss already drives takings via the peep-play path.
-- Sideshows are `ISIndoors 1` (shelter from rain) — a natural tie-in with the weather sim (T-056), not yet wired.
+- A dedicated win *sound* (the burst is visual only) — no win-sound asset is named in the `.sam`.
+- The VM `EVT_SIDESHOW_WIN` (212) script path is still just a constant; the economic win already drives takings
+  + the burst via the peep-play path.
 
 ## Context
 
