@@ -245,6 +245,13 @@ public sealed class BuildMode : Entity
 				}
 				if ( Hit( Key.Delete ) ) SellSelected(); // sell/demolish the selected ride (T-041)
 			}
+			// Selected shop: snack/drink price (, .) — a toilet stays free (T-041).
+			if ( SelectedShop is { Kind: not ShopKind.Toilet } shopSel && Selected < 0 )
+			{
+				if ( Hit( Key.Comma ) ) shopSel.Price = MathF.Max( 1f, shopSel.Price - 1f );
+				if ( Hit( Key.Period ) ) shopSel.Price += 1f;
+				if ( Hit( Key.Delete ) ) SellSelected();
+			}
 			// Loans: take / repay the small loan.
 			if ( Hit( Key.L ) ) fin.TakeLoan( 0 );
 			if ( Hit( Key.K ) ) fin.RepayLoan( 0 );

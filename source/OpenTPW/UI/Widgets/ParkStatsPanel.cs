@@ -95,6 +95,12 @@ internal sealed class ParkStatsPanel : HudPanel
 					? $"STAFF {staffSel.Role}  zone r{staffSel.Zone!.Value.Radius:0} (FIRE/ZONE buttons)"
 					: $"STAFF {staffSel.Role}  free roam (FIRE/SET ZONE buttons)" );
 
+			// Selected shop: its sale price (a toilet is free), adjustable with , . like a ride.
+			if ( build.SelectedShop is { } shopSel )
+				lines.Add( shopSel.Kind == ShopKind.Toilet
+					? $"SHOP {shopSel.Name} (free)"
+					: $"SHOP {shopSel.Name}  price {shopSel.Price:0} (,.)" );
+
 			if ( build.SelectedRide is { } sel )
 			{
 				lines.Add( $"RIDE {sel.Name} L{sel.UpgradeLevel} cap {sel.Capacity}  price {sel.TicketPrice:0} (,.)" );

@@ -21,8 +21,9 @@ public sealed class Shop : ModelEntity
 	/// <summary>Every shop in the park.</summary>
 	public static readonly List<Shop> Stalls = new();
 
-	/// <summary>What a snack/drink costs (park income when bought).</summary>
-	public float Price { get; }
+	/// <summary>What a snack/drink costs (park income when bought) — settable by the player (T-041), like a
+	/// ride's ticket price. A toilet stays free (its price is unused).</summary>
+	public float Price { get; set; }
 
 	/// <summary>What this stall sells (which need it satisfies).</summary>
 	public ShopKind Kind { get; }

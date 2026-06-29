@@ -332,6 +332,7 @@ public class Level
 			s.Placements.Add( new SaveGame.Placement
 			{
 				Kind = "shop", Name = ShopCatalogName( sh.Kind ), TileX = sh.TileX, TileY = sh.TileY,
+				TicketPrice = sh.Price, // reuse the generic price field for the stall's sale price (T-041)
 			} );
 		return s;
 	}
@@ -368,8 +369,15 @@ public class Level
 			if ( !CommitPlacement( item, grid, terrain, p.TileX, p.TileY, p.Rotation, charge: false ) )
 				continue;
 			if ( p.Kind == "ride" )
+			{
 				if ( Entity.All.OfType<Ride>().FirstOrDefault( r => r.TileX == p.TileX && r.TileY == p.TileY ) is { } ride )
 					ride.TicketPrice = p.TicketPrice;
+			}
+			else if ( p.Kind == "shop" && p.TicketPrice > 0f )
+			{
+				if ( Shop.Stalls.FirstOrDefault( sh => sh.TileX == p.TileX && sh.TileY == p.TileY ) is { } shop )
+					shop.Price = p.TicketPrice;
+			}
 		}
 		Log.Info( $"[save] restored {s.Placements.Count} placement(s)" );
 	}

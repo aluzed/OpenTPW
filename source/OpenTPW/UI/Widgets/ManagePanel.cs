@@ -80,10 +80,17 @@ internal sealed class ManagePanel : HudPanel
 				$"SELL ${ride.BuildCost * Ride.SellRefundFraction:0}", true,
 				() => BuildMode.Current?.SellSelected(), Warned: true ) );
 		}
-		// Selected-shop row: stalls have no price/research, just a sell button.
+		// Selected-shop row: a food/drink stall's price is adjustable (a toilet is free); plus sell.
 		else if ( BuildMode.Current?.SelectedShop is { } shop )
 		{
-			list.Add( new Btn( new Rectangle( 16f, RideY, 200f, BtnH ),
+			if ( shop.Kind != ShopKind.Toilet )
+			{
+				list.Add( new Btn( new Rectangle( 16f, RideY, 64f, BtnH ), "PRICE-", shop.Price > 1f,
+					() => shop.Price = System.Math.Max( 1f, shop.Price - 1f ) ) );
+				list.Add( new Btn( new Rectangle( 84f, RideY, 88f, BtnH ), $"PRICE+ {shop.Price:0}", true,
+					() => shop.Price += 1f ) );
+			}
+			list.Add( new Btn( new Rectangle( 192f, RideY, 230f, BtnH ),
 				$"SELL {shop.Name} ${shop.BuildCost * Ride.SellRefundFraction:0}", true,
 				() => BuildMode.Current?.SellSelected(), Warned: true ) );
 		}
