@@ -90,8 +90,10 @@ Traced where the effect records (`DAT_00804370`, stride 320 = `short[160]`) are 
 2. A handful of minor `short[160]` slots (per-particle size, sprite/texture ref, blend mode) weren't isolated
    — the spawn reads colour from the ramp region and most remaining slots are emitter runtime-state. The
    gameplay-meaningful authored fields are labelled above.
-   **Note:** OpenTPW's renderer still uses a colour-proxy for effects (T-007/T-037), so the new fields are
-   consumed only once a real particle simulation exists — but they're now decoded and ready.
+   **Consumed in-game:** the `RideEngine` effect proxy now *uses* these labels — instead of one static cube it
+   spawns a `BurstCount` burst of small motes, each living `LifetimeTicks` and drifting under the effect's
+   `EmissionVelocity` + `Acceleration` (still colour-proxies, not a full GPU particle sim, but data-driven and
+   verified in-game). So the decode is wired into live gameplay, not documentation-only.
 
 ## Affected files
 
