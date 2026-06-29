@@ -30,7 +30,7 @@ public sealed class Peep : ModelEntity
 	private const float LeaveHappiness = 10f;   // fed up below this
 	private const float LitterChancePerSec = 0.04f; // ~1 dropped every ~25 s of wandering
 	private const float LitterRadius = 18f;          // litter within this sours the mood
-	private const float LitterPenaltyPerSec = 1.5f;  // happiness lost per second per nearby litter (capped)
+	private const float LitterPenaltyPerSec = 0.4f;  // happiness lost per second per nearby litter (capped at 3 → max 1.2/s, so a peep survives the walk to a ride instead of dying in the litter death-spiral)
 	private const float HungerPerSec = 2f;           // hunger builds while in the park (0..100)
 	private const float HungerThreshold = 55f;        // detour to a food stall at this point
 	private const float ThirstPerSec = 2.6f;          // thirst builds a little faster than hunger (0..100)
@@ -336,7 +336,14 @@ public sealed class Peep : ModelEntity
 			pos = route.PositionOf( this );
 		}
 
-		bool atSpot = MoveTo( route.StandPoint( pos ) );
+		var standPt = route.StandPoint( pos );
+		bool atSpot = MoveTo( standPt );
+		// The boarding tile sits right next to the ride footprint, which the path graph treats as blocked, so
+		// A* stops ~1–2 tiles short and the peep can never land exactly on it (it would orbit the entrance
+		// forever, never boarding). Count "close enough at the front" as arrived so the peep actually boards.
+		const float BoardReach = 40f; // ~2.5 tiles
+		if ( pos == 0 && (Position - standPt).Length <= BoardReach )
+			atSpot = true;
 
 		// Only the front peep boards, and only once it has reached the entrance and a slot is free.
 		if ( pos == 0 && atSpot && route.HasFreeSlot )
