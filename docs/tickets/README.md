@@ -18,14 +18,13 @@ Tickets derived from the 2026-06-15 analysis (build + tests run on Linux with
 ## Remaining work (open tickets)
 
 All format/VM decoding and the core gameplay loop are done. Open work falls into:
-- **🆕 Next steps (proposed — from the 2026-06 RE pass, T-053–T-060)**: a 4-agent recon pass (assets + the
-  named-symbol no-CD binary) surfaced the **meta-game** layer that's authored-but-unimplemented. The
-  highest-value cluster is **progression**: an in-game clock (**T-053**, foundation) → the **challenge system**
-  (**T-054**, `Challenges.sam` = 35 challenges, scorer RE'd) + **golden-ticket goals** (**T-055**, targets in
-  `Standard.sam`, `CGoldenTicketControl` RE'd). Then **save/load** (**T-059**, `.TPWS` `SAD_*` modules RE'd, or
-  a native save), the **peep decision scorer** (**T-060**, `DecisionVar*` weights RE'd), and lower-value
-  atmosphere/UX: **weather/seasons** (**T-056**), **minimap** (**T-057**), **sideshows** (**T-058**). All have
-  the data present; see each ticket for the RE evidence.
+- **✅ Meta-game layer (2026-06 RE pass, T-053–T-060) — all landed**: a 4-agent recon pass (assets + the
+  named-symbol no-CD binary) surfaced the **meta-game** layer that was authored-but-unimplemented, and the whole
+  cluster is now built: the in-game clock (**T-053**, foundation) → the **challenge system** (**T-054**,
+  `Challenges.sam`) + **golden-ticket goals** (**T-055**), **save/load** (**T-059**, native), the **peep decision
+  scorer** (**T-060**), and the atmosphere/UX tail — **weather/seasons** (**T-056**), **minimap** (**T-057**),
+  **sideshows** (**T-058**). Each is core-done/done with unit tests + in-game verification; see the per-ticket
+  notes for what polish remains.
 - **Active feature tails**: remaining items are all low-value/blocked — **T-047** COAST/ADDOBJ residue (needs
   the `.MAP` code→asset catalog), **T-048** car-waypoint positions (runtime-bound, no file data), per-message
   advisor clips (not shipped). The headline tails (T-046/47/48/52) are otherwise done.
@@ -96,7 +95,7 @@ All format/VM decoding and the core gameplay loop are done. Open work falls into
 | [T-055](T-055-golden-ticket-goals.md) | 🟡 Feature | ⚠️ Core done | **Golden-ticket goals / level objectives** — `GoldenTicketLocal.*` parsed from `Standard.sam`; pure evaluator + manager track visitors/in-park/happiness/happy-people/profit-per-year (on `OnNewDay`), award once all met; HUD `TICKET GOALS n/5` → `WON!`. 5 unit tests, verified in-game. Polish: RecentVisitors window + award effect/advisor |
 | [T-056](T-056-weather-seasons.md) | 🟢 Low | ⚠️ Core done | **Weather + seasons** — `Seasons[0..3]`/`Weather.*`/`WeatherEffects.Quality*` parsed from `Standard.sam`; pure `Weather.Classify`/`SeasonForMonth`/`RollQuality` + clock-driven `WeatherSim` (re-rolls each `DaysBetweenChanges` on `OnNewDay`); screen-space rain/snow tint + animated precipitation + lightning flash overlay (`WeatherOverlay`) + season/sky HUD line. 9 unit tests, verified in-game (`OPENTPW_WEATHER` pins a state). Polish: feed weather into peep behaviour + real fog/lighting ramp |
 | [T-057](T-057-minimap.md) | 🟢 Low | ✅ Done | **Minimap (2dmap)** — `MinimapPanel` corner map: the level's `2dmap.tga` backdrop + a live pin per ride/shop/peep/litter at its projected world position (pure `MinimapProjection` over the placement-grid bounds, 6 unit tests), a camera-focus box, a `RIDE/SHOP/PEEP/LITR` legend that toggles each layer, M to toggle, click-to-pan. Verified in-game |
-| [T-058](T-058-sideshow-rides.md) | 🟢 Low | ☐ To do | **Sideshow rides** (proposed) — 5 `sideshow/*.wad` per level, ride engine reusable; `SideshowTakings`/`EventSideshowWin` stubs exist |
+| [T-058](T-058-sideshow-rides.md) | 🟢 Low | ✅ Done | **Sideshow rides** — the 5 jungle `sideshow/*.wad` stalls load like rides into the catalog; `Ride` auto-detects `IsSideshow` + reads its authored `UsageInfo` odds, and a peep plays it for pay-to-play **takings** (pure `SideshowEconomy`, 5 tests) credited via `ParkFinances.TakeSideshowTakings` (+ played/won counters, HUD line). Verified in-game (peeps queued + played, takings accrued) |
 | [T-059](T-059-save-load.md) | 🟡 Feature | ⚠️ Core done | **Save / load games** (Route A) — native versioned-JSON `SaveGame` (balance+loans+clock+rides/shops), `Level.CaptureSave`/`ApplySave` rebuild the park, **F5 save / F9 load**. Round-trip unit-tested + verified in-game. Remaining: staff/coaster-tracks/fine-progression + slot UI; Route B (`.TPWS` compat) needs a sample |
 | [T-060](T-060-peep-decision-scorer.md) | 🟡 Feature | ⚠️ Core done | **Peep ride-choice scorer** — authored `PeepInfo.DecisionVar*` weights load from `Standard.sam`; pure `RideChoiceScorer` scores excitement vs distance vs queue (+ new-ride bonus); `Peep.PickRoute` picks weighted-by-score. 6 unit tests, verified in-game. Polish: preferred-excitement match + ride-age |
 

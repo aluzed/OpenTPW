@@ -2,8 +2,34 @@
 
 - **Priority**: 🟢 Low (content)
 - **Type**: Engine
-- **Status**: ☐ To do (proposed — RE recon done; **5 sideshow WADs present, ride engine reusable**)
+- **Status**: ✅ Done (placeable from the catalog, peeps play them, takings credited; verified in-game)
 - **Related**: [T-032](T-032-ride-engine.md) (ride engine), [T-041](T-041-ride-shop-placement.md) (placement).
+
+## Done
+
+- **Catalog**: the 5 jungle `sideshow/*.wad` stalls (`puzzle`, `squark`, `hyenas`, `junspray`, `arc2x3`) are
+  added to the build catalog exactly like rides — their wad carries shape/mesh/script, so `RideShape.Load`
+  + `SpawnRideAt` place them with no new placement infra.
+- **`Ride.IsSideshow`**: auto-detected from the `sideshow/` path (holds even if the `.sam` is absent); when set,
+  the ride reads its authored `UsageInfo.InitPricePerUse`/`InitCostOfGoods`/`InitChanceOfLoosing` (defaults
+  10/30/70 from the shared `SideShow.sam`) and drives `TicketPrice` from the play price.
+- **Takings** (`SideshowEconomy`, pure + 5 unit tests): a peep always pays the price; with the complementary
+  chance they win and the park pays out a prize costing `costOfGoods`, so net = `price` (loss) or
+  `price − costOfGoods` (win) — the authored jungle numbers give the house a small +1/play edge.
+- **Peep seam**: when a peep reaches a sideshow's front and a slot is free it calls `Ride.PlaySideshow()`
+  (rolls win/lose) and credits `ParkFinances.TakeSideshowTakings(net, won)` instead of `TakeRideTicket` —
+  with `SideshowRevenue` + played/won counters (folded into `TotalIncome`, shown on the stats HUD).
+- **Queue**: sideshow shapes mark only an *exit* cell (no entrance), so `SpawnQueuePath` falls back to the exit
+  cell — a stall still forms a queue and earns.
+- Verified in-game: the autoplaced `puzzle`/`squark` stalls drew peeps who queued + played; `SIDESHOW` takings
+  accrued (`played 3, won 0 → 30`).
+
+## Remaining (polish)
+
+- The VM `EVT_SIDESHOW_WIN` (212) event still only exists as a constant — wiring the script-driven win
+  sound/particle (`CreateParticleEffect 80` / `DestroyParticleEffect 76`) is a cosmetic follow-up; the economic
+  win/loss already drives takings via the peep-play path.
+- Sideshows are `ISIndoors 1` (shelter from rain) — a natural tie-in with the weather sim (T-056), not yet wired.
 
 ## Context
 
