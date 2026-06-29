@@ -36,6 +36,7 @@ internal sealed class ParkStatsPanel : HudPanel
 			$"TICKETS {fin.RideRevenue:0}",
 			$"GATE {fin.EntryRevenue:0}",
 			$"FOOD {fin.FoodRevenue:0}",
+			$"SIDESHOW {fin.SideshowRevenue:0}  (played {fin.SideshowsPlayed}, won {fin.SideshowsWon})",
 			$"UPKEEP {fin.UpkeepPaid:0}",
 			$"WAGES {fin.WagesPaid:0}",
 			$"VISITORS {visitors}   STAFF {staff}",

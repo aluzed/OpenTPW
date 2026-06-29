@@ -226,6 +226,25 @@ public class Ride : Entity
 	/// the tour/kart circuit loop (T-048 / docs/08).</summary>
 	public bool IsBumperRide => VM != null && VM.Instructions.Any( i => i.opcode is Opcode.BUMP );
 
+	/// <summary>True if this is a <b>sideshow</b> — a small stall/game (coconut shy, puzzle, etc.) loaded from
+	/// the level's <c>sideshow/</c> folder. Peeps "play" it like a quick ride, but it pays out via the takings
+	/// model (<see cref="SideshowEconomy"/>) — pay-to-play with a chance of winning a prize — rather than a flat
+	/// ride ticket (T-058).</summary>
+	public bool IsSideshow { get; private set; }
+
+	/// <summary>Authored sideshow economics (T-058), from the stall's <c>UsageInfo</c> fields; only meaningful
+	/// when <see cref="IsSideshow"/>.</summary>
+	public int SideshowPrice { get; private set; }
+	public int SideshowCostOfGoods { get; private set; }
+	public int SideshowChanceOfLoosing { get; private set; }
+	private readonly Random sideshowRng = new();
+
+	/// <summary>Run one sideshow play (T-058): roll win/lose against the authored odds and return the park's net
+	/// takings + whether the peep won. The peep-play path calls this; the pure maths live in
+	/// <see cref="SideshowEconomy"/>.</summary>
+	public (float Net, bool Won) PlaySideshow()
+		=> SideshowEconomy.Play( SideshowPrice, SideshowCostOfGoods, SideshowChanceOfLoosing, sideshowRng.NextDouble() );
+
 	/// <summary>What the player paid to build this ride — used to compute the sell refund (T-041).</summary>
 	public float BuildCost { get; set; }
 
@@ -278,6 +297,10 @@ public class Ride : Entity
 		Position = position;
 		Archive = rideArchive;
 		Rotation = ((rotation % 4) + 4) % 4;
+		// Sideshows live in the level's sideshow/ folder; detected by path so it holds even if the .sam is absent.
+		// Economy defaults match the shared jungle SideShow.sam, overridden below by the stall's own UsageInfo.
+		IsSideshow = rideArchive.Contains( "sideshow", StringComparison.OrdinalIgnoreCase );
+		(SideshowPrice, SideshowCostOfGoods, SideshowChanceOfLoosing) = (10, 30, 70);
 		var rideName = Path.GetFileNameWithoutExtension( rideArchive );
 		Shape = RideShape.Load( rideArchive, rideName ).Rotated( Rotation );
 
@@ -324,6 +347,16 @@ public class Ride : Entity
 			Excitement = Math.Max( 1, ReadInt( settings, "UsageInfo.ExcitementLevel", 50 ) );
 			Attraction = ReadInt( settings, "Info.AttractionValue", 25 );
 			TicketPrice = MathF.Max( 1f, MathF.Round( Excitement / 10f ) );
+
+			// Sideshow takings (T-058): a stall is pay-to-play with a chance of winning a prize; load its
+			// authored odds and let the play price drive the ticket/price model.
+			if ( IsSideshow )
+			{
+				SideshowPrice = Math.Max( 1, ReadInt( settings, "UsageInfo.InitPricePerUse", SideshowPrice ) );
+				SideshowCostOfGoods = Math.Max( 0, ReadInt( settings, "UsageInfo.InitCostOfGoods", SideshowCostOfGoods ) );
+				SideshowChanceOfLoosing = Math.Clamp( ReadInt( settings, "UsageInfo.InitChanceOfLoosing", SideshowChanceOfLoosing ), 0, 100 );
+				TicketPrice = SideshowPrice;
+			}
 
 			Log.Info( $"[ride] loaded '{Name}' from {rideArchive} (footprint {Shape.Width}x{Shape.Height}, entrance {Shape.Entrance?.ToString() ?? "none"}, exit {Shape.Exit?.ToString() ?? "none"})" );
 		}

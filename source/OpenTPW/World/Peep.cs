@@ -334,7 +334,14 @@ public sealed class Peep : ModelEntity
 		// Only the front peep boards, and only once it has reached the entrance and a slot is free.
 		if ( pos == 0 && atSpot && route.HasFreeSlot )
 		{
-			ParkFinances.Current?.TakeRideTicket( route.Ride.TicketPrice ); // pays to board
+			// A sideshow is pay-to-play with a chance of winning a prize (T-058); a normal ride takes a flat ticket.
+			if ( route.Ride.IsSideshow )
+			{
+				var (net, won) = route.Ride.PlaySideshow();
+				ParkFinances.Current?.TakeSideshowTakings( net, won );
+			}
+			else
+				ParkFinances.Current?.TakeRideTicket( route.Ride.TicketPrice ); // pays to board
 			route.Board( this );
 			riding = true;
 			rideTimer = route.RideDuration;

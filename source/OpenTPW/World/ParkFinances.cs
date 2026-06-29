@@ -42,7 +42,7 @@ public sealed class ParkFinances
 	/// Drives the advisor's escalating "in the red" warnings (T-046).</summary>
 	public int MonthsInRed { get; private set; }
 
-	private float TotalIncome => RideRevenue + EntryRevenue + FoodRevenue;
+	private float TotalIncome => RideRevenue + EntryRevenue + FoodRevenue + SideshowRevenue;
 	private float TotalExpense => UpkeepPaid + WagesPaid + BuildSpent;
 
 	// Capture this month's flows (cumulative totals minus the last snapshot) + the closing balance.
@@ -170,6 +170,22 @@ public sealed class ParkFinances
 		Money += price;
 		RideRevenue += price;
 		RidesRidden++;
+	}
+
+	/// <summary>How many sideshows peeps have played + won, and the park's cumulative sideshow takings (T-058).</summary>
+	public int SideshowsPlayed { get; private set; }
+	public int SideshowsWon { get; private set; }
+	public float SideshowRevenue { get; private set; }
+
+	/// <summary>A peep plays a sideshow: the park banks the net takings (the pay-to-play price, minus a prize
+	/// payout when the peep wins — see <see cref="SideshowEconomy"/>). Net can be negative on a winning play.</summary>
+	public void TakeSideshowTakings( float net, bool won )
+	{
+		Money += net;
+		SideshowRevenue += net;
+		SideshowsPlayed++;
+		if ( won )
+			SideshowsWon++;
 	}
 
 	/// <summary>A fresh visitor pays the gate entry fee.</summary>

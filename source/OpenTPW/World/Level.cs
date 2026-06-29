@@ -168,6 +168,8 @@ public class Level
 				+ $"shop={CommitPlacement( Item( "shop" ), grid, terrain, cx + 6, cy + 4 )} "
 				+ $"drink={CommitPlacement( Item( "drink" ), grid, terrain, cx + 6, cy + 1 )} "
 				+ $"toilet={CommitPlacement( Item( "toilet" ), grid, terrain, cx + 8, cy + 4 )} "
+					+ $"sideshow={CommitPlacement( Item( "puzzle" ), grid, terrain, cx - 2, cy + 4 )} " // T-058: a stall peeps play
+					+ $"squark={CommitPlacement( Item( "squark" ), grid, terrain, cx + 2, cy + 4 )} "
 				+ $"ent={CommitPlacement( Item( "entertainer" ), grid, terrain, cx, cy + 2 )} "
 				+ $"hand={CommitPlacement( Item( "handyman" ), grid, terrain, cx + 2, cy + 2 )} "
 				+ $"rsch={CommitPlacement( Item( "researcher" ), grid, terrain, cx + 4, cy + 2 )} "
@@ -378,6 +380,14 @@ public class Level
 		foreach ( var path in new[] { "levels/jungle/rides/totem", "levels/jungle/rides/monkey", "levels/jungle/rides/wateride", "levels/jungle/rides/coaster1", "levels/jungle/rides/gokarts", "levels/jungle/rides/tourride", "levels/jungle/rides/bumper" } )
 		{
 			var name = Path.GetFileName( path );
+			var shape = RideShape.Load( path, name );
+			list.Add( new BuildCatalogItem( name, path, null, shape.Width, shape.Height, ReadRideCost( path, name ) ) );
+		}
+		// Sideshows (T-058): the level's stalls/games — placed like rides (their wad carries shape/mesh/script),
+		// but peeps play them for pay-to-play takings rather than a flat ticket (see Ride.IsSideshow).
+		foreach ( var name in new[] { "puzzle", "squark", "hyenas", "junspray", "arc2x3" } )
+		{
+			var path = $"levels/jungle/sideshow/{name}";
 			var shape = RideShape.Load( path, name );
 			list.Add( new BuildCatalogItem( name, path, null, shape.Width, shape.Height, ReadRideCost( path, name ) ) );
 		}
@@ -593,7 +603,9 @@ public class Level
 	// can follow them), or null if the ride has no entrance.
 	private static IReadOnlyList<Vector3>? SpawnQueuePath( Ride ride, PlacementGrid grid, ParkTerrain terrain, int tx, int ty, int length = 6 )
 	{
-		if ( ride.Shape.Entrance is not { } e )
+		// Sideshow shapes mark only an exit cell (no separate entrance) — peeps queue at, play, and leave from
+		// that one cell (T-058). Fall back to it so a stall still gets a queue and earns takings.
+		if ( (ride.Shape.Entrance ?? ride.Shape.Exit) is not { } e )
 			return null;
 
 		// Outward direction = away from the footprint edge the entrance is on.
