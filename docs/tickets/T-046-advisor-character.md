@@ -120,7 +120,9 @@ assets by iterating screenshot → adjust the anchoring constants in `Advisor.cs
     `[advisor+(group+2)*0xc+8][msgId].+4` → `FUN_00472d70` drives the talking-head node visibility.
   - The clip handles in those entries are loaded a layer deeper (the message-centre / localized resource),
     which still needs tracing; the exact `sp_NNN` numbers weren't recovered. **Not worth a deep dig** unless
-    real per-message voice becomes a priority — a positional/heuristic clip pick is the cheap alternative.
+    real per-message voice becomes a priority. **Pragmatic alternative shipped:** the advisor now shows the
+    readable **tip text** per advice id (`AdvisorTips`) in a HUD speech panel (one neutral `sp_001` voice
+    under it), so the advice is useful to the player without the per-clip audio mapping.
 - ~~The advisor still only spawns under `OPENTPW_ADVISOR_DEMO=1`.~~ **Done**: it now spawns by default in a
   park, gated on the persisted `GameSettings.AdvisorEnabled` (default true, the original's `AdvisorOn`); the
   env var still force-spawns it anywhere for testing. Verified in-game (welcome tip + lip-sync, no env var).
