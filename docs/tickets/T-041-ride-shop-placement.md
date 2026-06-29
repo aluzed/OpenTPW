@@ -83,8 +83,9 @@
 
 ## Remaining (follow-up)
 
-- None blocking — T-041 covers catalog/preview/place/manage/sell/rotate + HUD readouts. (Nice-to-haves: a
-  real drag-to-rotate handle, and shop price controls.)
+- None blocking — T-041 covers catalog/preview/place/manage/sell/rotate + HUD readouts. **Shop price controls
+  now done** (PRICE± buttons / `,`·`.` keys / HUD on a selected food-or-drink stall; toilets stay free;
+  persisted through save/load). Remaining nice-to-have: a real drag-to-rotate handle.
 
 ## Context
 
