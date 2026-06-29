@@ -237,6 +237,7 @@ public class Ride : Entity
 	public int SideshowPrice { get; private set; }
 	public int SideshowCostOfGoods { get; private set; }
 	public int SideshowChanceOfLoosing { get; private set; }
+	private int sideshowWinEffect = 80; // Info.CreateParticleEffect — the burst when a peep wins (T-058)
 	private readonly Random sideshowRng = new();
 
 	/// <summary>True if this attraction is under cover (<c>UsageInfo.ISIndoors</c>) — peeps shelter here from
@@ -247,7 +248,15 @@ public class Ride : Entity
 	/// takings + whether the peep won. The peep-play path calls this; the pure maths live in
 	/// <see cref="SideshowEconomy"/>.</summary>
 	public (float Net, bool Won) PlaySideshow()
-		=> SideshowEconomy.Play( SideshowPrice, SideshowCostOfGoods, SideshowChanceOfLoosing, sideshowRng.NextDouble() );
+	{
+		var result = SideshowEconomy.Play( SideshowPrice, SideshowCostOfGoods, SideshowChanceOfLoosing, sideshowRng.NextDouble() );
+		if ( result.Won )
+		{
+			Log.Info( $"[sideshow] {Name}: a peep won! burst effect {sideshowWinEffect}" );
+			engine.SpawnParticleEffect( sideshowWinEffect ); // a celebratory burst over the stall (authored code)
+		}
+		return result;
+	}
 
 	/// <summary>What the player paid to build this ride — used to compute the sell refund (T-041).</summary>
 	public float BuildCost { get; set; }
@@ -360,6 +369,7 @@ public class Ride : Entity
 				SideshowPrice = Math.Max( 1, ReadInt( settings, "UsageInfo.InitPricePerUse", SideshowPrice ) );
 				SideshowCostOfGoods = Math.Max( 0, ReadInt( settings, "UsageInfo.InitCostOfGoods", SideshowCostOfGoods ) );
 				SideshowChanceOfLoosing = Math.Clamp( ReadInt( settings, "UsageInfo.InitChanceOfLoosing", SideshowChanceOfLoosing ), 0, 100 );
+				sideshowWinEffect = ReadInt( settings, "Info.CreateParticleEffect", sideshowWinEffect );
 				TicketPrice = SideshowPrice;
 			}
 
