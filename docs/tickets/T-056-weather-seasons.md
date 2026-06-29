@@ -2,7 +2,7 @@
 
 - **Priority**: 🟢 Low (atmosphere)
 - **Type**: Engine / rendering
-- **Status**: ⚠️ Core done (sim + overlay + HUD; peep-behaviour nudge + real fog/lighting ramp remain)
+- **Status**: ✅ Done (sim + overlay + HUD; weather drives peeps; day/night wash) — verified in-game
 - **Needs**: [T-053](T-053-ingame-clock.md) (day/season clock).
 
 ## Done
@@ -21,13 +21,21 @@
   shows a `SPRING STORM (q5)`-style season/sky line.
 - **Wiring**: `Level` builds the sim from the level settings + ticks it on the daily clock. `OPENTPW_WEATHER`
   (`rain`/`storm`/`snow`/`blizzard`) pins a state so the overlay can be demoed on a level that rarely produces it.
-- 9 MSTest unit tests (`WeatherSimTests`); verified in-game (storm = blue wash + streaks + HUD line).
+- **Weather → peeps**: an exposed peep loses happiness in rain/snow (`Weather.ComfortPenaltyPerSec` — base per
+  kind + a storm bite), which feeds `WantsToLeave` so crowds thin out in foul weather; peeps heading to an
+  indoor stall are exempt (sheltering). Ride choice biases toward **indoor** attractions in bad weather
+  (`Ride.IsIndoors` from `UsageInfo.ISIndoors` + a `RideChoiceScorer` indoor bonus). Riding peeps already exempt.
+- **Day/night** (`DayNightCycle` + `DayNightOverlay`): a slow cosmetic cycle (120 s/visual-day, decoupled from
+  the compressed gameplay clock, anchored at midday on load) washes the park toward a night tint (hue from
+  `ThemeEngine.AmbientLightLevel`) and clears at midday; the stats HUD shows the day phase. Alpha-bucketed
+  tint textures avoid per-frame allocation.
+- Unit tests: `WeatherSimTests` (config/classify/roll/comfort), `RideChoiceScorerTests` (indoor bonus),
+  `DayNightTintTests` (ramp/phase). Verified in-game: storm wash + streaks + HUD; DAY→NIGHT darkening + phase.
 
 ## Remaining (polish)
 
-- Feed weather into peep behaviour (shelter/leave in bad weather).
-- A real fog/lighting ramp (`FogColour`/`AmbientLightLevel`/`DirectionalLightLevel`) — currently a flat tint,
-  not the day-cycle lighting; the renderer is unlit.
+- A *true* lit fog ramp (`FogColour`/`DirectionalLightLevel`) — the day/night is a screen tint, not real
+  lighting; the renderer is unlit.
 - Ambient rain sound (`mRainSoundHandle`) + the snow path on a level that actually enables it.
 
 ## Context
