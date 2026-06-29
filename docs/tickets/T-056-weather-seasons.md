@@ -2,8 +2,33 @@
 
 - **Priority**: 🟢 Low (atmosphere)
 - **Type**: Engine / rendering
-- **Status**: ☐ To do (proposed — RE recon done; **balance data + weather assets present**)
+- **Status**: ⚠️ Core done (sim + overlay + HUD; peep-behaviour nudge + real fog/lighting ramp remain)
 - **Needs**: [T-053](T-053-ingame-clock.md) (day/season clock).
+
+## Done
+
+- **Parse** (`WeatherConfig.ParseLocal`): `Seasons[0..3].{AvgWeatherQuality,NormalTolerance,ChanceForExceptionalWeather}`,
+  `Weather.{DaysBetweenChanges,DaysOfWarning,SpeedOfChange}`, `WeatherEffects.QualityFor{Rain,Snow,Lightning}{Low,High}`
+  from the level `Standard.sam`. A `-1` bound disables that effect (jungle never snows); a missing block falls
+  back to always-clear.
+- **Pure maths** (`Weather`, unit-tested): `SeasonForMonth` (12 months → 4 seasons), `Classify` (quality 0..100,
+  lower = worse → clear/rain/snow, snow wins overlaps, lightning rides on top), `RollQuality` (avg ± tolerance,
+  doubled on an exceptional roll, clamped).
+- **Sim** (`WeatherSim`): rolls a fresh quality for the current season every `DaysBetweenChanges` on
+  `GameClock.OnNewDay`; `Current` exposes `State`/`Quality`/`Season` for the overlay + HUD.
+- **Visuals** (`WeatherOverlay : HudPanel`): full-screen colour wash + animated falling precipitation
+  (rain streaks / drifting snow, a deterministic per-index stream) + a brief lightning flash. `ParkStatsPanel`
+  shows a `SPRING STORM (q5)`-style season/sky line.
+- **Wiring**: `Level` builds the sim from the level settings + ticks it on the daily clock. `OPENTPW_WEATHER`
+  (`rain`/`storm`/`snow`/`blizzard`) pins a state so the overlay can be demoed on a level that rarely produces it.
+- 9 MSTest unit tests (`WeatherSimTests`); verified in-game (storm = blue wash + streaks + HUD line).
+
+## Remaining (polish)
+
+- Feed weather into peep behaviour (shelter/leave in bad weather).
+- A real fog/lighting ramp (`FogColour`/`AmbientLightLevel`/`DirectionalLightLevel`) — currently a flat tint,
+  not the day-cycle lighting; the renderer is unlit.
+- Ambient rain sound (`mRainSoundHandle`) + the snow path on a level that actually enables it.
 
 ## Context
 
