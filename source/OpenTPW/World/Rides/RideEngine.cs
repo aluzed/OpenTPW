@@ -187,8 +187,8 @@ public sealed class RideEngine : IRideEngine
 				Entity.All.Remove( light.Proxy );
 		lights.Clear();
 
-		foreach ( var (entity, _) in particleProxies )
-			Entity.All.Remove( entity );
+		foreach ( var p in particleProxies )
+			Entity.All.Remove( p.Entity );
 		particleProxies.Clear();
 
 		foreach ( var (_, marker) in headProxies.Values )
@@ -445,9 +445,26 @@ public sealed class RideEngine : IRideEngine
 		}
 	}
 
-	private const float ParticleProxyLife = 1.2f; // seconds an effect proxy stays before fading out
-	private readonly List<(ModelEntity Entity, float Expire)> particleProxies = new();
-	private float lastNow; // most recent Update time, for timing proxy expiry
+	// A single live proxy particle: a small emissive cube that drifts under its own velocity + the effect's
+	// acceleration until it expires. Driven by the .PLB fields decoded in T-019.
+	private sealed class ParticleProxy
+	{
+		public required ModelEntity Entity;
+		public Vector3 Velocity;
+		public Vector3 Acceleration;
+		public float Expire;
+	}
+
+	private readonly List<ParticleProxy> particleProxies = new();
+	private float lastNow; // most recent Update time, for timing proxy expiry + integration
+
+	// Burst tuning. The .PLB stores velocity/lifetime in engine fixed-point; these map them to world units at
+	// a visible scale (the relative magnitudes + signs are authentic, the absolute scale is a display choice).
+	private const float ParticleProxyLife = 1.2f; // fallback proxy life when the effect has no decoded lifetime
+	private const int MaxBurst = 24;            // cap particles per effect so a big burst stays cheap
+	private const float TickToSeconds = 1f / 200f; // LifetimeTicks → seconds (Sparks 100→0.5s, Smoke 800→4s)
+	private const float VelScale = 0.04f;       // fixed-point velocity → world units/sec
+	private const float SpreadSpeed = 3.5f;     // random outward burst speed added to every particle (units/sec)
 
 	// Particle effect at the ride centre (no addressed node) — the Repair() effect + any caller without a
 	// node. Sits high over the ride body, as before.
@@ -500,22 +517,66 @@ public sealed class RideEngine : IRideEngine
 		}
 		try
 		{
+			// Drive the burst from the .PLB fields (T-019): how many particles, how long they live, their
+			// emission velocity + acceleration. A continuous emitter (BurstCount 0, e.g. Smoke/Repair) still
+			// shows a small puff. The cube colour is the effect's representative ramp stop.
+			var fx = EffectFor( effectCode );
+			int count = Math.Clamp( fx?.BurstCount ?? 1, 1, MaxBurst );
+			if ( fx is { BurstCount: 0 } )
+				count = 4;
+			float life = fx is { LifetimeTicks: > 0 }
+				? Math.Clamp( fx.LifetimeTicks * TickToSeconds, 0.3f, 4f )
+				: ParticleProxyLife;
+			var baseVel = fx != null
+				? new Vector3( fx.EmissionVelocity.X, fx.EmissionVelocity.Y, fx.EmissionVelocity.Z ) * VelScale
+				: Vector3.Zero;
+			var accel = fx != null
+				? new Vector3( fx.Acceleration.X, fx.Acceleration.Y, fx.Acceleration.Z ) * VelScale
+				: Vector3.Zero;
+
 			var mat = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader",
 				MaterialFlags.DoubleSided | MaterialFlags.DisableDepthWrite );
 			mat.Set( "Color", new Texture( [r, g, b, 255], 1, 1 ) );
-			var proxy = new ModelEntity
+			var model = Primitives.Cube.GenerateModel( mat );
+			float scale = count > 1 ? 1.1f : 2.5f; // a lone proxy stays chunky; a burst uses small motes
+
+			for ( var i = 0; i < count; i++ )
 			{
-				Model = Primitives.Cube.GenerateModel( mat ),
-				Scale = new Vector3( 2.5f ),
-				Position = position,
-			};
-			particleProxies.Add( (proxy, lastNow + ParticleProxyLife) );
+				var proxy = new ModelEntity
+				{
+					Model = model,
+					Scale = new Vector3( scale ),
+					Position = position,
+				};
+				particleProxies.Add( new ParticleProxy
+				{
+					Entity = proxy,
+					Velocity = baseVel + RandomSpread() * SpreadSpeed,
+					Acceleration = accel,
+					Expire = lastNow + life,
+				} );
+			}
 		}
 		catch ( Exception e )
 		{
 			Log.Warning( $"[ride] particle effect {effectCode} proxy failed: {e.Message}" );
 		}
 		Log.Info( $"[ride] particle effect {effectCode} ({name}) @{position}" );
+	}
+
+	// The decoded effect record for a code (for its spawn fields), or null if the library/effect is absent.
+	private static ParticleEffect? EffectFor( int effectCode )
+	{
+		var lib = ParticleLib;
+		return lib != null && effectCode >= 0 && effectCode < lib.Effects.Count ? lib.Effects[effectCode] : null;
+	}
+
+	// A random unit-ish vector biased gently upward, so a burst sprays outward + up rather than sideways only.
+	private static Vector3 RandomSpread()
+	{
+		float a = (float)(Random.Shared.NextDouble() * Math.PI * 2);
+		float r = (float)Random.Shared.NextDouble();
+		return new Vector3( MathF.Cos( a ) * r, MathF.Sin( a ) * r, 0.4f + (float)Random.Shared.NextDouble() * 0.8f );
 	}
 
 	// The effect's name + a representative colour (its brightest ramp stop) from the decoded .PLB (T-019);
@@ -536,13 +597,20 @@ public sealed class RideEngine : IRideEngine
 
 	private void ExpireParticleProxies( float now )
 	{
+		float dt = Math.Clamp( now - lastNow, 0f, 0.1f ); // integrate motion; clamp so a long stall can't fling them
 		lastNow = now;
 		for ( var i = particleProxies.Count - 1; i >= 0; i-- )
 		{
-			if ( now < particleProxies[i].Expire )
+			var p = particleProxies[i];
+			if ( now >= p.Expire )
+			{
+				Entity.All.Remove( p.Entity );
+				particleProxies.RemoveAt( i );
 				continue;
-			Entity.All.Remove( particleProxies[i].Entity );
-			particleProxies.RemoveAt( i );
+			}
+			// Drift the mote under its velocity + the effect's acceleration (gravity/buoyancy).
+			p.Velocity += p.Acceleration * dt;
+			p.Entity.Position += p.Velocity * dt;
 		}
 	}
 
