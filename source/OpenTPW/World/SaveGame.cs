@@ -6,20 +6,25 @@ namespace OpenTPW;
 /// <summary>
 /// A native OpenTPW save (T-059, Route A): a versioned JSON snapshot of the park — the balance + loans, the
 /// in-game clock, the placed rides/shops (their catalog name, tile, rotation, ticket price, research/upgrade
-/// level + mechanical condition), and the hired staff (role + position + patrol zone). Capturing + applying
-/// live in <see cref="Level"/> (which owns the placement pipeline); this is the serializable shape +
+/// level + mechanical condition), the hired staff (role + position + patrol zone), the player-built coaster
+/// tracks, and the goal progression (the active/offered challenge + the golden-ticket win flag). Capturing +
+/// applying live in <see cref="Level"/> (which owns the placement pipeline); this is the serializable shape +
 /// fault-tolerant file I/O (mirrors <c>GameSettings</c>), with <see cref="SlotPath"/> save slots. Peeps are
-/// transient (they respawn); the restored clock keeps the calendar/loan/challenge timing aligned.
+/// transient (they respawn); the restored clock keeps the calendar/loan timing aligned. Versioning is
+/// additive + back-compatible — older saves simply lack the newer blocks, which default to "none".
 /// </summary>
 public sealed class SaveGame
 {
-	public int Version { get; set; } = 2;
+	public int Version { get; set; } = 3;
 	public float Money { get; set; }
 	public float EntryFee { get; set; }
 	public float ClockSeconds { get; set; }
 	public List<LoanState> Loans { get; set; } = new();
 	public List<Placement> Placements { get; set; } = new();
 	public List<StaffState> Staff { get; set; } = new();
+	public List<TrackState> Tracks { get; set; } = new(); // player-built coaster tracks (one per coaster)
+	public ChallengeState? Challenge { get; set; }    // active/offered challenge progress (null = none)
+	public bool GoldenTicketAwarded { get; set; }     // the level-win flag (T-055), so a won park stays won
 
 	public sealed class LoanState
 	{
@@ -61,6 +66,38 @@ public sealed class SaveGame
 		public float ZoneX { get; set; }
 		public float ZoneY { get; set; }
 		public float ZoneRadius { get; set; }
+	}
+
+	/// <summary>The active/offered challenge's progression (T-059, T-054). The challenge itself is identified by
+	/// its <c>Index</c> into the level's <c>Challenges.sam</c> list; the manager re-derives the metric baseline
+	/// on load, so only the progress + remaining days + win/loss tally need persisting.</summary>
+	public sealed class ChallengeState
+	{
+		public string Phase { get; set; } = "Idle";   // ChallengeManager.Phase (Idle/Offered/Active)
+		public int ActiveIndex { get; set; } = -1;     // Challenge.Index of the offered/active challenge (-1 = none)
+		public int DaysLeft { get; set; }
+		public float Progress { get; set; }
+		public int Won { get; set; }
+		public int Lost { get; set; }
+	}
+
+	/// <summary>A player-built coaster track (T-059): the laid tiles + heights + the closed-loop flag, tied to its
+	/// coaster by that ride's grid tile (so it re-attaches after the placements rebuild). The station anchor tile
+	/// is included at [0] but the constructor re-derives it; the rest is replayed via <c>CoasterTrack.Restore</c>.</summary>
+	public sealed class TrackState
+	{
+		public int CoasterTileX { get; set; }
+		public int CoasterTileY { get; set; }
+		public bool Closed { get; set; }
+		public List<TrackTile> Tiles { get; set; } = new();
+	}
+
+	/// <summary>One laid track tile: grid position + its height offset above the base track height.</summary>
+	public sealed class TrackTile
+	{
+		public int X { get; set; }
+		public int Y { get; set; }
+		public float Rise { get; set; }
 	}
 
 	private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };

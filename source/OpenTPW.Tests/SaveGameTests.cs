@@ -104,6 +104,60 @@ public class SaveGameTests
 	}
 
 	[TestMethod]
+	public void ChallengeAndGoldenTicketStateRoundTrip()
+	{
+		var s = new SaveGame
+		{
+			GoldenTicketAwarded = true,
+			Challenge = new SaveGame.ChallengeState
+			{
+				Phase = "Active", ActiveIndex = 7, DaysLeft = 4, Progress = 20f, Won = 1, Lost = 2,
+			},
+		};
+
+		var back = SaveGame.FromJson( s.ToJson() )!;
+
+		Assert.IsTrue( back.GoldenTicketAwarded );
+		Assert.IsNotNull( back.Challenge );
+		Assert.AreEqual( "Active", back.Challenge!.Phase );
+		Assert.AreEqual( 7, back.Challenge.ActiveIndex );
+		Assert.AreEqual( 4, back.Challenge.DaysLeft );
+		Assert.AreEqual( 20f, back.Challenge.Progress );
+		Assert.AreEqual( 1, back.Challenge.Won );
+		Assert.AreEqual( 2, back.Challenge.Lost );
+	}
+
+	[TestMethod]
+	public void CoasterTrackRoundTrips()
+	{
+		var s = new SaveGame();
+		var ts = new SaveGame.TrackState { CoasterTileX = 10, CoasterTileY = 12, Closed = true };
+		ts.Tiles.Add( new SaveGame.TrackTile { X = 10, Y = 12, Rise = 0f } );      // station anchor
+		ts.Tiles.Add( new SaveGame.TrackTile { X = 11, Y = 12, Rise = 5f } );      // a raised hill segment
+		ts.Tiles.Add( new SaveGame.TrackTile { X = 11, Y = 13, Rise = 0f } );
+		s.Tracks.Add( ts );
+
+		var back = SaveGame.FromJson( s.ToJson() )!;
+
+		Assert.AreEqual( 1, back.Tracks.Count );
+		var bt = back.Tracks[0];
+		Assert.AreEqual( 10, bt.CoasterTileX );
+		Assert.AreEqual( 12, bt.CoasterTileY );
+		Assert.IsTrue( bt.Closed );
+		Assert.AreEqual( 3, bt.Tiles.Count );
+		Assert.AreEqual( 11, bt.Tiles[1].X );
+		Assert.AreEqual( 5f, bt.Tiles[1].Rise, 1e-3f );
+	}
+
+	[TestMethod]
+	public void V1SaveHasNoChallengeState()
+	{
+		var back = SaveGame.FromJson( """{ "Version": 1, "Money": 100 }""" )!;
+		Assert.IsNull( back.Challenge, "an absent challenge block stays null" );
+		Assert.IsFalse( back.GoldenTicketAwarded );
+	}
+
+	[TestMethod]
 	public void SlotPathsAreDistinctAndClamped()
 	{
 		Assert.AreNotEqual( SaveGame.SlotPath( 1 ), SaveGame.SlotPath( 2 ) );

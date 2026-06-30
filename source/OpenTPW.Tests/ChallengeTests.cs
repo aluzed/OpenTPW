@@ -135,4 +135,39 @@ Challenges[2].CheckAtEndOnly	1
 		Assert.AreEqual( ChallengeManager.Phase.Offered, mgr.State );
 		Assert.AreEqual( 2, mgr.Active!.Type, "FollowupType 2 is offered next" );
 	}
+
+	// ── Save/load restore (T-059) ───────────────────────────────────────────────────────────────────────
+
+	[TestMethod]
+	public void RestoreStateResumesActiveChallengeWithReanchoredBaseline()
+	{
+		float metric = 250; // the live metric after the park is rebuilt
+		var mgr = new ChallengeManager( new[] { Ch( 1, 3, 10, 5 ), Ch( 7, 2, 50, 9 ) }, _ => metric, _ => { } );
+
+		// Restore "active on challenge index 7, 4 days left, 20 progress so far, 1 win / 0 losses".
+		mgr.RestoreState( ChallengeManager.Phase.Active, activeIndex: 7, daysLeft: 4, progress: 20f, won: 1, lost: 0 );
+
+		Assert.AreEqual( ChallengeManager.Phase.Active, mgr.State );
+		Assert.AreEqual( 7, mgr.Active!.Index );
+		Assert.AreEqual( 4, mgr.DaysLeft );
+		Assert.AreEqual( 1, mgr.Won );
+
+		// Baseline was re-anchored to metric(now) − progress = 230, so a further +30 gain reads as 50 progress.
+		metric = 280;
+		mgr.OnNewDay();
+		Assert.AreEqual( 50f, mgr.Progress, 1e-3f );
+		Assert.AreEqual( 3, mgr.DaysLeft );
+	}
+
+	[TestMethod]
+	public void RestoreStateWithUnknownIndexFallsBackToIdle()
+	{
+		var mgr = new ChallengeManager( new[] { Ch( 1, 3, 10, 5 ) }, _ => 0f, _ => { } );
+		mgr.RestoreState( ChallengeManager.Phase.Active, activeIndex: 99, daysLeft: 3, progress: 5f, won: 2, lost: 1 );
+
+		Assert.AreEqual( ChallengeManager.Phase.Idle, mgr.State );
+		Assert.IsNull( mgr.Active );
+		Assert.AreEqual( 2, mgr.Won, "the win/loss tally still restores" );
+		Assert.AreEqual( 1, mgr.Lost );
+	}
 }

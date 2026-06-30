@@ -27,6 +27,11 @@ public sealed class GoldenTicketGoals
 	public int Met => Progress.Count( g => g.Met );
 	public int Total => Progress.Count;
 
+	/// <summary>Restore the awarded flag from a save (T-059): a level already won stays won across save/load,
+	/// so the win banner doesn't reappear/clear on reload. <see cref="Evaluate"/> only ever sets it true, so
+	/// restoring it can't un-win a park mid-session.</summary>
+	public void RestoreAwarded( bool awarded ) => Awarded = awarded;
+
 	/// <summary>Re-evaluate against the live park (call periodically, e.g. on <see cref="GameClock.OnNewDay"/>);
 	/// awards the ticket the first time every set target is met.</summary>
 	public void Evaluate()

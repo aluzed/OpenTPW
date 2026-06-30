@@ -160,6 +160,32 @@ public sealed class CoasterTrack
 		RebuildRibbon();
 	}
 
+	/// <summary>The laid tiles (the station anchor at [0], then one per segment) — captured by save/load (T-059).</summary>
+	public IReadOnlyList<(int X, int Y)> Tiles => tiles;
+
+	/// <summary>The per-tile height offset above the base track height (STACKUP/DOWN), parallel to <see cref="Tiles"/>.</summary>
+	public IReadOnlyList<float> Rises => rise;
+
+	/// <summary>Rebuild a laid track from a save (T-059): replay the saved tiles past the station anchor (which the
+	/// constructor already placed), then apply the saved per-tile heights (Extend continues at the head height, so
+	/// the STACKUP/DOWN rises are restored here) and the closed-circuit flag. Tiles that no longer extend cleanly
+	/// (a corrupt/edited save) are skipped, so a bad save can't throw.</summary>
+	public void Restore( IReadOnlyList<(int X, int Y)> savedTiles, IReadOnlyList<float> savedRises, bool closed )
+	{
+		for ( int i = 1; i < savedTiles.Count; i++ )
+			Extend( savedTiles[i].X, savedTiles[i].Y );
+
+		// Apply the saved heights (Extend laid each segment at the head height; STACKUP/DOWN weren't replayed).
+		for ( int i = 0; i < rise.Count && i < savedRises.Count; i++ )
+		{
+			rise[i] = savedRises[i];
+			if ( i >= 1 && i - 1 < pylons.Count )
+				PositionPylon( pylons[i - 1], tiles[i].X, tiles[i].Y, rise[i] );
+		}
+		IsClosed = closed;
+		RebuildRibbon();
+	}
+
 	/// <summary>Remove all laid segments, the ribbon and the train (called when the track is abandoned).</summary>
 	public void Despawn()
 	{

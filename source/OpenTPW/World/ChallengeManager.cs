@@ -94,6 +94,35 @@ public sealed class ChallengeManager
 		daysUntilOffer = DaysAfterDeclined;
 	}
 
+	/// <summary>Restore the challenge state from a save (T-059): the phase, the offered/active challenge (matched
+	/// by <see cref="Challenge.Index"/> against this level's list), the remaining days + win/loss tally. For an
+	/// Active challenge the baseline is re-derived from the live metric and the saved progress (<c>baseline =
+	/// metric(now) − progress</c>), so the gain keeps counting correctly once the restored park is running —
+	/// no need to persist the absolute baseline. An unknown index (or Idle phase) restores as Idle.</summary>
+	public void RestoreState( Phase phase, int activeIndex, int daysLeft, float progress, int won, int lost )
+	{
+		Won = won;
+		Lost = lost;
+		LastResult = null;
+
+		var active = activeIndex >= 0 ? all.FirstOrDefault( c => c.Index == activeIndex ) : null;
+		if ( active is null || phase == Phase.Idle )
+		{
+			State = Phase.Idle;
+			Active = null;
+			return;
+		}
+
+		Active = active;
+		State = phase;
+		if ( phase == Phase.Active )
+		{
+			DaysLeft = daysLeft;
+			Progress = progress;
+			baseline = metric( active ) - progress; // re-anchor so future OnNewDay gains stay consistent
+		}
+	}
+
 	private void Finish( bool won )
 	{
 		var c = Active!;

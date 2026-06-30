@@ -357,6 +357,29 @@ public class Level
 			}
 			s.Staff.Add( ss );
 		}
+
+		// Coaster tracks (T-059): each coaster's laid track — tiles + heights + closed-loop flag, keyed by the
+		// coaster's tile so it re-attaches after the placements rebuild.
+		foreach ( var r in Entity.All.OfType<Ride>() )
+		{
+			if ( r.Track is not { } tr )
+				continue;
+			var ts = new SaveGame.TrackState { CoasterTileX = r.TileX, CoasterTileY = r.TileY, Closed = tr.IsClosed };
+			for ( int i = 0; i < tr.Tiles.Count; i++ )
+				ts.Tiles.Add( new SaveGame.TrackTile { X = tr.Tiles[i].X, Y = tr.Tiles[i].Y, Rise = i < tr.Rises.Count ? tr.Rises[i] : 0f } );
+			s.Tracks.Add( ts );
+		}
+
+		// Progression (T-059): the active/offered challenge (T-054) + the golden-ticket win flag (T-055), so a
+		// reloaded park resumes its goals mid-flight instead of restarting them.
+		if ( ChallengeManager.Current is { } cm )
+			s.Challenge = new SaveGame.ChallengeState
+			{
+				Phase = cm.State.ToString(),
+				ActiveIndex = cm.Active?.Index ?? -1,
+				DaysLeft = cm.DaysLeft, Progress = cm.Progress, Won = cm.Won, Lost = cm.Lost,
+			};
+		s.GoldenTicketAwarded = GoldenTicketGoals.Current?.Awarded ?? false;
 		return s;
 	}
 
@@ -419,6 +442,19 @@ public class Level
 		foreach ( var (ride, _) in researching.OrderBy( e => e.Pos < 0 ? int.MaxValue : e.Pos ) )
 			ResearchQueue.Enqueue( ride );
 
+		// Rebuild each saved coaster track on its (now-respawned) coaster — the rebuilt ride has no track yet,
+		// so a fresh CoasterTrack replays the laid tiles + heights (T-059).
+		foreach ( var ts in s.Tracks )
+		{
+			var coaster = Entity.All.OfType<Ride>().FirstOrDefault(
+				r => r.TileX == ts.CoasterTileX && r.TileY == ts.CoasterTileY && r.Shape.HasTrack );
+			if ( coaster is null || coaster.Track != null )
+				continue;
+			var savedTiles = ts.Tiles.Select( t => (t.X, t.Y) ).ToList();
+			var savedRises = ts.Tiles.Select( t => t.Rise ).ToList();
+			new CoasterTrack( coaster, grid, terrain ).Restore( savedTiles, savedRises, ts.Closed );
+		}
+
 		// Respawn staff at their saved wander centres, re-applying any patrol zone (T-059 v2).
 		foreach ( var ss in s.Staff )
 		{
@@ -428,6 +464,13 @@ public class Level
 			if ( ss.HasZone )
 				st.SetPatrolZone( new System.Numerics.Vector3( ss.ZoneX, ss.ZoneY, 0f ), ss.ZoneRadius );
 		}
+
+		// Progression (T-059): resume the challenge + golden-ticket state. Done after the park is rebuilt so the
+		// challenge's metric baseline re-anchors against the restored finances/visitors.
+		if ( s.Challenge is { } cs && ChallengeManager.Current is { } cm
+			&& Enum.TryParse<ChallengeManager.Phase>( cs.Phase, out var phase ) )
+			cm.RestoreState( phase, cs.ActiveIndex, cs.DaysLeft, cs.Progress, cs.Won, cs.Lost );
+		GoldenTicketGoals.Current?.RestoreAwarded( s.GoldenTicketAwarded );
 
 		Log.Info( $"[save] restored {s.Placements.Count} placement(s) + {s.Staff.Count} staff" );
 	}

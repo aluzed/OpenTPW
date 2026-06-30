@@ -2,18 +2,21 @@
 
 - **Priority**: 🟡 Feature (high impact)
 - **Type**: Engine / RE
-- **Status**: ⚠️ Core done (Route A) — a native versioned-JSON save (**v2**): `SaveGame` (balance + loans +
-  clock + placed rides/shops) with fault-tolerant file I/O; `Level.CaptureSave`/`ApplySave` snapshot + rebuild
-  the park (demolish → restore finances/clock → rebuild placements for free via `CommitPlacement(charge:false)`).
-  **v2 adds depth**: each ride now round-trips its **research/upgrade level + in-progress research (fraction +
-  park-wide queue order) + reliability/breakdown** (`Ride.RestoreProgress`, clamped to the real upgrade table),
-  and **hired staff** round-trip (role + wander centre + patrol zone — respawned on load since staff roam off
-  the grid). Plus a **3-slot save UI**: `SaveGame.SlotPath`/`SlotExists`, **F6 cycles the slot**, **F5 saves /
-  F9 loads** the active one, with a HUD `SAVE SLOT n [used/empty]` line. v2 is **back-compatible** — a v1 save
-  (no progression/staff keys) loads as level-0, fully-reliable, un-queued rides with no staff. Round-trip
-  unit-tested (10 `SaveGameTests`, incl. a v1→v2 compat load). **Remaining (v1.x)**: coaster tracks + the
-  active challenge/golden-ticket goal state in the save (the restored clock keeps their timing aligned).
-  **Route B** (original `.TPWS` compat) is unchanged (needs a real sample).
+- **Status**: ✅ Done (Route A) — a native versioned-JSON save (**v3**): `SaveGame` with fault-tolerant file I/O;
+  `Level.CaptureSave`/`ApplySave` snapshot + rebuild the park (demolish → restore finances/clock → rebuild
+  placements for free via `CommitPlacement(charge:false)`). The save now round-trips the **whole park**:
+  balance + loans + clock + placed rides/shops; **per-ride research/upgrade level + in-progress research
+  (fraction + park-wide queue order) + reliability/breakdown** (`Ride.RestoreProgress`); **hired staff** (role +
+  wander centre + patrol zone, respawned since staff roam off the grid); **player-built coaster tracks** (laid
+  tiles + per-tile heights + closed-loop flag, replayed on the rebuilt coaster via `CoasterTrack.Restore`); and
+  the **goal progression** — the active/offered **challenge** (`ChallengeManager.RestoreState`, baseline
+  re-anchored from the live metric so the gain keeps counting) + the **golden-ticket** win flag
+  (`GoldenTicketGoals.RestoreAwarded`). A **3-slot UI**: `SaveGame.SlotPath`/`SlotExists`, **F6 cycles the slot**,
+  **F5 saves / F9 loads** the active one, HUD `SAVE SLOT n [used/empty]`. Versioning is **additive +
+  back-compatible** — an older save simply lacks the newer blocks, which default to "none"/level-0/reliable.
+  Round-trip unit-tested (15 `SaveGameTests` + 2 `ChallengeManager.RestoreState` tests). **Route B** (original
+  `.TPWS` compat) stays open — it needs a real `.TPWS` sample (none in this install), tracked under
+  [T-017](T-017-tpws-saves.md).
 - **Related**: [T-017](T-017-tpws-saves.md) (the `.TPWS` container is already RE'd + writable; the `SAD_*`
   module payloads are not).
 
