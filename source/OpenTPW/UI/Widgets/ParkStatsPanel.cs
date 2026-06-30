@@ -43,6 +43,15 @@ internal sealed class ParkStatsPanel : HudPanel
 			$"LITTER {Litter.Active.Count}",
 			$"ADMISSION {fin.EntryFee:0}  ([ ] adjust)",
 		};
+		// Crowd mood (T-050): a compact breakdown of riders' reactions, so the otherwise-invisible thoughts read.
+		if ( Peep.ThoughtTotal > 0 )
+		{
+			var parts = new List<string>();
+			for ( int i = 0; i < Peep.ThoughtTally.Count; i++ )
+				if ( Peep.ThoughtTally[i] > 0 )
+					parts.Add( $"{RideThoughtText.Tag( (RideThought)i )} {Peep.ThoughtTally[i]}" );
+			lines.Add( "THOUGHTS " + string.Join( " · ", parts ) );
+		}
 		if ( GameClock.Current is { } clock )
 			lines.Insert( 0, $"YEAR {clock.Year}  MTH {clock.Month}  DAY {clock.Day}  {DayNightTint.Phase( DayNightCycle.Phase01 )}" ); // in-game date + visual day phase (T-053/T-056)
 

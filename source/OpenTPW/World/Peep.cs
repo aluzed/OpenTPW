@@ -11,6 +11,34 @@ public enum RideThought
 	Rubbish,      // dull
 }
 
+/// <summary>Readable player-facing text for a <see cref="RideThought"/> (T-050): a full first-person line and a
+/// short HUD tag. Pure, so the wording is unit-tested + decoupled from how it's shown.</summary>
+public static class RideThoughtText
+{
+	public static string For( RideThought t ) => t switch
+	{
+		RideThought.GreatRide => "What a great ride!",
+		RideThought.GoodValue => "Good value for money",
+		RideThought.TooExpensive => "That was too expensive!",
+		RideThought.Unreliable => "That ride felt unsafe!",
+		RideThought.Mediocre => "That was OK, I suppose",
+		RideThought.Rubbish => "What a load of rubbish!",
+		_ => "",
+	};
+
+	/// <summary>A short tag for the compact HUD mood readout.</summary>
+	public static string Tag( RideThought t ) => t switch
+	{
+		RideThought.GreatRide => "Great",
+		RideThought.GoodValue => "Value",
+		RideThought.TooExpensive => "Pricey",
+		RideThought.Unreliable => "Unsafe",
+		RideThought.Mediocre => "OK",
+		RideThought.Rubbish => "Rubbish",
+		_ => "",
+	};
+}
+
 /// <summary>
 /// A park visitor. Renders as an upright camera-facing billboard (a placeholder until the authentic
 /// peep sprites — <c>esprites.wad</c>'s <c>.TPC</c>/<c>.FPC</c>, a custom encoded image format — are
@@ -52,6 +80,13 @@ public sealed class Peep : ModelEntity
 	/// <summary>Park-wide count of toilet visits (T-039) — toilets earn no income, so this is the only
 	/// signal they're used.</summary>
 	public static int ToiletVisits { get; private set; }
+
+	/// <summary>Park-wide tally of ride reactions (T-050): how many riders left with each
+	/// <see cref="RideThought"/>, indexed by the enum. Surfaced on the HUD so the player can read the crowd's
+	/// mood (the thought was computed but invisible before).</summary>
+	private static readonly int[] thoughtTally = new int[6];
+	public static IReadOnlyList<int> ThoughtTally => thoughtTally;
+	public static int ThoughtTotal { get { int s = 0; foreach ( var n in thoughtTally ) s += n; return s; } }
 
 	/// <summary>Average visitor happiness (0–100) across the live crowd — the park rating; -1 if empty.</summary>
 	public static float AverageHappiness
@@ -207,6 +242,7 @@ public sealed class Peep : ModelEntity
 			{
 				var (satisfaction, thought) = RateRide( route!.Ride.Excitement, route.Ride.TicketPrice, route.Ride.Reliability );
 				LastThought = thought;
+				thoughtTally[(int)thought]++; // park-wide mood tally (T-050, surfaced on the HUD)
 				route.Ride.RegisterRideExperience( satisfaction );
 				// Happiness change is driven by satisfaction (which already folds in value-for-money +
 				// reliability), centred on 50 so a great ride lifts the mood and a poor one sours it.

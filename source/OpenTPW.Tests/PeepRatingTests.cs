@@ -62,4 +62,18 @@ public class PeepRatingTests
 		var cheap = Peep.RateRide( 60, 4f, 1f ).Satisfaction;
 		Assert.IsTrue( cheap >= dear, "lowering the price never lowers satisfaction" );
 	}
+
+	[TestMethod]
+	public void EveryThoughtHasReadableTextAndAShortTag()
+	{
+		foreach ( RideThought t in System.Enum.GetValues<RideThought>() )
+		{
+			Assert.IsFalse( string.IsNullOrWhiteSpace( RideThoughtText.For( t ) ), $"{t} has a full line" );
+			Assert.IsFalse( string.IsNullOrWhiteSpace( RideThoughtText.Tag( t ) ), $"{t} has a HUD tag" );
+		}
+		// A couple of representative wordings (so the mapping can't silently swap).
+		StringAssert.Contains( RideThoughtText.For( RideThought.TooExpensive ), "expensive" );
+		Assert.AreEqual( "Unsafe", RideThoughtText.Tag( RideThought.Unreliable ) );
+		Assert.AreEqual( "Great", RideThoughtText.Tag( RideThought.GreatRide ) );
+	}
 }
