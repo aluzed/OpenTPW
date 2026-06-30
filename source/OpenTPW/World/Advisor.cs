@@ -168,7 +168,8 @@ public sealed class Advisor : Entity
 	{
 		try
 		{
-			var speechDir = Path.Join( GameDir.GamePath, "data", "levels", "jungle", "Speech" );
+			var theme = Level.Current?.Name ?? "jungle"; // advisor speech is per-theme (T-062)
+			var speechDir = Path.Join( GameDir.GamePath, "data", "levels", theme, "Speech" );
 			var sdtPath = Path.Join( speechDir, "speechHD.SDT" );
 			if ( !File.Exists( sdtPath ) )
 				return false;

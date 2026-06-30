@@ -115,9 +115,10 @@ internal static class Game
 		while ( loadingStart.ElapsedMilliseconds < 1500 );
 
 		//
-		// Create level
+		// Create level — the theme is selectable via OPENTPW_LEVEL (jungle / hallow / fantasy / space); a
+		// missing or unknown name falls back to jungle so a bad value never breaks startup (T-062).
 		//
-		var level = new Level( "jungle" );
+		var level = new Level( LevelTheme.Resolve( Environment.GetEnvironmentVariable( "OPENTPW_LEVEL" ) ) );
 
 		LoadProgress.Done();
 		Render.ClearColor = RgbaFloat.Black;

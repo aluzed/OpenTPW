@@ -60,7 +60,7 @@ public class Level
 	private static void SetupDevPark()
 	{
 		LoadProgress.Report( "Loading park terrain...", 0.5f );
-		var terrain = new ParkTerrain( "levels/jungle/terrain" );
+		var terrain = new ParkTerrain( $"levels/{Current.Name}/terrain" );
 
 		// The park starts with a budget; peeps pay a gate fee + ride tickets, rides cost upkeep (see Ride / Peep).
 		ParkFinances.Current = new ParkFinances( starting: 30000f, entryFee: 10f );
@@ -88,7 +88,7 @@ public class Level
 		catch ( Exception e ) { Log.Warning( $"[challenge] load failed: {e.Message}" ); }
 
 		// Centre the placement grid on the terrain's dense centroid (robust to stray distant meshes).
-		var standard = new SettingsFile( "/levels/jungle/Standard.sam" );
+		var standard = new SettingsFile( $"/levels/{Current.Name}/Standard.sam" );
 
 		// Peep ride-choice weights (T-060): the authored DecisionVar* weights drive which ride peeps pick, and
 		// the per-type PreferredExcitement gives each peep its own taste (gentle vs intense rides).
@@ -165,6 +165,16 @@ public class Level
 			int cx = grid.Width / 2, cy = grid.Height / 2;
 			BuildCatalogItem Item( string name ) => catalog.First( c => c.Name == name );
 
+			// Non-jungle themes don't have jungle's named rides (totem/monkey/…), so the named autoplace below
+			// would throw. Place the theme's first enumerated rides + the shared shops/staff generically instead,
+			// then fall through to the generic coaster-track laying (which keys off any track ride). T-062.
+			if ( Current.Name != "jungle" )
+			{
+				AutoplaceGeneric( catalog, grid, terrain, cx, cy );
+			}
+			else
+			{
+
 			// Bumper demo: place ONLY a bumper at the park centre on clear grass and aim the camera at it,
 			// so the arena collision sim (CarSim) is cleanly framed (OPENTPW_BUMPER_DEMO=1). See docs/08.
 			if ( Environment.GetEnvironmentVariable( "OPENTPW_BUMPER_DEMO" ) == "1" )
@@ -210,6 +220,8 @@ public class Level
 					if ( car.IsBumperRide && Environment.GetEnvironmentVariable( "OPENTPW_BUMPER_DEMO" ) == "1" )
 						BuildCameraMode.Focus = car.Position;
 				}
+
+			} // end jungle-specific named autoplace (T-062)
 
 			// Lay a coaster track that loops around the station back to its '<' entry connector, so the
 			// CoasterTrack closes into a circuit and its train (slice 3) runs a continuous loop.
@@ -497,23 +509,59 @@ public class Level
 
 	// Build catalog: jungle rides (footprint from RideShape, cost from the .sam) + a food shop + hireable
 	// staff (no footprint — placed on a tile and charged a hire cost, T-043).
+	// Generic autoplace for a non-jungle theme (T-062): drop the first few enumerated rides + the shared shops
+	// and one of each staff role around the park centre, so a freshly-selected theme's park is populated without
+	// relying on jungle's specific ride names. Best-effort — placements that don't fit are simply skipped.
+	private static void AutoplaceGeneric( List<BuildCatalogItem> catalog, PlacementGrid grid, ParkTerrain terrain, int cx, int cy )
+	{
+		var rides = catalog.Where( c => c.RidePath != null ).Take( 6 ).ToList();
+		var spots = new (int dx, int dy)[] { (-6, -2), (1, -2), (-6, 4), (2, 4), (6, -2), (-2, 4) };
+		int placed = 0;
+		for ( int i = 0; i < rides.Count && i < spots.Length; i++ )
+			if ( CommitPlacement( rides[i], grid, terrain, cx + spots[i].dx, cy + spots[i].dy ) )
+				placed++;
+
+		// Shared shops + one of each staff role (these catalog names exist for every theme).
+		foreach ( var (name, dx, dy) in new[] { ("shop", 6, 4), ("drink", 6, 1), ("toilet", 8, 4) } )
+			if ( catalog.FirstOrDefault( c => c.Name == name ) is { Name: not null } shop )
+				CommitPlacement( shop, grid, terrain, cx + dx, cy + dy );
+		foreach ( var (name, dx, dy) in new[] { ("entertainer", 0, 2), ("handyman", 2, 2), ("guard", 0, 0), ("mechanic", 4, 0), ("researcher", 4, 2) } )
+			if ( catalog.FirstOrDefault( c => c.Name == name ) is { Name: not null } st )
+				CommitPlacement( st, grid, terrain, cx + dx, cy + dy );
+
+		Log.Info( $"[build] autoplace (theme {Current.Name}): {placed}/{rides.Count} ride(s) + shops + staff" );
+	}
+
 	private static List<BuildCatalogItem> BuildCatalog()
 	{
 		var list = new List<BuildCatalogItem>();
-		foreach ( var path in new[] { "levels/jungle/rides/totem", "levels/jungle/rides/monkey", "levels/jungle/rides/wateride", "levels/jungle/rides/coaster1", "levels/jungle/rides/gokarts", "levels/jungle/rides/tourride", "levels/jungle/rides/bumper" } )
+		var theme = Current.Name;
+
+		// Rides + sideshows come from the active theme (T-062): jungle keeps its curated set (so the default
+		// park is unchanged), other themes enumerate their WADs. Each WAD is loaded defensively so one bad
+		// archive skips that item instead of breaking the whole catalog.
+		void AddFrom( string subfolder, IReadOnlyList<string> names )
 		{
-			var name = Path.GetFileName( path );
-			var shape = RideShape.Load( path, name );
-			list.Add( new BuildCatalogItem( name, path, null, shape.Width, shape.Height, ReadRideCost( path, name ) ) );
+			foreach ( var name in names )
+			{
+				var path = $"levels/{theme}/{subfolder}/{name}";
+				try
+				{
+					var shape = RideShape.Load( path, name );
+					list.Add( new BuildCatalogItem( name, path, null, shape.Width, shape.Height, ReadRideCost( path, name ) ) );
+				}
+				catch ( Exception e )
+				{
+					Log.Warning( $"[build] skipping '{name}' from {subfolder} ({e.Message})" );
+				}
+			}
 		}
+
+		AddFrom( "rides", LevelTheme.RideNames( theme ) );
 		// Sideshows (T-058): the level's stalls/games — placed like rides (their wad carries shape/mesh/script),
 		// but peeps play them for pay-to-play takings rather than a flat ticket (see Ride.IsSideshow).
-		foreach ( var name in new[] { "puzzle", "squark", "hyenas", "junspray", "arc2x3" } )
-		{
-			var path = $"levels/jungle/sideshow/{name}";
-			var shape = RideShape.Load( path, name );
-			list.Add( new BuildCatalogItem( name, path, null, shape.Width, shape.Height, ReadRideCost( path, name ) ) );
-		}
+		AddFrom( "sideshow", LevelTheme.SideshowNames( theme ) );
+
 		list.Add( new BuildCatalogItem( "shop", null, null, 2, 2, 500f ) );   // food stall (satisfies hunger)
 		list.Add( new BuildCatalogItem( "drink", null, null, 2, 2, 450f ) );  // drink stall (satisfies thirst, T-039)
 		list.Add( new BuildCatalogItem( "toilet", null, null, 2, 2, 400f ) ); // toilet (relieves bladder, free to use, T-039)
