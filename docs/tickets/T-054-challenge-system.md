@@ -5,10 +5,15 @@
 - **Status**: ⚠️ Core done — `Challenges.sam` parses; a `ChallengeManager` state machine offers/accepts/
   declines, tracks the metric gain vs `TargetVal` over `TargetTime` days (on `GameClock.OnNewDay`), wins/loses,
   pays the prize and chains `FollowupType`; the HUD shows the challenge (Y accept / N decline). Verified
-  in-game (load → offer → accept → day countdown → timeout → next). **Metric mapping is partial**: only the
-  confidently-RE'd Types (1 visitors / 2 food / 3 drinks) are tracked + offered — the other ~25 Types need the
-  `.str` descriptions or a Ghidra dispatch trace (see `ChallengeMetrics`). A dedicated clickable panel + the
-  advisor delivering offers remain (polish).
+  in-game (load → offer → accept → day countdown → timeout → next). The **advisor now reacts to a win/loss**
+  (T-055 milestone tips). **Metric mapping expanded + corrected from `Challenges.sam`'s own EA comments** (the
+  authoritative type semantics): 1 = sell fries (food), 2 = sell burgers (food), 3 = drinks, **11 = new
+  visitors**, **13 = sideshow profit**, **20 = peeps using a ride** — six types now tracked + offered (was 1/2/3,
+  and Type 1 had been mis-mapped to *visitors* — the real visitors challenge is Type 11). Fries+burgers share the
+  single `FoodSold` counter and the "use the Minecart ride" goal is approximated by total `RidesRidden` (no
+  per-ride counter). Unit-tested (`ChallengeMetricsTests`). Still-opaque types (6 balloons, 18/19 build-a-ride,
+  24 toilet-cleanliness) stay skipped until a counter exists. A dedicated clickable panel + advisor-delivered
+  offers remain (polish).
 - **Needs**: [T-053](T-053-ingame-clock.md) (in-game days). **Related**: [T-055](T-055-golden-ticket-goals.md),
   [T-046](T-046-advisor-character.md) (advisor delivers challenge offers).
 
