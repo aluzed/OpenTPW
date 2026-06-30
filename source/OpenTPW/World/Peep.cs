@@ -122,6 +122,7 @@ public sealed class Peep : ModelEntity
 	private readonly Model billboard;
 
 	private readonly Vector3 home; // the park-edge point this peep entered at and heads back to when done
+	private readonly float preferredExcitement; // this peep's ride-intensity taste (T-060, PeepTypes[*])
 
 	private RideQueue? route;
 	private RideQueue? lastRoute;
@@ -164,6 +165,10 @@ public sealed class Peep : ModelEntity
 		this.queues = queues;
 		this.paths = paths;
 		home = spawn;
+
+		// Ride taste (T-060): a random peep type, whose authored PreferredExcitement steers ride choice toward
+		// rides near that intensity (a timid peep favours gentle rides, a thrill-seeker intense ones).
+		preferredExcitement = PeepTypes.PreferredFor( Random.Shared.Next( PeepTypes.Count ) );
 
 		// Prefer a real decoded peep sprite (per-frame models, directional walk cycles), a random kid for
 		// crowd variety; fall back to a flat-colour billboard if it can't load.
@@ -627,7 +632,8 @@ public sealed class Peep : ModelEntity
 		float indoorBonus = WeatherSim.Current is { } weather && !weather.State.IsClear ? IndoorShelterBias : 0f;
 		var scores = candidates
 			.Select( q => RideChoiceScorer.Score(
-				new RideOption( q.Ride.Excitement, Position.Distance( q.Ride.Position ), q.LineLength, IsNew: false, q.Ride.IsIndoors ), w, indoorBonus ) )
+				new RideOption( q.Ride.Excitement, Position.Distance( q.Ride.Position ), q.LineLength, q.Ride.IsNew, q.Ride.IsIndoors ),
+				w, indoorBonus, preferredExcitement ) )
 			.ToList();
 		int idx = RideChoiceScorer.ChooseWeighted( scores, (float)Random.Shared.NextDouble() );
 		route = idx >= 0 ? candidates[idx] : candidates[^1];

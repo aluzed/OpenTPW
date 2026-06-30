@@ -5,10 +5,15 @@
 - **Status**: ⚠️ Core done — the authored `PeepInfo.DecisionVar*` weights load from `levels/Standard.sam`
   (`DecisionWeights`); a pure `RideChoiceScorer` scores each ride by excitement vs distance vs queue length
   (+ a new-ride bonus), and `Peep.PickRoute` now picks a ride **weighted by that score** instead of the
-  excitement/rating-only heuristic. 6 unit tests; verified in-game (weights load, peeps choose + ride, 0
-  exceptions). **Remaining (polish)**: per-peep *preferred-excitement* match (`PeepTypes[*].PreferredExcitement`)
-  + the new-ride bonus needs ride-age tracking (in-scorer but `IsNew=false` for now); the need weights
-  (thirst/hunger/…) steer shop choice, not rides.
+  excitement/rating-only heuristic. **Polish now landed**: (1) **per-peep preferred-excitement** — the authored
+  `PeepTypes[*].PreferredExcitement` table loads via `PeepTypes.Load` (read out of the engine's *columnar* `.sam`
+  layout, where one key path lists several fields and the value is the first column); each peep takes a random
+  type's taste and the scorer's excitement term now rewards how *close* a ride is to that taste (a timid peep
+  favours gentle rides, a thrill-seeker intense ones) — `preferredExcitement = -1` keeps the old "more is
+  better" behaviour for back-compat. (2) **Ride-age tracking** — `Ride.AgeDays`/`Ride.IsNew` (built-day vs
+  `GameClock.TotalDays`, window = `DecisionVariable1`), so the new-ride bonus actually fires for a ride's first
+  days instead of `IsNew=false`. 11 unit tests (5 new). **Remaining**: the need weights (thirst/hunger/…) steer
+  shop choice, not rides — out of scope here.
 - **Related**: [T-034](T-034-peeps.md)/[T-050](T-050-peep-simulation-depth.md) (peep sim — currently uses a
   simpler excitement-weighted choice).
 

@@ -131,6 +131,17 @@ public class Ride : Entity
 		ratingCount++;
 	}
 
+	// Ride age (T-060): the in-game day the ride was built, so a freshly-opened ride draws extra interest
+	// (the "new ride" bonus) for its first DecisionVariable1 days, then settles to its steady-state pull.
+	private readonly int builtDay;
+
+	/// <summary>How many in-game days this ride has been open.</summary>
+	public int AgeDays => Math.Max( 0, (GameClock.Current?.TotalDays ?? builtDay) - builtDay );
+
+	/// <summary>True while the ride is still "new" — younger than the authored new-ride window
+	/// (<c>DecisionVariable1</c>), so peeps weight it more heavily (T-060).</summary>
+	public bool IsNew => AgeDays < RideChoiceScorer.Weights.NewRideDays;
+
 	/// <summary>The ride's base attraction value (<c>Info.AttractionValue</c>).</summary>
 	public int Attraction { get; private set; } = 25;
 
@@ -326,6 +337,7 @@ public class Ride : Entity
 	{
 		Position = position;
 		Archive = rideArchive;
+		builtDay = GameClock.Current?.TotalDays ?? 0; // ride-age origin for the "new ride" draw (T-060)
 		Rotation = ((rotation % 4) + 4) % 4;
 		// Sideshows live in the level's sideshow/ folder; detected by path so it holds even if the .sam is absent.
 		// Economy defaults match the shared jungle SideShow.sam, overridden below by the stall's own UsageInfo.

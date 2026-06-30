@@ -47,15 +47,23 @@ public static class RideChoiceScorer
 
 	/// <summary>The desirability of <paramref name="o"/> under <paramref name="w"/> (higher = more appealing;
 	/// can be negative when a ride is far / heavily queued). <paramref name="indoorBonus"/> (≥0) is added for an
-	/// indoor attraction — the caller raises it in bad weather so peeps seek shelter (T-056).</summary>
-	public static float Score( RideOption o, DecisionWeights w, float indoorBonus = 0f )
+	/// indoor attraction — the caller raises it in bad weather so peeps seek shelter (T-056).
+	/// <paramref name="preferredExcitement"/> (0–100) is the peep's own taste (<c>PeepTypes[*].PreferredExcitement</c>,
+	/// T-060): when ≥0 the excitement term rewards how <i>close</i> the ride is to that taste (a timid peep is
+	/// drawn to gentle rides, a thrill-seeker to intense ones) instead of always favouring the most intense;
+	/// pass -1 (the default) to keep the plain "more excitement is better" behaviour.</summary>
+	public static float Score( RideOption o, DecisionWeights w, float indoorBonus = 0f, float preferredExcitement = -1f )
 	{
-		float excitement = o.Excitement / 100f;
-		float score = w.Excitement * excitement
+		// "Appeal" of the ride's intensity to this peep: a match score (1 at the peep's preferred level, falling
+		// off with distance from it) when a taste is given, else the raw normalised excitement.
+		float appeal = preferredExcitement >= 0f
+			? Math.Clamp( 1f - MathF.Abs( o.Excitement - preferredExcitement ) / 100f, 0f, 1f )
+			: o.Excitement / 100f;
+		float score = w.Excitement * appeal
 			- w.Distance * (o.Distance / RefDistance)
 			- w.Queue * (o.QueueLength / RefQueue);
 		if ( o.IsNew )
-			score += w.NewRideMultiplier * excitement; // a new ride draws extra interest
+			score += w.NewRideMultiplier * appeal; // a new ride draws extra interest (scaled by how appealing it is)
 		if ( o.IsIndoors && indoorBonus > 0f )
 			score += indoorBonus; // shelter appeal in rain/snow
 		return score;
@@ -90,5 +98,50 @@ public static class RideChoiceScorer
 				return i;
 		}
 		return scores.Count - 1;
+	}
+}
+
+/// <summary>
+/// The peep "types" and their authored ride taste (T-060): each <c>PeepTypes[i]</c> in <c>levels/Standard.sam</c>
+/// carries a <c>PreferredExcitement</c> (0–100) — a timid peep prefers gentle rides, a thrill-seeker intense
+/// ones. A spawning peep is assigned a random type, and its preference feeds <see cref="RideChoiceScorer.Score"/>.
+/// <para>The <c>.sam</c> stores these in the engine's columnar layout: one key path lists several field names
+/// (<c>PeepTypes[i].PreferredExcitement.StartingCash.BoredomThreshold</c>) followed by the columns
+/// (<c>80  300  40</c>), and <see cref="SAMParser"/> keeps the first column as the value of the whole key.
+/// So PreferredExcitement is read as the value of the key that <i>starts with</i> <c>PeepTypes[i].PreferredExcitement</c>.</para>
+/// </summary>
+public static class PeepTypes
+{
+	// The shipped jungle values (PeepTypes[0..7].PreferredExcitement), used until a level is loaded / if the
+	// key is absent — so the scorer behaves sensibly without the .sam.
+	private static readonly float[] DefaultPreferences = { 80f, 65f, 50f, 35f, 65f, 80f, 45f, 80f };
+
+	/// <summary>Per-type preferred excitement (0–100), indexed by peep type; defaults until <see cref="Load"/>.</summary>
+	public static IReadOnlyList<float> Preferences { get; set; } = DefaultPreferences;
+
+	/// <summary>How many peep types are defined (≥1).</summary>
+	public static int Count => Preferences.Count > 0 ? Preferences.Count : 1;
+
+	/// <summary>The preferred excitement for type <paramref name="type"/> (wrapped into range).</summary>
+	public static float PreferredFor( int type )
+	{
+		var p = Preferences.Count > 0 ? Preferences : DefaultPreferences;
+		return p[((type % p.Count) + p.Count) % p.Count];
+	}
+
+	/// <summary>Read <c>PeepTypes[i].PreferredExcitement</c> for each defined type from a level settings file,
+	/// stopping at the first gap. Falls back to <see cref="DefaultPreferences"/> when none are present.</summary>
+	public static List<float> Load( SettingsFile sam )
+	{
+		var result = new List<float>();
+		for ( int i = 0; ; i++ )
+		{
+			string prefix = $"PeepTypes[{i}].PreferredExcitement";
+			var pair = sam.Entries.FirstOrDefault( e => e.Key.StartsWith( prefix, StringComparison.OrdinalIgnoreCase ) );
+			if ( pair.Key == null || !float.TryParse( pair.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var v ) )
+				break;
+			result.Add( Math.Clamp( v, 0f, 100f ) );
+		}
+		return result.Count > 0 ? result : DefaultPreferences.ToList();
 	}
 }

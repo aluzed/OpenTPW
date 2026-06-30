@@ -87,4 +87,59 @@ PeepInfo.DecisionVariable2				5
 		var scores = new[] { -5f, -1f, -3f };
 		Assert.AreEqual( 1, RideChoiceScorer.ChooseWeighted( scores, 0.5f ), "the least-negative is taken" );
 	}
+
+	[TestMethod]
+	public void PreferredExcitementMatchBeatsRawIntensity()
+	{
+		var gentle = new RideOption( 30f, 50f, 0, IsNew: false );
+		var intense = new RideOption( 90f, 50f, 0, IsNew: false );
+
+		// A timid peep (prefers 30) ranks the gentle ride above the intense one — the opposite of the raw
+		// "more excitement is better" ranking.
+		Assert.IsTrue( RideChoiceScorer.Score( gentle, W, 0f, preferredExcitement: 30f )
+			> RideChoiceScorer.Score( intense, W, 0f, preferredExcitement: 30f ),
+			"a timid peep prefers the ride nearest its taste" );
+
+		// A thrill-seeker (prefers 90) flips the ranking back.
+		Assert.IsTrue( RideChoiceScorer.Score( intense, W, 0f, preferredExcitement: 90f )
+			> RideChoiceScorer.Score( gentle, W, 0f, preferredExcitement: 90f ),
+			"a thrill-seeker prefers the most intense ride" );
+	}
+
+	[TestMethod]
+	public void PreferredExcitementMinusOneMatchesPlainExcitement()
+	{
+		var o = new RideOption( 70f, 50f, 2, IsNew: true );
+		// -1 (no taste) must reproduce the original excitement-only behaviour exactly (back-compat).
+		Assert.AreEqual( RideChoiceScorer.Score( o, W ), RideChoiceScorer.Score( o, W, 0f, -1f ), 1e-4f );
+	}
+
+	[TestMethod]
+	public void LoadsPreferredExcitementFromColumnarSam()
+	{
+		// The engine's columnar .sam layout: one key path names several fields, then the columns follow; the
+		// parser keeps the first column as the value, so PreferredExcitement is the first number.
+		const string sam = "PeepTypes[0].PreferredExcitement.StartingCash.BoredomThreshold\t80\t300\t40\n"
+			+ "PeepTypes[1].PreferredExcitement.StartingCash.BoredomThreshold\t65\t250\t30\n";
+		var prefs = PeepTypes.Load( new SettingsFile( new MemoryStream( Encoding.ASCII.GetBytes( sam ) ) ) );
+
+		Assert.AreEqual( 2, prefs.Count, "stops at the first missing type" );
+		Assert.AreEqual( 80f, prefs[0], 1e-3f );
+		Assert.AreEqual( 65f, prefs[1], 1e-3f );
+	}
+
+	[TestMethod]
+	public void PreferredForWrapsIntoRange()
+	{
+		var saved = PeepTypes.Preferences;
+		PeepTypes.Preferences = new[] { 10f, 90f };
+		try
+		{
+			Assert.AreEqual( 10f, PeepTypes.PreferredFor( 0 ) );
+			Assert.AreEqual( 90f, PeepTypes.PreferredFor( 1 ) );
+			Assert.AreEqual( 10f, PeepTypes.PreferredFor( 2 ), "type index wraps modulo the table size" );
+			Assert.AreEqual( 2, PeepTypes.Count );
+		}
+		finally { PeepTypes.Preferences = saved; }
+	}
 }
