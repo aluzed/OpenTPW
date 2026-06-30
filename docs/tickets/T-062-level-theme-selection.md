@@ -35,9 +35,13 @@ from the data rather than a fixed name list.
 
 ## Remaining (polish)
 
-- A **front-end theme picker** (currently env-var only) — a lobby menu to choose the world.
-- Per-theme **queue/path strip textures** (the jungle `jpa_*` filenames don't exist in other themes → the path
-  strip falls back to `Texture.Missing`; cosmetic) and the `Terrain.cs` fallback texture.
+- A **front-end theme picker** (currently env-var only) — a lobby menu to choose the world (needs a level-reload
+  path; the level is created once at startup today).
+- ~~Per-theme queue/path strip textures~~ — **done**: the `jpa_que1`/`jpa_str1` filenames turned out to be
+  *shared* across every theme's `queue.wad`/`terrain.wad`, so `LoadPathTexture` just routes the path through the
+  active theme. (The `Terrain.cs` flat-plane class with a hardcoded jungle texture is **dead code** — the park
+  uses `ParkTerrain`, which loads each theme's own per-mesh textures from its WAD; verified by space rendering
+  its own ground.)
 - ~~Wider verification of hallow / fantasy~~ — **done**: all four themes launched and populate cleanly
   (0 exceptions); no per-WAD failures observed (a few rides simply didn't fit the generic autoplace spots).
 

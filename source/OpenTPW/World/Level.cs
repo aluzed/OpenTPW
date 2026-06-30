@@ -819,7 +819,11 @@ public class Level
 
 	private static Texture LoadPathTexture()
 	{
-		foreach ( var p in new[] { "levels/jungle/queue/stexture/jpa_que1.wct", "levels/jungle/terrain/spathtex/jpa_str1.wct" } )
+		// The queue/path strip textures (jpa_que1 / jpa_str1) are shared filenames across every theme's
+		// queue.wad / terrain.wad, so route the path through the active theme (T-062) — was jungle-only, which
+		// left other themes' paths untextured. Falls back through the alternates, then to Texture.Missing.
+		var theme = Current.Name;
+		foreach ( var p in new[] { $"levels/{theme}/queue/stexture/jpa_que1.wct", $"levels/{theme}/terrain/spathtex/jpa_str1.wct" } )
 		{
 			try { return new Texture( p, TextureFlags.Repeat ); }
 			catch { /* try next */ }
