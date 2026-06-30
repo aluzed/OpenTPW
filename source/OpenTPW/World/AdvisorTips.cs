@@ -19,6 +19,9 @@ public static class AdvisorTips
 		["VisitorsHungry"] = "Your visitors are hungry. Build a food stall!",
 		["NewResearchGroupRide"] = "New research is available — put a researcher to work to unlock ride upgrades.",
 		["CongratVisitorsHappy"] = "Your visitors are having a wonderful time — keep it up!",
+		["CongratGoldenTicket"] = "You've won the Golden Ticket — every park goal is met. Magnificent work!",
+		["CongratChallengeWon"] = "Challenge complete! The prize is in the bank — ready for the next one?",
+		["ChallengeFailed"] = "That challenge slipped away this time. Don't worry — another will come along.",
 	};
 
 	/// <summary>The readable tip for an advice id, or a sensible fallback if it isn't mapped yet.</summary>

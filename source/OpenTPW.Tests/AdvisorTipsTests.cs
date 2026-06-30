@@ -13,6 +13,7 @@ public class AdvisorTipsTests
 		{
 			"WelcomeTutorial", "InTheRedSixMonths", "InTheRedThreeMonths", "InTheRedMonthLeft",
 			"VisitorsThirsty", "VisitorsHungry", "NewResearchGroupRide", "CongratVisitorsHappy",
+			"CongratGoldenTicket", "CongratChallengeWon", "ChallengeFailed",
 		} )
 			Assert.IsTrue( AdvisorTips.Has( id ), $"missing advisor tip text for '{id}'" );
 	}

@@ -8,9 +8,12 @@
   once all set targets are met; the HUD shows `TICKET GOALS n/N` → `GOLDEN TICKET WON!`. Unit-tested, verified
   in-game. **`RecentVisitors` now wired**: `ParkFinances` snapshots the cumulative visitor count per closed
   month (`FinanceSample.Visitors`) and `ParkFinances.RecentVisitors(months)` returns the count admitted over
-  the `RecentVisitorMonths` window; `GoldenTicket.Evaluate` scores it as a 6th goal. **Remaining (polish)**: the
-  exact "happy" threshold (approx 50), and the award **particle effect + advisor congratulation** (currently a
-  log + HUD banner); Global/Secret tiers aren't in the jungle `.sam`.
+  the `RecentVisitorMonths` window; `GoldenTicket.Evaluate` scores it as a 6th goal. **Award advisor
+  congratulation now wired**: the advisor edge-triggers a one-shot `CongratGoldenTicket` tip the tick the ticket
+  is won (via `AdvisorAdvice` + a new readable line) — likewise a `CongratChallengeWon` / `ChallengeFailed`
+  reaction for challenges (T-054). **Remaining (polish)**: the exact "happy" threshold (approx 50), and the
+  award **particle effect** (the advisor speaks, but no fireworks yet); Global/Secret tiers aren't in the
+  jungle `.sam`.
 - **Needs**: [T-053](T-053-ingame-clock.md) (months for the "recent visitors" window). **Related**:
   [T-054](T-054-challenge-system.md) (shares the `SAD_ADV_SCORING` progression cluster), [T-047](T-047-ride-event-3d-sound-particle-pools.md)
   (particle/award effect).

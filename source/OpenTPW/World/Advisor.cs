@@ -217,18 +217,37 @@ public sealed class Advisor : Entity
 
 	// Gather the park figures the advice rules key off (T-046). The thirst/hunger thresholds come from the
 	// .sam, so a level that retunes them retunes who counts as thirsty/hungry without code changes.
+	// Previous milestone tallies, so BuildSnapshot can edge-trigger a one-shot advisor reaction the tick the
+	// golden ticket is won / a challenge is won or lost (T-054/T-055), rather than re-firing while the state holds.
+	private bool prevTicketAwarded;
+	private int prevChallengesWon, prevChallengesLost;
+
 	private ParkSnapshot BuildSnapshot()
 	{
 		var fin = ParkFinances.Current;
 		float thirstThresh = config.Param( "VisitorsThirsty", "ThirstierThan" ) ?? 99f;
 		float hungerThresh = config.Param( "VisitorsHungry", "HungrierThan" ) ?? 99f;
+
+		bool ticketAwarded = GoldenTicketGoals.Current?.Awarded ?? false;
+		int won = ChallengeManager.Current?.Won ?? 0;
+		int lost = ChallengeManager.Current?.Lost ?? 0;
+		bool ticketJustWon = ticketAwarded && !prevTicketAwarded;
+		bool challengeJustWon = won > prevChallengesWon;
+		bool challengeJustLost = lost > prevChallengesLost;
+		prevTicketAwarded = ticketAwarded;
+		prevChallengesWon = won;
+		prevChallengesLost = lost;
+
 		return new ParkSnapshot(
 			Money: fin?.Money ?? 0f,
 			MonthsInRed: fin?.MonthsInRed ?? 0,
 			ThirstyVisitors: Peep.CountThirstierThan( thirstThresh ),
 			HungryVisitors: Peep.CountHungrierThan( hungerThresh ),
 			AverageHappiness: Peep.AverageHappiness,
-			ResearchAvailable: Entity.All.OfType<Ride>().Any( r => r.NextResearched ) );
+			ResearchAvailable: Entity.All.OfType<Ride>().Any( r => r.NextResearched ),
+			GoldenTicketWon: ticketJustWon,
+			ChallengeWon: challengeJustWon,
+			ChallengeLost: challengeJustLost );
 	}
 
 	protected override void OnUpdate()

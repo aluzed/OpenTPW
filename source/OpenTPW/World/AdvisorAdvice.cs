@@ -8,7 +8,13 @@ public readonly record struct ParkSnapshot(
 	int ThirstyVisitors,
 	int HungryVisitors,
 	float AverageHappiness,
-	bool ResearchAvailable );
+	bool ResearchAvailable,
+	// Edge-triggered milestone flags (the snapshot builder sets these only on the tick the event happens, so the
+	// advisor reacts once): the golden ticket was just won (T-055), a challenge was just won / just lost (T-054).
+	// Trailing defaults keep existing callers + tests compiling.
+	bool GoldenTicketWon = false,
+	bool ChallengeWon = false,
+	bool ChallengeLost = false );
 
 /// <summary>
 /// Maps the live park state to advisor message candidates — <c>(id, group, score)</c> for the
@@ -26,6 +32,9 @@ public static class AdvisorAdvice
 	private const float RedMonthScore = 110f, RedThreeScore = 50f, RedSixScore = 75f;
 	private const float ThirstyPerPerson = 1f, HungryPerPerson = 1f, ResearchScore = 40f, CongratScore = 60f;
 	private const float CongratHappiness = 75f; // average happiness worth a "well done"
+	// Milestone reactions (T-054/T-055): winning the level's golden ticket is the loudest tip; a challenge
+	// win/loss is a notable-but-lesser event.
+	private const float GoldenTicketScore = 200f, ChallengeWonScore = 90f, ChallengeLostScore = 70f;
 
 	/// <summary>The candidate tips justified by <paramref name="s"/>, scored via <paramref name="c"/>.</summary>
 	public static List<(string Id, int Group, float Score)> Evaluate( ParkSnapshot s, AdvisorConfig c )
@@ -59,6 +68,14 @@ public static class AdvisorAdvice
 		// Congratulate a happy park.
 		if ( s.AverageHappiness >= CongratHappiness )
 			list.Add( ("CongratVisitorsHappy", GroupCongrats, c.Param( "CongratVisitorsHappy", "Score" ) ?? CongratScore) );
+
+		// One-shot milestone reactions (the builder edge-triggers these so they speak once).
+		if ( s.GoldenTicketWon )
+			list.Add( ("CongratGoldenTicket", GroupCongrats, c.Param( "CongratGoldenTicket", "Score" ) ?? GoldenTicketScore) );
+		if ( s.ChallengeWon )
+			list.Add( ("CongratChallengeWon", GroupCongrats, c.Param( "CongratChallengeWon", "Score" ) ?? ChallengeWonScore) );
+		if ( s.ChallengeLost )
+			list.Add( ("ChallengeFailed", GroupGeneral, c.Param( "ChallengeFailed", "Score" ) ?? ChallengeLostScore) );
 
 		return list;
 	}

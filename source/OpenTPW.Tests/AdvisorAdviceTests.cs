@@ -87,4 +87,24 @@ CongratVisitorsHappy.Score				60
 		Assert.AreEqual( 110f, advice.Single( a => a.Id == "InTheRedMonthLeft" ).Score, 1e-4f, "default red score" );
 		Assert.AreEqual( 1f * 3, advice.Single( a => a.Id == "VisitorsThirsty" ).Score, 1e-4f, "default 1/thirsty person" );
 	}
+
+	[TestMethod]
+	public void MilestoneFlagsRaiseOneShotCongratsAndCommiseration()
+	{
+		var c = Cfg();
+
+		// A healthy park with no milestone flagged → no milestone advice.
+		Assert.IsFalse( AdvisorAdvice.Evaluate( Healthy(), c ).Any( a => a.Id.StartsWith( "Congrat" ) || a.Id == "ChallengeFailed" ) );
+
+		var ticket = AdvisorAdvice.Evaluate( Healthy() with { GoldenTicketWon = true }, c )
+			.Single( a => a.Id == "CongratGoldenTicket" );
+		Assert.AreEqual( AdvisorAdvice.GroupCongrats, ticket.Group );
+		Assert.AreEqual( 200f, ticket.Score, 1e-4f, "the golden ticket is the loudest tip" );
+
+		var won = AdvisorAdvice.Evaluate( Healthy() with { ChallengeWon = true }, c );
+		Assert.IsTrue( won.Any( a => a.Id == "CongratChallengeWon" && a.Group == AdvisorAdvice.GroupCongrats ) );
+
+		var lost = AdvisorAdvice.Evaluate( Healthy() with { ChallengeLost = true }, c );
+		Assert.IsTrue( lost.Any( a => a.Id == "ChallengeFailed" && a.Group == AdvisorAdvice.GroupGeneral ) );
+	}
 }
