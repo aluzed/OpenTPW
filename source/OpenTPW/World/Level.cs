@@ -327,6 +327,11 @@ public class Level
 			{
 				Kind = "ride", Name = Path.GetFileName( r.Archive ),
 				TileX = r.TileX, TileY = r.TileY, Rotation = r.Rotation, TicketPrice = r.TicketPrice,
+				// Progression (T-059 v2): research/upgrade level + condition + the park-wide research-queue slot.
+				UpgradeLevel = r.UpgradeLevel, ResearchedLevel = r.ResearchedLevel,
+				Researching = r.IsResearching, ResearchFraction = r.ResearchFraction,
+				ResearchQueuePos = ResearchQueue.Position( r ),
+				Reliability = r.Reliability, Broken = r.IsBroken,
 			} );
 		foreach ( var sh in Shop.Stalls )
 			s.Placements.Add( new SaveGame.Placement
@@ -334,6 +339,18 @@ public class Level
 				Kind = "shop", Name = ShopCatalogName( sh.Kind ), TileX = sh.TileX, TileY = sh.TileY,
 				TicketPrice = sh.Price, // reuse the generic price field for the stall's sale price (T-041)
 			} );
+
+		// Staff (T-059 v2): role + wander centre + patrol zone — respawned on load (they roam, so no grid tile).
+		foreach ( var st in Entity.All.OfType<Staff>() )
+		{
+			var ss = new SaveGame.StaffState { Role = st.Role.ToString(), X = st.WanderCenter.X, Y = st.WanderCenter.Y };
+			if ( st.Zone is { } z )
+			{
+				ss.HasZone = true;
+				ss.ZoneX = z.Center.X; ss.ZoneY = z.Center.Y; ss.ZoneRadius = z.Radius;
+			}
+			s.Staff.Add( ss );
+		}
 		return s;
 	}
 
@@ -348,6 +365,9 @@ public class Level
 			DemolishRide( r, grid );
 		foreach ( var sh in Shop.Stalls.ToList() )
 			DemolishShop( sh, grid );
+		foreach ( var st in Entity.All.OfType<Staff>().ToList() )
+			st.Fire();
+		ResearchQueue.Reset(); // rebuilt below from the saved per-ride queue positions
 
 		if ( ParkFinances.Current is { } fin )
 		{
@@ -361,6 +381,10 @@ public class Level
 		}
 		GameClock.Current?.SetElapsed( s.ClockSeconds );
 
+		// Rides that were mid-research, in the order they sat in the park-wide research queue (T-044) — collected
+		// while rebuilding so the restored queue head matches the save instead of the load order.
+		var researching = new List<(Ride Ride, int Pos)>();
+
 		foreach ( var p in s.Placements )
 		{
 			var item = catalog.FirstOrDefault( c => c.Name == p.Name );
@@ -371,7 +395,12 @@ public class Level
 			if ( p.Kind == "ride" )
 			{
 				if ( Entity.All.OfType<Ride>().FirstOrDefault( r => r.TileX == p.TileX && r.TileY == p.TileY ) is { } ride )
+				{
 					ride.TicketPrice = p.TicketPrice;
+					ride.RestoreProgress( p.UpgradeLevel, p.ResearchedLevel, p.Researching, p.ResearchFraction, p.Reliability, p.Broken );
+					if ( ride.IsResearching )
+						researching.Add( (ride, p.ResearchQueuePos) );
+				}
 			}
 			else if ( p.Kind == "shop" && p.TicketPrice > 0f )
 			{
@@ -379,7 +408,22 @@ public class Level
 					shop.Price = p.TicketPrice;
 			}
 		}
-		Log.Info( $"[save] restored {s.Placements.Count} placement(s)" );
+
+		// Rebuild the research queue in its saved order (a position of -1 sorts last — a defensive fallback).
+		foreach ( var (ride, _) in researching.OrderBy( e => e.Pos < 0 ? int.MaxValue : e.Pos ) )
+			ResearchQueue.Enqueue( ride );
+
+		// Respawn staff at their saved wander centres, re-applying any patrol zone (T-059 v2).
+		foreach ( var ss in s.Staff )
+		{
+			if ( !Enum.TryParse<StaffRole>( ss.Role, out var role ) )
+				continue;
+			var st = new Staff( role, terrain, new System.Numerics.Vector3( ss.X, ss.Y, 0f ), roam: 160f );
+			if ( ss.HasZone )
+				st.SetPatrolZone( new System.Numerics.Vector3( ss.ZoneX, ss.ZoneY, 0f ), ss.ZoneRadius );
+		}
+
+		Log.Info( $"[save] restored {s.Placements.Count} placement(s) + {s.Staff.Count} staff" );
 	}
 
 	// The build-catalog item name for a shop kind (the inverse of ShopKindOf).

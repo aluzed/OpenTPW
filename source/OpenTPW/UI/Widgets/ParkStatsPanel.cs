@@ -90,6 +90,8 @@ internal sealed class ParkStatsPanel : HudPanel
 			else if ( build.SelectedRide is { Shape.HasTrack: true } )
 				lines.Add( "T: lay coaster track" );
 
+			lines.Add( $"SAVE SLOT {build.SaveSlot} {(SaveGame.SlotExists( build.SaveSlot ) ? "[used]" : "[empty]")}  (F5 save, F9 load, F6 slot)" );
+
 			if ( build.SelectedStaff is { } staffSel )
 				lines.Add( staffSel.HasPatrolZone
 					? $"STAFF {staffSel.Role}  zone r{staffSel.Zone!.Value.Radius:0} (FIRE/ZONE buttons)"

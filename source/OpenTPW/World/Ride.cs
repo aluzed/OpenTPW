@@ -86,6 +86,23 @@ public class Ride : Entity
 			UpgradeLevel++;
 	}
 
+	/// <summary>Restore this ride's progression from a save (T-059): the applied + researched upgrade levels,
+	/// any in-progress research (fraction of the next level), and the mechanical condition. Values are clamped
+	/// to the ride's real upgrade table so a stale/corrupt save can't push it out of range. The caller rebuilds
+	/// the park-wide <see cref="ResearchQueue"/> order separately (so it matches the saved queue, not load order).</summary>
+	public void RestoreProgress( int upgradeLevel, int researchedLevel, bool isResearching, float researchFraction, float reliability, bool broken )
+	{
+		int maxLevel = Math.Max( 0, upgrades.Count - 1 );
+		UpgradeLevel = Math.Clamp( upgradeLevel, 0, maxLevel );
+		ResearchedLevel = Math.Clamp( researchedLevel, UpgradeLevel, maxLevel );
+
+		researching = isResearching && HasNextLevel && !NextResearched;
+		researchProgress = researching ? Math.Clamp( researchFraction, 0f, 1f ) * ResearchDuration : 0f;
+
+		Reliability = Math.Clamp( reliability, 0f, 1f );
+		IsBroken = broken;
+	}
+
 	/// <summary>The ride's duration band (<c>Info.DurationUnit</c>, 0–3 — indexes a seconds table in TP.EXE).</summary>
 	public int DurationUnit { get; private set; }
 

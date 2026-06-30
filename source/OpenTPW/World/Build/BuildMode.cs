@@ -47,6 +47,9 @@ public sealed class BuildMode : Entity
 	/// <summary>Index of the selected catalog item, or -1 when no placement tool is active.</summary>
 	public int Selected { get; private set; } = -1;
 
+	/// <summary>The active save slot (1..<see cref="SaveGame.SlotCount"/>); F5 saves it, F9 loads it, F6 cycles it (T-059).</summary>
+	public int SaveSlot { get; private set; } = 1;
+
 	/// <summary>Select catalog item <paramref name="index"/> (or clear with any out-of-range value, e.g. -1).
 	/// Clicking the already-selected item toggles it off. Used by the clickable build UI (T-038).</summary>
 	public void SelectIndex( int index )
@@ -210,9 +213,10 @@ public sealed class BuildMode : Entity
 		if ( Hit( Key.R ) && Selected >= 0 && Catalog[Selected].RidePath != null )
 			Rotation = (Rotation + 1) % 4;
 
-		// Save (F5) / load (F9) the park to the default slot (T-059).
-		if ( Hit( Key.F5 ) ) Level.CaptureSave().WriteToFile( SaveGame.DefaultPath );
-		if ( Hit( Key.F9 ) && SaveGame.ReadFromFile( SaveGame.DefaultPath ) is { } loaded ) Level.ApplySave( loaded );
+		// Save (F5) / load (F9) the park to the active slot; F6 cycles the slot 1→2→3→1 (T-059).
+		if ( Hit( Key.F6 ) ) SaveSlot = SaveSlot % SaveGame.SlotCount + 1;
+		if ( Hit( Key.F5 ) ) Level.CaptureSave().WriteToFile( SaveGame.SlotPath( SaveSlot ) );
+		if ( Hit( Key.F9 ) && SaveGame.ReadFromFile( SaveGame.SlotPath( SaveSlot ) ) is { } loaded ) Level.ApplySave( loaded );
 
 		var fin = ParkFinances.Current;
 		if ( fin != null )

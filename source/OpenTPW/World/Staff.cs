@@ -83,6 +83,10 @@ public sealed class Staff : ModelEntity
 	/// <summary>The assigned patrol zone, or null when the staff member roams freely.</summary>
 	public PatrolZone? Zone => zone;
 
+	/// <summary>The staff member's wander centre (its anchor, not the jittering live position) — captured by
+	/// save/load so a reloaded staffer respawns where the player put them (T-059).</summary>
+	public Vector3 WanderCenter => center;
+
 	/// <summary>True when the player has bounded this staff member to a patrol zone.</summary>
 	public bool HasPatrolZone => zone != null;
 

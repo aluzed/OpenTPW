@@ -2,13 +2,18 @@
 
 - **Priority**: 🟡 Feature (high impact)
 - **Type**: Engine / RE
-- **Status**: ⚠️ Core done (Route A) — a native versioned-JSON save: `SaveGame` (balance + loans + clock +
-  placed rides/shops) with fault-tolerant file I/O; `Level.CaptureSave`/`ApplySave` snapshot + rebuild the
-  park (demolish → restore finances/clock → rebuild placements for free via `CommitPlacement(charge:false)`);
-  **F5 saves, F9 loads** the default slot. Round-trip unit-tested + verified in-game (7 placements captured,
-  money restored, 5 rides/2 shops rebuilt, 0 exceptions). **Remaining (v1.x)**: staff + coaster tracks +
-  fine progression (research-in-progress, the active challenge/goal state — the restored clock keeps timing
-  aligned), and a save-slot UI. **Route B** (original `.TPWS` compat) is unchanged (needs a real sample).
+- **Status**: ⚠️ Core done (Route A) — a native versioned-JSON save (**v2**): `SaveGame` (balance + loans +
+  clock + placed rides/shops) with fault-tolerant file I/O; `Level.CaptureSave`/`ApplySave` snapshot + rebuild
+  the park (demolish → restore finances/clock → rebuild placements for free via `CommitPlacement(charge:false)`).
+  **v2 adds depth**: each ride now round-trips its **research/upgrade level + in-progress research (fraction +
+  park-wide queue order) + reliability/breakdown** (`Ride.RestoreProgress`, clamped to the real upgrade table),
+  and **hired staff** round-trip (role + wander centre + patrol zone — respawned on load since staff roam off
+  the grid). Plus a **3-slot save UI**: `SaveGame.SlotPath`/`SlotExists`, **F6 cycles the slot**, **F5 saves /
+  F9 loads** the active one, with a HUD `SAVE SLOT n [used/empty]` line. v2 is **back-compatible** — a v1 save
+  (no progression/staff keys) loads as level-0, fully-reliable, un-queued rides with no staff. Round-trip
+  unit-tested (10 `SaveGameTests`, incl. a v1→v2 compat load). **Remaining (v1.x)**: coaster tracks + the
+  active challenge/golden-ticket goal state in the save (the restored clock keeps their timing aligned).
+  **Route B** (original `.TPWS` compat) is unchanged (needs a real sample).
 - **Related**: [T-017](T-017-tpws-saves.md) (the `.TPWS` container is already RE'd + writable; the `SAD_*`
   module payloads are not).
 

@@ -42,4 +42,73 @@ public class SaveGameTests
 	{
 		Assert.IsNull( SaveGame.FromJson( "not valid json {{" ) );
 	}
+
+	[TestMethod]
+	public void RideProgressionRoundTrips()
+	{
+		var s = new SaveGame();
+		s.Placements.Add( new SaveGame.Placement
+		{
+			Kind = "ride", Name = "totem", TileX = 3, TileY = 4,
+			UpgradeLevel = 2, ResearchedLevel = 3, Researching = true, ResearchFraction = 0.5f,
+			ResearchQueuePos = 1, Reliability = 0.25f, Broken = true,
+		} );
+
+		var back = SaveGame.FromJson( s.ToJson() )!.Placements[0];
+
+		Assert.AreEqual( 2, back.UpgradeLevel );
+		Assert.AreEqual( 3, back.ResearchedLevel );
+		Assert.IsTrue( back.Researching );
+		Assert.AreEqual( 0.5f, back.ResearchFraction );
+		Assert.AreEqual( 1, back.ResearchQueuePos );
+		Assert.AreEqual( 0.25f, back.Reliability );
+		Assert.IsTrue( back.Broken );
+	}
+
+	[TestMethod]
+	public void StaffRoundTrips()
+	{
+		var s = new SaveGame();
+		s.Staff.Add( new SaveGame.StaffState { Role = "Guard", X = 12f, Y = -7f } );
+		s.Staff.Add( new SaveGame.StaffState { Role = "Mechanic", X = 1f, Y = 2f, HasZone = true, ZoneX = 1f, ZoneY = 2f, ZoneRadius = 30f } );
+
+		var back = SaveGame.FromJson( s.ToJson() )!;
+
+		Assert.AreEqual( 2, back.Staff.Count );
+		Assert.AreEqual( "Guard", back.Staff[0].Role );
+		Assert.AreEqual( 12f, back.Staff[0].X );
+		Assert.IsFalse( back.Staff[0].HasZone );
+		Assert.IsTrue( back.Staff[1].HasZone );
+		Assert.AreEqual( 30f, back.Staff[1].ZoneRadius );
+	}
+
+	[TestMethod]
+	public void V1SaveLoadsWithSaneProgressionDefaults()
+	{
+		// A v1 save predates the progression/staff fields; the missing keys must default to a freshly-built,
+		// fully-reliable, un-queued ride (not "broken at level 0 with reliability 0").
+		const string v1 = """
+		{ "Version": 1, "Money": 5000, "EntryFee": 5,
+		  "Placements": [ { "Kind": "ride", "Name": "totem", "TileX": 1, "TileY": 1, "TicketPrice": 6 } ] }
+		""";
+
+		var back = SaveGame.FromJson( v1 )!;
+		var ride = back.Placements[0];
+
+		Assert.AreEqual( 0, ride.UpgradeLevel );
+		Assert.IsFalse( ride.Researching );
+		Assert.AreEqual( -1, ride.ResearchQueuePos, "an absent queue position defaults to -1 (not queued)" );
+		Assert.AreEqual( 1f, ride.Reliability, "an absent reliability defaults to fully reliable" );
+		Assert.IsFalse( ride.Broken );
+		Assert.AreEqual( 0, back.Staff.Count );
+	}
+
+	[TestMethod]
+	public void SlotPathsAreDistinctAndClamped()
+	{
+		Assert.AreNotEqual( SaveGame.SlotPath( 1 ), SaveGame.SlotPath( 2 ) );
+		Assert.AreEqual( SaveGame.SlotPath( 1 ), SaveGame.DefaultPath, "slot 1 is the default path (v1 compat)" );
+		Assert.AreEqual( SaveGame.SlotPath( SaveGame.SlotCount ), SaveGame.SlotPath( 99 ), "out-of-range slots clamp to the last" );
+		Assert.AreEqual( SaveGame.SlotPath( 1 ), SaveGame.SlotPath( 0 ), "out-of-range slots clamp to the first" );
+	}
 }
