@@ -38,26 +38,30 @@ GoldenTicketLocal.RecentVisitorMonths			6
 	public void EvaluateYieldsOneRowPerSetTargetWithMetFlag()
 	{
 		var t = Targets();
-		var s = new ParkState( VisitorsTotal: 120, PeopleInPark: 150, AverageHappiness: 80f, HappyPeople: 100, ProfitYear: 20000f );
+		var s = new ParkState( VisitorsTotal: 120, PeopleInPark: 150, AverageHappiness: 80f, HappyPeople: 100, ProfitYear: 20000f, RecentVisitors: 400 );
 		var rows = GoldenTicket.Evaluate( t, s );
 
-		Assert.AreEqual( 5, rows.Count, "five set targets (RecentVisitors isn't evaluated)" );
+		Assert.AreEqual( 6, rows.Count, "six set targets (RecentVisitors now evaluated)" );
 		Assert.IsTrue( rows.Single( r => r.Name == "Visitors" ).Met, "120 ≥ 100" );
 		Assert.IsFalse( rows.Single( r => r.Name == "In park" ).Met, "150 < 200" );
 		Assert.IsTrue( rows.Single( r => r.Name == "Happiness" ).Met, "80 ≥ 75" );
 		Assert.IsFalse( rows.Single( r => r.Name == "Happy people" ).Met, "100 < 150" );
 		Assert.IsTrue( rows.Single( r => r.Name == "Profit/yr" ).Met, "20000 ≥ 15000" );
+		Assert.IsTrue( rows.Single( r => r.Name == "Recent visitors" ).Met, "400 ≥ 350" );
 	}
 
 	[TestMethod]
 	public void AllMetOnlyWhenEverySetTargetIsMet()
 	{
 		var t = Targets();
-		var nearly = new ParkState( 120, 250, 80f, 200, 20000f ); // happiness... 80≥75 ok; all others ok
+		var nearly = new ParkState( 120, 250, 80f, 200, 20000f, RecentVisitors: 400 ); // every set target met
 		Assert.IsTrue( GoldenTicket.AllMet( t, nearly ) );
 
 		var oneShort = nearly with { ProfitYear = 14999f }; // profit just under
 		Assert.IsFalse( GoldenTicket.AllMet( t, oneShort ) );
+
+		var fewRecent = nearly with { RecentVisitors = 349 }; // recent-visitors goal just under
+		Assert.IsFalse( GoldenTicket.AllMet( t, fewRecent ), "the recent-visitors window goal must also be met" );
 	}
 
 	[TestMethod]

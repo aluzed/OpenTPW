@@ -3,8 +3,8 @@ using System.Globalization;
 namespace OpenTPW;
 
 /// <summary>The level's golden-ticket targets (T-055), parsed from <c>GoldenTicketLocal.*</c> in the level
-/// <c>Standard.sam</c>. A target of 0 means "not set" (skipped). <c>RecentVisitors</c> over a months window is
-/// parsed but not yet evaluated (no per-month visitor history — see <see cref="GoldenTicket"/>).</summary>
+/// <c>Standard.sam</c>. A target of 0 means "not set" (skipped). <c>RecentVisitors</c> over a
+/// <c>RecentVisitorMonths</c> window is now evaluated against <see cref="ParkFinances.RecentVisitors"/>.</summary>
 public readonly record struct GoldenTicketTargets(
 	int Visitors, int PeopleInPark, float Happiness, int HappyPeople, float ProfitYear,
 	int RecentVisitors, int RecentVisitorMonths )
@@ -25,9 +25,12 @@ public readonly record struct GoldenTicketTargets(
 	}
 }
 
-/// <summary>A snapshot of the park figures the golden-ticket goals measure.</summary>
+/// <summary>A snapshot of the park figures the golden-ticket goals measure. <c>RecentVisitors</c> is the count
+/// admitted over the level's <c>RecentVisitorMonths</c> window (T-055); it defaults to 0 so callers that don't
+/// measure it keep compiling.</summary>
 public readonly record struct ParkState(
-	int VisitorsTotal, int PeopleInPark, float AverageHappiness, int HappyPeople, float ProfitYear );
+	int VisitorsTotal, int PeopleInPark, float AverageHappiness, int HappyPeople, float ProfitYear,
+	int RecentVisitors = 0 );
 
 /// <summary>
 /// Pure golden-ticket goal evaluation (T-055): compares a <see cref="ParkState"/> to the level's
@@ -53,6 +56,7 @@ public static class GoldenTicket
 		Add( "Happiness", s.AverageHappiness, t.Happiness );
 		Add( "Happy people", s.HappyPeople, t.HappyPeople );
 		Add( "Profit/yr", s.ProfitYear, t.ProfitYear );
+		Add( "Recent visitors", s.RecentVisitors, t.RecentVisitors );
 		return goals;
 	}
 

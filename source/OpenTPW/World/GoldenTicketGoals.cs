@@ -45,7 +45,7 @@ public sealed class GoldenTicketGoals
 		}
 	}
 
-	private static ParkState Snapshot()
+	private ParkState Snapshot()
 	{
 		var fin = ParkFinances.Current;
 		return new ParkState(
@@ -53,6 +53,7 @@ public sealed class GoldenTicketGoals
 			PeopleInPark: Entity.All.Count( e => e is Peep ),
 			AverageHappiness: MathF.Max( 0f, Peep.AverageHappiness ),
 			HappyPeople: Peep.CountHappierThan( HappyThreshold ),
-			ProfitYear: fin?.RecentProfit( GameClock.MonthsPerYear ) ?? 0f );
+			ProfitYear: fin?.RecentProfit( GameClock.MonthsPerYear ) ?? 0f,
+			RecentVisitors: fin?.RecentVisitors( targets.RecentVisitorMonths ) ?? 0 );
 	}
 }

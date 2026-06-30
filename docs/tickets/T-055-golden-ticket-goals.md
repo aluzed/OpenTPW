@@ -4,11 +4,13 @@
 - **Type**: Engine / UI
 - **Status**: ⚠️ Core done — `GoldenTicketLocal.*` targets parse from `Standard.sam`; a pure `GoldenTicket`
   evaluator + `GoldenTicketGoals` manager track the live park (visitors / in-park / happiness / happy-people /
-  profit-per-year, on `GameClock.OnNewDay`) and award the ticket once all set targets are met; the HUD shows
-  `TICKET GOALS n/5` → `GOLDEN TICKET WON!`. Unit-tested, verified in-game. **Remaining (polish)**: the
-  `RecentVisitors`-over-months goal (needs per-month visitor history), the exact "happy" threshold (approx 50),
-  and the award **particle effect + advisor congratulation** (currently a log + HUD banner); Global/Secret
-  tiers aren't in the jungle `.sam`.
+  profit-per-year / **recent-visitors-over-a-months-window**, on `GameClock.OnNewDay`) and award the ticket
+  once all set targets are met; the HUD shows `TICKET GOALS n/N` → `GOLDEN TICKET WON!`. Unit-tested, verified
+  in-game. **`RecentVisitors` now wired**: `ParkFinances` snapshots the cumulative visitor count per closed
+  month (`FinanceSample.Visitors`) and `ParkFinances.RecentVisitors(months)` returns the count admitted over
+  the `RecentVisitorMonths` window; `GoldenTicket.Evaluate` scores it as a 6th goal. **Remaining (polish)**: the
+  exact "happy" threshold (approx 50), and the award **particle effect + advisor congratulation** (currently a
+  log + HUD banner); Global/Secret tiers aren't in the jungle `.sam`.
 - **Needs**: [T-053](T-053-ingame-clock.md) (months for the "recent visitors" window). **Related**:
   [T-054](T-054-challenge-system.md) (shares the `SAD_ADV_SCORING` progression cluster), [T-047](T-047-ride-event-3d-sound-particle-pools.md)
   (particle/award effect).

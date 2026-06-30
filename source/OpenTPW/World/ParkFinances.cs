@@ -25,8 +25,9 @@ public sealed class ParkFinances
 	public float BuildSpent { get; private set; }
 
 	// ── Finance history (T-049): one sample per in-game "month", for the finance graph ─────────────
-	/// <summary>One period's finances: the closing balance and the income / expense that flowed that month.</summary>
-	public readonly record struct FinanceSample( float Balance, float Income, float Expense );
+	/// <summary>One period's finances: the closing balance, the income / expense that flowed that month, and the
+	/// cumulative visitor count at the close (drives the golden-ticket "recent visitors" window, T-055).</summary>
+	public readonly record struct FinanceSample( float Balance, float Income, float Expense, int Visitors = 0 );
 
 	/// <summary>How many monthly samples the rolling history keeps (oldest dropped past this).</summary>
 	public const int MaxHistory = 48;
@@ -53,7 +54,7 @@ public sealed class ParkFinances
 		lastIncomeTotal = TotalIncome;
 		lastExpenseTotal = TotalExpense;
 
-		history.Add( new FinanceSample( Money, income, expense ) );
+		history.Add( new FinanceSample( Money, income, expense, VisitorsTotal ) );
 		if ( history.Count > MaxHistory )
 			history.RemoveRange( 0, history.Count - MaxHistory );
 
@@ -223,6 +224,19 @@ public sealed class ParkFinances
 		for ( int i = Math.Max( 0, history.Count - months ); i < history.Count; i++ )
 			sum += history[i].Income - history[i].Expense;
 		return sum;
+	}
+
+	/// <summary>Visitors admitted over the last <paramref name="months"/> recorded months — the golden-ticket
+	/// "recent visitors" goal (T-055): the latest closed month's cumulative count minus the count as of the
+	/// close just before the window (0 before any history). Counts closed months only, like <see cref="RecentProfit"/>.</summary>
+	public int RecentVisitors( int months )
+	{
+		if ( history.Count == 0 || months <= 0 )
+			return 0;
+		int latest = history[^1].Visitors;
+		int start = history.Count - months - 1; // the close just before the window
+		int baseline = start >= 0 ? history[start].Visitors : 0;
+		return latest - baseline;
 	}
 
 	/// <summary>Ongoing ride running cost.</summary>
