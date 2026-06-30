@@ -11,9 +11,11 @@
   names. **Jungle is unchanged** — it keeps its curated, verified ride/sideshow set, so the default park is
   byte-for-byte the same. Non-jungle themes use a generic autoplace (`AutoplaceGeneric`) that drops the first few
   enumerated rides + the shared shops/staff. Terrain, `Standard.sam` and the advisor speech dir are theme-relative.
-  **Verified in-game**: jungle loads identically (`autoplace totem=True … guard=True`, autotrack 9 segs, 0 exc);
-  **space loads its own terrain (200-mesh) + its own rides** (bouncy/creature/hoverbot/mbuggy/moonshot/…, 5/6
-  autoplaced, peeps enter, 0 exceptions). Unit-tested (`LevelThemeTests`: resolve/fallback + jungle stays curated).
+  **Verified in-game — all four themes load with 0 exceptions**: jungle identical (`autoplace totem=True …
+  guard=True`, autotrack 9 segs), **space** (200-mesh terrain; bouncy/creature/hoverbot/mbuggy/moonshot, 5/6
+  autoplaced), **hallow** (201-mesh; brainb/bug/coasta, 4/6), **fantasy** (195-mesh; bbugs/b_drip/bigapple/
+  candy_c, 5/6) — each loads its own terrain + its own enumerated rides, peeps enter. Unit-tested
+  (`LevelThemeTests`: resolve/fallback + jungle stays curated).
 
 ## Context
 
@@ -36,8 +38,8 @@ from the data rather than a fixed name list.
 - A **front-end theme picker** (currently env-var only) — a lobby menu to choose the world.
 - Per-theme **queue/path strip textures** (the jungle `jpa_*` filenames don't exist in other themes → the path
   strip falls back to `Texture.Missing`; cosmetic) and the `Terrain.cs` fallback texture.
-- Wider verification of **hallow / fantasy** (only jungle + space were launched); some themes' rides may need
-  per-WAD fixes if any fail to load (they skip gracefully today).
+- ~~Wider verification of hallow / fantasy~~ — **done**: all four themes launched and populate cleanly
+  (0 exceptions); no per-WAD failures observed (a few rides simply didn't fit the generic autoplace spots).
 
 ## Affected files
 
