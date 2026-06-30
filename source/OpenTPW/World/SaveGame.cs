@@ -25,6 +25,7 @@ public sealed class SaveGame
 	public List<TrackState> Tracks { get; set; } = new(); // player-built coaster tracks (one per coaster)
 	public ChallengeState? Challenge { get; set; }    // active/offered challenge progress (null = none)
 	public bool GoldenTicketAwarded { get; set; }     // the level-win flag (T-055), so a won park stays won
+	public MetaInfo? Meta { get; set; }               // at-a-glance slot summary (T-061; null on pre-Meta saves)
 
 	public sealed class LoanState
 	{
@@ -98,6 +99,30 @@ public sealed class SaveGame
 		public int X { get; set; }
 		public int Y { get; set; }
 		public float Rise { get; set; }
+	}
+
+	/// <summary>At-a-glance metadata for the save-slot menu (T-061): the park's money, in-game date, total
+	/// visitors and ride/shop counts at save time — enough to tell slots apart without loading the park.</summary>
+	public sealed class MetaInfo
+	{
+		public float Money { get; set; }
+		public int Year { get; set; } = 1;
+		public int Month { get; set; } = 1;
+		public int Day { get; set; } = 1;
+		public int Visitors { get; set; }
+		public int Rides { get; set; }
+		public int Shops { get; set; }
+	}
+
+	/// <summary>A one-line slot label for the save menu (T-061): money, in-game date and ride/shop/visitor
+	/// counts from <see cref="Meta"/>; for a pre-Meta save it falls back to what the placements alone reveal.</summary>
+	public string Summary()
+	{
+		if ( Meta is { } m )
+			return $"${m.Money:0}  Y{m.Year} M{m.Month} D{m.Day}  {m.Rides}R {m.Shops}S  {m.Visitors}v";
+		int rides = Placements.Count( p => p.Kind == "ride" );
+		int shops = Placements.Count( p => p.Kind == "shop" );
+		return $"${Money:0}  {rides}R {shops}S";
 	}
 
 	private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };

@@ -20,7 +20,7 @@ internal abstract class HudPanel : Panel
 	public static bool PointerOverUi()
 		=> (BuildPanel.Current?.ContainsMouse() ?? false) || (ManagePanel.Current?.ContainsMouse() ?? false)
 			|| (OptionsPanel.Current?.ContainsMouse() ?? false) || (FinancePanel.Current?.ContainsMouse() ?? false)
-			|| (MinimapPanel.Current?.ContainsMouse() ?? false);
+			|| (MinimapPanel.Current?.ContainsMouse() ?? false) || (SavePanel.Current?.ContainsMouse() ?? false);
 
 	// Window mouse (pixels, Y-down) → base 1280×720 space (Y-up).
 	protected static Vector2 MouseBase()

@@ -158,6 +158,39 @@ public class SaveGameTests
 	}
 
 	[TestMethod]
+	public void MetaRoundTripsAndDrivesSummary()
+	{
+		var s = new SaveGame
+		{
+			Meta = new SaveGame.MetaInfo { Money = 8200f, Year = 2, Month = 5, Day = 14, Visitors = 137, Rides = 4, Shops = 2 },
+		};
+
+		var back = SaveGame.FromJson( s.ToJson() )!;
+
+		Assert.IsNotNull( back.Meta );
+		Assert.AreEqual( 137, back.Meta!.Visitors );
+		var summary = back.Summary();
+		StringAssert.Contains( summary, "$8200" );
+		StringAssert.Contains( summary, "Y2 M5 D14" );
+		StringAssert.Contains( summary, "4R 2S" );
+		StringAssert.Contains( summary, "137v" );
+	}
+
+	[TestMethod]
+	public void SummaryFallsBackToPlacementsWithoutMeta()
+	{
+		var s = new SaveGame { Money = 500f };
+		s.Placements.Add( new SaveGame.Placement { Kind = "ride", Name = "totem" } );
+		s.Placements.Add( new SaveGame.Placement { Kind = "ride", Name = "monkey" } );
+		s.Placements.Add( new SaveGame.Placement { Kind = "shop", Name = "drink" } );
+
+		// No Meta block (a pre-T-061 save) → summary derived from money + placement counts.
+		var summary = s.Summary();
+		StringAssert.Contains( summary, "$500" );
+		StringAssert.Contains( summary, "2R 1S" );
+	}
+
+	[TestMethod]
 	public void SlotPathsAreDistinctAndClamped()
 	{
 		Assert.AreNotEqual( SaveGame.SlotPath( 1 ), SaveGame.SlotPath( 2 ) );

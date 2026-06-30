@@ -380,6 +380,18 @@ public class Level
 				DaysLeft = cm.DaysLeft, Progress = cm.Progress, Won = cm.Won, Lost = cm.Lost,
 			};
 		s.GoldenTicketAwarded = GoldenTicketGoals.Current?.Awarded ?? false;
+
+		// Slot-menu metadata (T-061): an at-a-glance summary so the player can tell saves apart.
+		s.Meta = new SaveGame.MetaInfo
+		{
+			Money = s.Money,
+			Year = GameClock.Current?.Year ?? 1,
+			Month = GameClock.Current?.Month ?? 1,
+			Day = GameClock.Current?.Day ?? 1,
+			Visitors = ParkFinances.Current?.VisitorsTotal ?? 0,
+			Rides = s.Placements.Count( p => p.Kind == "ride" ),
+			Shops = s.Placements.Count( p => p.Kind == "shop" ),
+		};
 		return s;
 	}
 
@@ -790,6 +802,7 @@ public class Level
 			Hud.AddChild( new ManagePanel() );    // clickable economy/ride manage buttons (T-038)
 			Hud.AddChild( new FinancePanel() );   // F11 income/expense graph (T-049)
 			Hud.AddChild( new MinimapPanel() );   // corner minimap (M toggles, click pans) (T-057)
+			Hud.AddChild( new SavePanel() );      // F8 save/load slot menu with park summaries (T-061)
 		}
 		else
 		{
