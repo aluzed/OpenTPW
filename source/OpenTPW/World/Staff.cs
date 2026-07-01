@@ -55,6 +55,10 @@ public sealed class Staff : ModelEntity
 	/// <summary>How many researchers are currently employed (drives ride upgrade research, T-044).</summary>
 	public static int ResearcherCount => Entity.All.Count( e => e is Staff s && s.Role == StaffRole.Researcher );
 
+	/// <summary>Drop the park-wide guard registry (T-062 reload): the entities themselves are cleared via
+	/// <c>Entity.All</c>, but this static list would otherwise keep stale references across a level reload.</summary>
+	public static void ResetAll() => guards.Clear();
+
 	/// <summary>True if a patrolling guard is within <paramref name="radius"/> of the point.</summary>
 	public static bool GuardNear( Vector3 p, float radius = GuardDeterRadius )
 	{

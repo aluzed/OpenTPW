@@ -88,6 +88,16 @@ public sealed class Peep : ModelEntity
 	public static IReadOnlyList<int> ThoughtTally => thoughtTally;
 	public static int ThoughtTotal { get { int s = 0; foreach ( var n in thoughtTally ) s += n; return s; } }
 
+	/// <summary>Zero the park-wide peep tallies (vandalism / toilet / ride thoughts) for a fresh park — used
+	/// when a level is reloaded so a new park doesn't inherit the previous one's stats (T-062).</summary>
+	public static void ResetStats()
+	{
+		VandalismActs = 0;
+		VandalismDeterred = 0;
+		ToiletVisits = 0;
+		Array.Clear( thoughtTally );
+	}
+
 	/// <summary>Average visitor happiness (0–100) across the live crowd — the park rating; -1 if empty.</summary>
 	public static float AverageHappiness
 	{

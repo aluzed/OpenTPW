@@ -182,6 +182,9 @@ public class Ride : Entity
 	public static int Breakdowns { get; private set; }
 	public static int Repairs { get; private set; }
 
+	/// <summary>Zero the park-wide breakdown/repair tallies for a fresh park (level reload, T-062).</summary>
+	public static void ResetStats() { Breakdowns = 0; Repairs = 0; }
+
 	// Breakdown feedback (T-039): while broken, the ride sparks + zaps on this cadence so the player sees +
 	// hears the fault (and where it is) instead of the ride just silently stopping.
 	private const float BreakdownFxPeriod = 1.8f; // seconds between spark bursts

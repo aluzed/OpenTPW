@@ -879,8 +879,80 @@ public class Level
 
 	private static float nextEconLog;
 
+	// Deferred level reload (T-062): a theme switch tears down + rebuilds the world, which can't happen while
+	// we're mid-update (iterating Entity.All / the render-loop delegate). So a request just records the theme,
+	// and Update() performs the swap at the top of the next frame, before it touches the world.
+	private static string? pendingReloadTheme;
+	private static float themeCycleAt = -1f; // OPENTPW_THEME_CYCLE diagnostic: next auto-switch time (-1 = unarmed)
+
+	/// <summary>Request a reload of the park into <paramref name="theme"/> (resolved to a known theme). Applied
+	/// at the start of the next frame. Used by the theme-cycle key (F7) and the auto-cycle diagnostic.</summary>
+	public static void RequestReload( string theme ) => pendingReloadTheme = LevelTheme.Resolve( theme );
+
+	/// <summary>The next theme after the current one, wrapping — drives the F7 cycle.</summary>
+	public static string NextTheme()
+	{
+		var known = LevelTheme.Known;
+		int i = System.Array.IndexOf( known, Current?.Name ?? LevelTheme.Default );
+		return known[(i + 1) % known.Length];
+	}
+
+	// Tear the current park down and build a fresh Level for `theme`, rewiring the render loop to it. Runs on
+	// the outgoing level instance. GPU resources of the old entities are dropped (a small per-reload leak,
+	// acceptable for an occasional theme switch).
+	private void DoReload( string theme )
+	{
+		Log.Info( $"[level] reloading park → {theme}" );
+		// global::Global.Render — inside Level the bare `Render` binds to this.Render (the method) and `Global`
+		// to this.Global (the level's SettingsFile), so both the renderer type + method need forcing.
+		global::Global.Render.OnUpdate -= this.Update;
+		global::Global.Render.OnRender -= this.Render;
+
+		// Drop all entities + the static world collections/tallies so the new park starts clean.
+		Entity.All.Clear();
+		Shop.Stalls.Clear();
+		Litter.Active.Clear();
+		parkQueues.Clear();
+		ResearchQueue.Reset();
+		Staff.ResetAll();
+		Peep.ResetStats();
+		Ride.ResetStats();
+		OpenTPW.UI.RootPanel.Instance = null;
+
+		// The world-state singletons are reassigned by the new SetupDevPark; null them first so a failed load
+		// can't leave stale ones pointing at freed entities.
+		ParkFinances.Current = null;
+		GameClock.Current = null;
+		ChallengeManager.Current = null;
+		GoldenTicketGoals.Current = null;
+		WeatherSim.Current = null;
+
+		var next = new Level( theme );
+		global::Global.Render.OnUpdate += next.Update;
+		global::Global.Render.OnRender += next.Render;
+	}
+
 	public void Update()
 	{
+		// Apply a pending theme reload before touching the world this frame (see pendingReloadTheme).
+		if ( pendingReloadTheme is { } reloadTheme )
+		{
+			pendingReloadTheme = null;
+			themeCycleAt = -1f; // re-armed below by the new level if the diagnostic is on
+			DoReload( reloadTheme );
+			return;
+		}
+
+		// Diagnostic (OPENTPW_THEME_CYCLE=1): auto-cycle to the next theme every ~20s, so the reload path can be
+		// exercised without keyboard input. Armed once per loaded park.
+		if ( Environment.GetEnvironmentVariable( "OPENTPW_THEME_CYCLE" ) == "1" )
+		{
+			if ( themeCycleAt < 0f )
+				themeCycleAt = Time.Now + 20f;
+			else if ( Time.Now >= themeCycleAt )
+				RequestReload( NextTheme() );
+		}
+
 		// Iterate a snapshot: an entity's update may spawn or remove entities (e.g. peeps dropping litter,
 		// handymen clearing it), which would otherwise invalidate the enumeration.
 		foreach ( var entity in Entity.All.ToArray() )

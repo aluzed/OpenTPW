@@ -213,6 +213,9 @@ public sealed class BuildMode : Entity
 		if ( Hit( Key.R ) && Selected >= 0 && Catalog[Selected].RidePath != null )
 			Rotation = (Rotation + 1) % 4;
 
+		// Cycle the park theme (F7): tears down + reloads into the next world — jungle→hallow→fantasy→space (T-062).
+		if ( Hit( Key.F7 ) ) Level.RequestReload( Level.NextTheme() );
+
 		// Save (F5) / load (F9) the park to the active slot; F6 cycles the slot 1→2→3→1 (T-059).
 		if ( Hit( Key.F6 ) ) SaveSlot = SaveSlot % SaveGame.SlotCount + 1;
 		if ( Hit( Key.F5 ) ) Level.CaptureSave().WriteToFile( SaveGame.SlotPath( SaveSlot ) );

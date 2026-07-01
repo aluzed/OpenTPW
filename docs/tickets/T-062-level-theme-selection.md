@@ -35,8 +35,15 @@ from the data rather than a fixed name list.
 
 ## Remaining (polish)
 
-- A **front-end theme picker** (currently env-var only) — a lobby menu to choose the world (needs a level-reload
-  path; the level is created once at startup today).
+- ~~A level-reload path~~ — **done**: `Level.RequestReload(theme)` defers a swap to the next frame, then
+  `DoReload` unwires the render loop, tears down the world (`Entity.All` + the static collections/tallies:
+  `Shop.Stalls`, `Litter.Active`, `parkQueues`, `ResearchQueue`, `Staff.ResetAll`, `Peep.ResetStats`,
+  `Ride.ResetStats`, `RootPanel.Instance`) and builds a fresh `Level` for the new theme. **F7 cycles the theme
+  in-game** (jungle→hallow→fantasy→space). Verified via an `OPENTPW_THEME_CYCLE` auto-cycle diagnostic: the park
+  reloaded jungle→hallow→fantasy live (3 parks, 2 reloads, 0 exceptions), each with its own terrain + catalog
+  (the hallow BUILD panel showed brainb/bug/coasta, etc.). *Caveat*: the reload loads synchronously (~a few
+  seconds' frozen frame) — a real **front-end lobby picker with a loading screen** is the remaining polish, plus
+  the per-reload GPU-resource leak of the old park.
 - ~~Per-theme queue/path strip textures~~ — **done**: the `jpa_que1`/`jpa_str1` filenames turned out to be
   *shared* across every theme's `queue.wad`/`terrain.wad`, so `LoadPathTexture` just routes the path through the
   active theme. (The `Terrain.cs` flat-plane class with a hardcoded jungle texture is **dead code** — the park
