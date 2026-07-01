@@ -3,9 +3,11 @@ using OpenTPW.UI;
 namespace OpenTPW;
 
 /// <summary>
-/// A dev HUD readout of the park's live state — the bank balance and the income/cost flows driven by
-/// peeps and rides (see <see cref="ParkFinances"/>), plus the visitor count. Renders nothing until a
-/// park economy exists, so it is harmless in the plain lobby. Text only; no background.
+/// The in-park HUD (T-065): the player-facing essentials (money, visitors, admission, challenge/goals, loan,
+/// park rating + contextual build/manage info) always shown, plus a <b>debug overlay</b> (income breakdown,
+/// counts, crowd-mood thoughts, save-slot hints, FPS) that is OFF by default and toggled with the backtick key
+/// (<see cref="GameSettings.ShowDebug"/>). Renders nothing until a park economy exists, so it's harmless in the
+/// lobby.
 /// </summary>
 internal sealed class ParkStatsPanel : HudPanel
 {
@@ -21,6 +23,23 @@ internal sealed class ParkStatsPanel : HudPanel
 	private const float Top = 655f; // sits below the FPS counter in the top-left corner
 	private const float LineStep = 28f;
 
+	private bool debugKeyWas;
+
+	protected override void OnUpdate()
+	{
+		// Backtick toggles the debug overlay (income breakdown / counts / thoughts / FPS) on/off — off by
+		// default so the HUD reads as a real interface (T-065). Persisted; also drives the renderer FPS overlay.
+		bool down = Input.Keyboard.KeysDown.Contains( Veldrid.Key.Grave );
+		if ( down && !debugKeyWas )
+		{
+			var s = GameSettings.Current;
+			s.ShowDebug = !s.ShowDebug;
+			Renderer.ShowFps = s.ShowDebug;
+			s.Save();
+		}
+		debugKeyWas = down;
+	}
+
 	protected override void OnRender()
 	{
 		if ( ParkFinances.Current is not { } fin )
@@ -28,29 +47,31 @@ internal sealed class ParkStatsPanel : HudPanel
 
 		int visitors = Entity.All.Count( e => e is Peep );
 		int staff = Entity.All.Count( e => e is Staff );
+		bool dbg = GameSettings.Current.ShowDebug;
 
-		// One line per stat, stepping down from the top-left.
+		// The player HUD (always shown): the essentials — money, visitors, admission control.
 		var lines = new List<string>
 		{
 			$"MONEY {fin.Money:0}",
-			$"TICKETS {fin.RideRevenue:0}",
-			$"GATE {fin.EntryRevenue:0}",
-			$"FOOD {fin.FoodRevenue:0}",
-			$"SIDESHOW {fin.SideshowRevenue:0}  (played {fin.SideshowsPlayed}, won {fin.SideshowsWon})",
-			$"UPKEEP {fin.UpkeepPaid:0}",
-			$"WAGES {fin.WagesPaid:0}",
-			$"VISITORS {visitors}   STAFF {staff}",
-			$"LITTER {Litter.Active.Count}",
+			$"VISITORS {visitors}",
 			$"ADMISSION {fin.EntryFee:0}  ([ ] adjust)",
 		};
-		// Crowd mood (T-050): a compact breakdown of riders' reactions, so the otherwise-invisible thoughts read.
-		if ( Peep.ThoughtTotal > 0 )
+
+		// The debug overlay (backtick toggle): the income breakdown, counts and crowd-mood diagnostics that
+		// used to clutter the HUD by default (T-065).
+		if ( dbg )
 		{
-			var parts = new List<string>();
-			for ( int i = 0; i < Peep.ThoughtTally.Count; i++ )
-				if ( Peep.ThoughtTally[i] > 0 )
-					parts.Add( $"{RideThoughtText.Tag( (RideThought)i )} {Peep.ThoughtTally[i]}" );
-			lines.Add( "THOUGHTS " + string.Join( " · ", parts ) );
+			lines.Add( $"TICKETS {fin.RideRevenue:0}  GATE {fin.EntryRevenue:0}  FOOD {fin.FoodRevenue:0}" );
+			lines.Add( $"SIDESHOW {fin.SideshowRevenue:0} (played {fin.SideshowsPlayed}, won {fin.SideshowsWon})" );
+			lines.Add( $"UPKEEP {fin.UpkeepPaid:0}  WAGES {fin.WagesPaid:0}  STAFF {staff}  LITTER {Litter.Active.Count}" );
+			if ( Peep.ThoughtTotal > 0 )
+			{
+				var parts = new List<string>();
+				for ( int i = 0; i < Peep.ThoughtTally.Count; i++ )
+					if ( Peep.ThoughtTally[i] > 0 )
+						parts.Add( $"{RideThoughtText.Tag( (RideThought)i )} {Peep.ThoughtTally[i]}" );
+				lines.Add( "THOUGHTS " + string.Join( " · ", parts ) );
+			}
 		}
 		if ( GameClock.Current is { } clock )
 			lines.Insert( 0, $"YEAR {clock.Year}  MTH {clock.Month}  DAY {clock.Day}  {DayNightTint.Phase( DayNightCycle.Phase01 )}" ); // in-game date + visual day phase (T-053/T-056)
@@ -99,7 +120,8 @@ internal sealed class ParkStatsPanel : HudPanel
 			else if ( build.SelectedRide is { Shape.HasTrack: true } )
 				lines.Add( "T: lay coaster track" );
 
-			lines.Add( $"SAVE SLOT {build.SaveSlot} {(SaveGame.SlotExists( build.SaveSlot ) ? "[used]" : "[empty]")}  (F5 save, F9 load, F6 slot, F8 menu)" );
+			if ( dbg )
+				lines.Add( $"SAVE SLOT {build.SaveSlot} {(SaveGame.SlotExists( build.SaveSlot ) ? "[used]" : "[empty]")}  (F5 save, F9 load, F6 slot, F8 menu)" );
 
 			if ( build.SelectedStaff is { } staffSel )
 				lines.Add( staffSel.HasPatrolZone

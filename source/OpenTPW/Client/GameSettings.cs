@@ -18,6 +18,10 @@ internal sealed class GameSettings
 	/// on by default. Persisted so the player can switch the bug head off and have it stay off.</summary>
 	public bool AdvisorEnabled { get; set; } = true;
 
+	/// <summary>Whether the debug overlay (income breakdown, counts, thoughts, FPS) is shown. OFF by default so
+	/// the HUD reads as a real interface; toggled in-game with the backtick key (T-065). Persisted.</summary>
+	public bool ShowDebug { get; set; } = false;
+
 	/// <summary>
 	/// Where the settings JSON lives. Defaults to the local <c>./.opentpw</c> cache dir (the same place
 	/// <see cref="Game"/> keeps its cache). Settable so tests can point it at a temp file.

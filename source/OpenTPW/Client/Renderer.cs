@@ -12,7 +12,7 @@ public partial class Renderer
 
 	// Toggleable FPS overlay (F3). Smoothed over ~0.5s. The original game had an "FPS: %4g" counter
 	// too (see docs/07-ghidra-render.md).
-	public static bool ShowFps = true;
+	public static bool ShowFps = false; // off by default; the debug toggle (backtick) drives it (T-065)
 	private double _fpsAccum;
 	private int _fpsFrames;
 	private float _fps;
