@@ -48,18 +48,38 @@ public sealed class Shop : ModelEntity
 	public void Despawn()
 	{
 		Stalls.Remove( this );
+		foreach ( var p in buildingParts )
+			Entity.All.Remove( p );
+		buildingParts.Clear();
 		Entity.All.Remove( this );
 	}
 
 	private static readonly Dictionary<ShopKind, Model> sharedModels = new();
 
+	// The real building's per-mesh entities when the theme model loaded (empty when it fell back to the
+	// billboard) — removed on demolish. A building has a fixed orientation, so it doesn't face the camera.
+	private readonly List<ModelEntity> buildingParts = new();
+	private readonly bool isBuilding;
+
 	public Shop( ParkTerrain terrain, Vector3 position, ShopKind kind = ShopKind.Food, float price = 8f )
 	{
 		Price = price;
 		Kind = kind;
-		Model = ModelFor( kind );
-		Scale = new Vector3( 9f, 1f, 12f ); // bigger than a peep so a stall reads as a building
 		Position = position.WithZ( terrain.SampleHeight( position.X, position.Y ) );
+
+		// Prefer the theme's real stall/toilet building; keep the coloured billboard only as a fallback.
+		if ( ShopBuilding.TryLoad( kind, Position, buildingParts ) )
+		{
+			isBuilding = true;
+			Model = ModelFor( kind );  // retained for the click/selection bounds, but rendered invisibly
+			Scale = Vector3.Zero;      // the real building renders through buildingParts
+		}
+		else
+		{
+			Model = ModelFor( kind );
+			Scale = new Vector3( 9f, 1f, 12f ); // bigger than a peep so a stall reads as a building
+		}
+
 		Stalls.Add( this );
 	}
 
@@ -99,6 +119,10 @@ public sealed class Shop : ModelEntity
 
 	protected override void OnUpdate()
 	{
+		// A real building has a fixed authored orientation; only the fallback billboard faces the camera.
+		if ( isBuilding )
+			return;
+
 		// Stalls face the camera like the other billboards.
 		var cam = Camera.Position;
 		float yaw = MathF.Atan2( -(cam.X - Position.X), cam.Y - Position.Y );

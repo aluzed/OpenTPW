@@ -220,6 +220,23 @@ public class Level
 				return;
 			}
 
+			// Shop demo: place the three stalls (food / drink / toilet) in a row at the park centre and frame them,
+			// to preview the real shop building models (OPENTPW_SHOP_DEMO=1).
+			if ( Environment.GetEnvironmentVariable( "OPENTPW_SHOP_DEMO" ) == "1" )
+			{
+				int placed = 0;
+				foreach ( var (name, dx, dy) in new[] { ("shop", -4, 0), ("drink", 0, 0), ("toilet", 4, 0) } )
+					if ( catalog.FirstOrDefault( c => c.Name == name ) is { } it
+						&& CommitPlacement( it, grid, terrain, cx + dx, cy + dy ) )
+					{
+						if ( Shop.Stalls.Count > 0 )
+							BuildCameraMode.Focus = Shop.Stalls[^1].Position;
+						placed++;
+					}
+				Log.Info( $"[build] shop-demo (theme {Current.Name}): placed {placed}" );
+				return;
+			}
+
 			// Non-jungle themes don't have jungle's named rides (totem/monkey/…), so the named autoplace below
 			// would throw. Place the theme's first enumerated rides + the shared shops/staff generically instead,
 			// then fall through to the generic coaster-track laying (which keys off any track ride). T-062.
