@@ -507,6 +507,11 @@ public sealed class RideEngine : IRideEngine
 
 	private void SpawnParticleEffectAt( int effectCode, Vector3 position )
 	{
+		// The particle "proxy" is a coloured cube stand-in for real particle rendering — it reads as debris in
+		// the park, so only spawn it while the debug overlay is on (T-066). Real particles are a renderer task.
+		if ( !GameSettings.Current.ShowDebug )
+			return;
+
 		var (name, r, g, b) = ResolveEffectColour( effectCode );
 		if ( name == "?" )
 		{
@@ -630,6 +635,15 @@ public sealed class RideEngine : IRideEngine
 	/// its head node, hide vacated ones. <paramref name="slots"/> is <c>RideVM.HeadSlots</c> (0 = empty).</summary>
 	public void SyncHeads( IReadOnlyList<int> slots )
 	{
+		// The head/walk figures are stand-in visualisations of the ride script's node tables (T-048) — they read
+		// as scattered sprites, so only show them with the debug overlay on (T-066); real riders are the peeps.
+		if ( !GameSettings.Current.ShowDebug )
+		{
+			foreach ( var (_, m) in headProxies.Values )
+				Entity.All.Remove( m.Entity );
+			headProxies.Clear();
+			return;
+		}
 		try
 		{
 			for ( int slot = 0; slot < slots.Count; slot++ )
@@ -675,6 +689,13 @@ public sealed class RideEngine : IRideEngine
 	/// <paramref name="slots"/> is <c>RideVM.WalkSlots</c>, <paramref name="gameTime"/> is <c>RideVM.GameTime</c>.</summary>
 	public void SyncWalk( IReadOnlyList<RideVM.WalkSlot> slots, int gameTime )
 	{
+		if ( !GameSettings.Current.ShowDebug ) // stand-in node figures — debug only (T-066), see SyncHeads
+		{
+			foreach ( var m in walkProxies.Values )
+				Entity.All.Remove( m.Entity );
+			walkProxies.Clear();
+			return;
+		}
 		try
 		{
 			for ( int slot = 0; slot < slots.Count; slot++ )
@@ -810,7 +831,10 @@ public sealed class RideEngine : IRideEngine
 	{
 		try
 		{
-			if ( !light.Enabled )
+			// The emissive cube is a debug stand-in for real light rendering — hide it unless the debug overlay
+			// is on, so the park reads as real rides, not floating coloured cubes (T-066). The light STATE is
+			// unaffected (tracked in `light`); only the marker is gated.
+			if ( !light.Enabled || !GameSettings.Current.ShowDebug )
 			{
 				if ( light.Proxy != null )
 				{
