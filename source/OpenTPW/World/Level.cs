@@ -201,6 +201,25 @@ public class Level
 			int cx = grid.Width / 2, cy = grid.Height / 2;
 			BuildCatalogItem Item( string name ) => catalog.First( c => c.Name == name );
 
+			// Car demo: place the theme's circuit vehicles (tour ride + go-karts, whichever this theme ships) at
+			// the park centre on clear grass and frame them, so the real vehicle meshes are visible without waiting
+			// for peeps to board (OPENTPW_CAR_DEMO=1, paired with the RideVehicle demo drive). Theme-agnostic.
+			if ( Environment.GetEnvironmentVariable( "OPENTPW_CAR_DEMO" ) == "1" )
+			{
+				int placed = 0;
+				foreach ( var (name, dx, dy) in new[] { ("tourride", -4, 0), ("gokarts", 4, 0) } )
+					if ( catalog.FirstOrDefault( c => c.Name == name && c.RidePath != null ) is { } it
+						&& CommitPlacement( it, grid, terrain, cx + dx, cy + dy ) )
+					{
+						var r = Entity.All.OfType<Ride>().Last();
+						BuildCameraMode.Focus = r.Position;
+						Log.Info( $"[build] car-demo: {name} isCarRide={r.IsCarRide} isBumper={r.IsBumperRide} vehicle={(r.Vehicle != null)}" );
+						placed++;
+					}
+				Log.Info( $"[build] car-demo (theme {Current.Name}): placed {placed}" );
+				return;
+			}
+
 			// Non-jungle themes don't have jungle's named rides (totem/monkey/…), so the named autoplace below
 			// would throw. Place the theme's first enumerated rides + the shared shops/staff generically instead,
 			// then fall through to the generic coaster-track laying (which keys off any track ride). T-062.

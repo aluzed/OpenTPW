@@ -85,30 +85,93 @@ public sealed class RideVehicle : Entity
 			Position = Offscreen,
 		};
 
-		// A bumper ride uses the real dodgem car mesh (b_car.MD2) driven by the arena collision sim; tour/
-		// kart seats are small rider markers along the loop.
-		bool isBumper = ride.IsBumperRide;
 		seats = new ModelEntity[seatCount];
 
-		Model carModel; Vector3 carScale;
-		if ( isBumper )
+		// Prefer the ride's own real vehicle meshes (tour bird/balloon, the coloured go-karts). Their presence
+		// means this is a track/circuit ride, so it circulates the loop with those cars — even go-karts, whose
+		// script also raises the BUMP opcode (they have a track, not a dodgem arena). Only a ride with no such
+		// mesh but the BUMP opcode is a true dodgem (the bumper's b_car.MD2, driven by the arena collision sim);
+		// anything else keeps the small rider-marker cubes.
+		var vehicles = LoadCircuitCars( ride.Archive, Path.GetFileNameWithoutExtension( ride.Archive ), tileSize );
+
+		if ( vehicles.Count > 0 )
 		{
+			// Circuit ride with real vehicles: go-karts cycle their four colours across the seats; a tour ride
+			// uses its single vehicle for every seat + the lead car.
+			car.Model = vehicles[0].Model;   // the lead car heads the train with a real mesh, not a red box
+			car.Scale = vehicles[0].Scale;
+			for ( int i = 0; i < seatCount; i++ )
+			{
+				var v = vehicles[i % vehicles.Count];
+				seats[i] = new ModelEntity { Model = v.Model, Scale = v.Scale, Position = Offscreen };
+			}
+		}
+		else if ( ride.IsBumperRide )
+		{
+			// A true dodgem arena: roam-and-bump via the collision sim, drawing the real b_car.MD2 (red box if absent).
 			carSim = new CarSim( seatCount,
 				ride.Shape.Width * tileSize * 0.5f, ride.Shape.Height * tileSize * 0.5f,
 				radius: tileSize * 0.3f, speed: Speed );
 
 			var (frames, scale) = LoadDodgemFrames( ride.Archive, tileSize );
 			carFrames = frames; // null if b_car.MD2 didn't load → fall back to a red box below
+			Model carModel; Vector3 carScale;
 			if ( frames != null ) { carModel = frames[0]; carScale = scale; }
 			else { carModel = ColourCube( 220, 40, 40 ); carScale = new Vector3( tileSize * 0.22f ); }
+			for ( int i = 0; i < seatCount; i++ )
+				seats[i] = new ModelEntity { Model = carModel, Scale = carScale, Position = Offscreen };
 		}
 		else
 		{
-			carModel = ColourCube( 250, 220, 90 ); carScale = new Vector3( tileSize * 0.06f ); // rider markers
+			// No vehicle mesh resolved → the original small rider-marker cubes.
+			var m = ColourCube( 250, 220, 90 ); var sc = new Vector3( tileSize * 0.06f );
+			for ( int i = 0; i < seatCount; i++ )
+				seats[i] = new ModelEntity { Model = m, Scale = sc, Position = Offscreen };
+		}
+	}
+
+	// Discovers and loads the real vehicle meshes for a circuit ride (tour / kart / water) from its WAD, sized to
+	// the tile. Go-karts return their four coloured karts (cycled across the seats); a tour ride returns its
+	// single theme vehicle (jungle Bird / hallow Balloon). We enumerate the WAD root rather than hard-coding a
+	// theme's name, so it adapts per level. Empty when none resolve → the caller keeps the marker cubes.
+	private static List<(Model Model, Vector3 Scale)> LoadCircuitCars( string archive, string rideName, float tileSize )
+	{
+		var found = new List<(Model, Vector3)>();
+
+		string[] files;
+		try { files = FileSystem.GetFiles( archive ); }
+		catch { return found; }
+
+		var present = files.Select( Path.GetFileName ).Where( n => !string.IsNullOrEmpty( n ) ).ToList();
+		string? Find( string baseNoExt ) => present.FirstOrDefault( n =>
+			Path.GetFileNameWithoutExtension( n! ).Equals( baseNoExt, StringComparison.OrdinalIgnoreCase ) );
+
+		// Go-karts: the four coloured karts (a small kart fits ~half a tile). Fall back to a tour ride's single
+		// vehicle (the bird / balloon), which fills more of its tile.
+		var candidates = new List<string>();
+		float fit = 0.5f;
+		foreach ( var c in new[] { "gk_blue", "gk_green", "gk_orange", "gk_purple" } )
+			if ( Find( c ) is { } f ) candidates.Add( f );
+		if ( candidates.Count == 0 )
+		{
+			fit = 0.85f;
+			foreach ( var c in new[] { "Bird", "Balloon" } )
+				if ( Find( c ) is { } f ) { candidates.Add( f ); break; }
 		}
 
-		for ( int i = 0; i < seatCount; i++ )
-			seats[i] = new ModelEntity { Model = carModel, Scale = carScale, Position = Offscreen };
+		foreach ( var name in candidates )
+		{
+			var built = RideCarMesh.Build( archive, name );
+			if ( built == null )
+				continue;
+			float he = built.Value.HalfExtent;
+			float s = he > 1e-3f ? (tileSize * fit) / (2f * he) : 1f;
+			found.Add( (built.Value.Model, built.Value.DecompScale * s) );
+		}
+
+		if ( found.Count > 0 )
+			Log.Info( $"[ride] {rideName}: loaded {found.Count} vehicle mesh(es) [{string.Join( ",", candidates )}]" );
+		return found;
 	}
 
 	private static Model ColourCube( byte r, byte g, byte b )
@@ -160,8 +223,9 @@ public sealed class RideVehicle : Entity
 		if ( length < 1e-3f )
 			return;
 
-		// The car circulates only while the ride is actually running (has riders, not broken down).
-		if ( ride.Riders > 0 && !ride.IsBroken )
+		// The car circulates only while the ride is actually running (has riders, not broken down). The car
+		// demo (OPENTPW_CAR_DEMO=1) circulates + fills every seat regardless, to preview the vehicles.
+		if ( DemoAllCars || (ride.Riders > 0 && !ride.IsBroken) )
 			dist = (dist + Speed * Time.Delta) % length;
 
 		var (pos, tan) = Sample( dist );
@@ -175,7 +239,7 @@ public sealed class RideVehicle : Entity
 		// as a train of cars rather than markers stacked beside one box. Each seat's path position is the
 		// car/seat node's live world position — published to the node field (T-048) whether or not it's
 		// occupied (the node exists physically), while the visible marker hides when empty.
-		int occupied = Math.Min( ride.Riders, seatCount );
+		int occupied = DemoAllCars ? seatCount : Math.Min( ride.Riders, seatCount );
 		for ( int i = 0; i < seatCount; i++ )
 		{
 			float d = ((dist - (i + 1) * SeatSpacing) % length + length) % length;
@@ -205,7 +269,9 @@ public sealed class RideVehicle : Entity
 	// roam and bump (docs/08, the BUMP branch). Each car's live world position feeds the node field (T-048).
 	// Dev visualisation: drive + show every dodgem regardless of occupancy, so the arena sim is visible
 	// without waiting for peeps to board (OPENTPW_BUMPER_DEMO=1). Off by default — normal play is occupancy-driven.
-	private static readonly bool DemoAllCars = Environment.GetEnvironmentVariable( "OPENTPW_BUMPER_DEMO" ) == "1";
+	private static readonly bool DemoAllCars =
+		Environment.GetEnvironmentVariable( "OPENTPW_BUMPER_DEMO" ) == "1" ||
+		Environment.GetEnvironmentVariable( "OPENTPW_CAR_DEMO" ) == "1";
 
 	private void UpdateArena()
 	{
