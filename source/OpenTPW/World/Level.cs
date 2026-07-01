@@ -17,8 +17,15 @@ public class Level
 	/// <summary>The level's folder name (e.g. <c>jungle</c>) — locates per-level assets like the minimap image.</summary>
 	public string Name { get; private init; }
 
-	public Level( string levelName )
+	// True when this Level is the front-end menu (no park loaded) rather than a playable park (T-063).
+	private readonly bool menuMode;
+
+	/// <summary>A playable park for <paramref name="levelName"/> (used by the world-select + reload + tests).</summary>
+	public Level( string levelName ) : this( levelName, menuMode: false ) { }
+
+	private Level( string levelName, bool menuMode )
 	{
+		this.menuMode = menuMode;
 		LoadProgress.Report( "Loading level settings...", 0.03f );
 		Name = levelName;
 		Global = new SettingsFile( $"/levels/{levelName}/global.sam" );
@@ -28,6 +35,10 @@ public class Level
 		SetupHud();
 	}
 
+	/// <summary>The front-end menu (T-063): a sky backdrop + the world-select screen, no park. Selecting a world
+	/// reloads into that park. This is the default entry point — the dev/autoplace park is test-only.</summary>
+	public static Level CreateMenu() => new( LevelTheme.Default, menuMode: true );
+
 	private void SetupEntities()
 	{
 		SunLight = new Sun() { Position = new( 0, 100, 100 ) };
@@ -35,23 +46,42 @@ public class Level
 		LoadProgress.Report( "Loading sky...", 0.12f );
 		_ = new Sky();
 
-		// (The lobby's giant water plane is omitted in the dev park demo below — the real terrain mesh
-		// has its own water surfaces, and a 10000-unit plane at z=0 would submerge/occlude the park.)
+		// Front-end lobby (the game's real menu — restored in T-063 after a dev park had replaced it): the four
+		// themed islands float over the sky, orbited by the lobby camera, with the logo + menu UI on top
+		// (SetupHud). No park is loaded until the player enters a world. Each island is best-effort so a missing
+		// model can't break the menu.
+		if ( menuMode )
+		{
+			foreach ( var (pos, theme) in new[]
+			{
+				(new Vector3( 400, 400, 0 ), "Jungle"),
+				(new Vector3( 600, 400, 0 ), "Hallow"),
+				(new Vector3( 600, 600, 0 ), "Fantasy"),
+				(new Vector3( 400, 600, 0 ), "Space"),
+			} )
+			{
+				try { _ = new LobbyIsland( pos, theme ); }
+				catch ( Exception e ) { Log.Warning( $"[lobby] island {theme} failed: {e.Message}" ); }
+			}
+			Camera.SetCameraMode<LobbyCameraMode>();
+			InPark = false;
+			return;
+		}
 
-		// Dev test: render the real jungle park terrain (terrain.wad/base.md2 — 272 meshes, the actual
-		// landscape), with several rides placed at tile coordinates on its surface. Replaces the lobby
-		// islands here. Guarded so a load failure falls back to the lobby orbit camera.
+		// A playable park: build the real terrain + placement grid + economy + catalog (see SetupDevPark).
+		// Autoplace test content only runs under OPENTPW_AUTOPLACE (the test runtime). Guarded so a load
+		// failure falls back to the front-end rather than a black screen.
 		LoadProgress.BeginPhase( 0.45f, 0.92f );
 		try
 		{
 			SetupDevPark();
-			InPark = true; // a park is loaded → show the in-park HUD (not the lobby front-end)
+			InPark = true; // a park is loaded → show the in-park HUD (not the front-end)
 		}
 		catch ( Exception e )
 		{
-			Log.Warning( $"dev park failed to load: {e.Message}" );
+			Log.Warning( $"park failed to load: {e.Message}" );
 			Camera.SetCameraMode<LobbyCameraMode>();
-			InPark = false; // fall back to the lobby front-end
+			InPark = false; // fall back to the front-end
 		}
 	}
 
@@ -859,6 +889,7 @@ public class Level
 		}
 		else
 		{
+			// The original front-end UI (logo + player/menu buttons) over the lobby islands (T-063 restore).
 			var layout = new LobbyLayout() { Hud = Hud };
 			layout.OnInit();
 		}

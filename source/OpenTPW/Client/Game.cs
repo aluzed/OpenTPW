@@ -115,10 +115,15 @@ internal static class Game
 		while ( loadingStart.ElapsedMilliseconds < 1500 );
 
 		//
-		// Create level — the theme is selectable via OPENTPW_LEVEL (jungle / hallow / fantasy / space); a
-		// missing or unknown name falls back to jungle so a bad value never breaks startup (T-062).
+		// Entry point (T-063): the default launch shows the front-end MENU (title + world select). Only the
+		// test runtime jumps straight into a park — set OPENTPW_TESTPARK=<jungle|hallow|fantasy|space> (add
+		// OPENTPW_AUTOPLACE for a pre-populated dev park). This keeps the shipped menu flow off the test path.
 		//
-		var level = new Level( LevelTheme.Resolve( Environment.GetEnvironmentVariable( "OPENTPW_LEVEL" ) ) );
+		var testPark = Environment.GetEnvironmentVariable( "OPENTPW_TESTPARK" )
+			?? Environment.GetEnvironmentVariable( "OPENTPW_LEVEL" ); // legacy alias, still test-only
+		var level = string.IsNullOrWhiteSpace( testPark )
+			? Level.CreateMenu()
+			: new Level( LevelTheme.Resolve( testPark ) );
 
 		LoadProgress.Done();
 		Render.ClearColor = RgbaFloat.Black;
