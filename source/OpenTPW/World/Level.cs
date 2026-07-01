@@ -804,7 +804,7 @@ public class Level
 	private static bool SpawnShopAt( ParkTerrain terrain, PlacementGrid grid, int tx, int ty, ShopKind kind, BuildCatalogItem item )
 	{
 		var c = grid.TileToWorld( tx, ty, item.Width, item.Height );
-		_ = new Shop( terrain, c, kind )
+		_ = new Shop( terrain, c, kind, grid.TileSize * item.Width )
 		{
 			TileX = tx, TileY = ty, TileW = item.Width, TileH = item.Height, BuildCost = item.Cost,
 		};

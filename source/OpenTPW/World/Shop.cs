@@ -13,8 +13,9 @@ public enum ShopKind
 
 /// <summary>
 /// A food/drink stall. A hungry or thirsty visitor detours to the nearest stall of the matching
-/// <see cref="ShopKind"/>, pays (park income) and has that need satisfied. Rendered as a tall billboard
-/// (green = food, blue = drink); tracked in <see cref="Stalls"/> so peeps can find the closest cheaply.
+/// <see cref="ShopKind"/>, pays (park income) and has that need satisfied. Rendered as the theme's real stall
+/// building (<see cref="ShopBuilding"/>), falling back to a coloured billboard (green = food, blue = drink,
+/// grey = toilet) when no model resolves; tracked in <see cref="Stalls"/> so peeps can find the closest cheaply.
 /// </summary>
 public sealed class Shop : ModelEntity
 {
@@ -61,14 +62,14 @@ public sealed class Shop : ModelEntity
 	private readonly List<ModelEntity> buildingParts = new();
 	private readonly bool isBuilding;
 
-	public Shop( ParkTerrain terrain, Vector3 position, ShopKind kind = ShopKind.Food, float price = 8f )
+	public Shop( ParkTerrain terrain, Vector3 position, ShopKind kind = ShopKind.Food, float footprintSize = 20f, float price = 8f )
 	{
 		Price = price;
 		Kind = kind;
 		Position = position.WithZ( terrain.SampleHeight( position.X, position.Y ) );
 
 		// Prefer the theme's real stall/toilet building; keep the coloured billboard only as a fallback.
-		if ( ShopBuilding.TryLoad( kind, Position, buildingParts ) )
+		if ( ShopBuilding.TryLoad( kind, Position, footprintSize, buildingParts ) )
 		{
 			isBuilding = true;
 			Model = ModelFor( kind );  // retained for the click/selection bounds, but rendered invisibly
