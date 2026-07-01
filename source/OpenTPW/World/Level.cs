@@ -883,7 +883,9 @@ public class Level
 	// we're mid-update (iterating Entity.All / the render-loop delegate). So a request just records the theme,
 	// and Update() performs the swap at the top of the next frame, before it touches the world.
 	private static string? pendingReloadTheme;
-	private static float themeCycleAt = -1f; // OPENTPW_THEME_CYCLE diagnostic: next auto-switch time (-1 = unarmed)
+	private static string? reloadOverlayTheme; // set while a "Loading <theme>…" overlay should be shown
+	private static bool reloadArmed;           // true on the frame after the overlay is drawn → do the heavy load
+	private static float themeCycleAt = -1f;   // OPENTPW_THEME_CYCLE diagnostic: next auto-switch time (-1 = unarmed)
 
 	/// <summary>Request a reload of the park into <paramref name="theme"/> (resolved to a known theme). Applied
 	/// at the start of the next frame. Used by the theme-cycle key (F7) and the auto-cycle diagnostic.</summary>
@@ -934,12 +936,24 @@ public class Level
 
 	public void Update()
 	{
-		// Apply a pending theme reload before touching the world this frame (see pendingReloadTheme).
+		// Theme reload is two-phase so a "Loading …" screen shows during the synchronous load (which can't
+		// present its own frames — DoReload runs mid-frame, after PreRender's CommandList.Begin). Phase 1: draw
+		// the overlay this frame. Phase 2 (next frame): tear down + rebuild, so the frozen frame is the overlay,
+		// not the previous park.
+		if ( reloadArmed )
+		{
+			reloadArmed = false;
+			var target = reloadOverlayTheme ?? LevelTheme.Default;
+			reloadOverlayTheme = null;
+			themeCycleAt = -1f; // re-armed by the new park if the diagnostic is on
+			DoReload( target );
+			return;
+		}
 		if ( pendingReloadTheme is { } reloadTheme )
 		{
 			pendingReloadTheme = null;
-			themeCycleAt = -1f; // re-armed below by the new level if the diagnostic is on
-			DoReload( reloadTheme );
+			reloadOverlayTheme = reloadTheme; // Level.Render draws the overlay this frame
+			reloadArmed = true;               // …and the load happens next frame
 			return;
 		}
 
@@ -976,5 +990,25 @@ public class Level
 		Camera.Update();
 
 		Entity.All.ForEach( entity => entity.Render() );
+
+		// A full-screen "Loading <theme>…" curtain shown for the frame before a reload's synchronous load, so
+		// the screen freezes on this instead of the old park (T-062).
+		if ( reloadOverlayTheme is { } t )
+			DrawReloadOverlay( t );
+	}
+
+	private static Font? overlayFont;
+	private static Texture? overlayBg;
+
+	private static void DrawReloadOverlay( string theme )
+	{
+		overlayFont ??= new Font( "Language/English/GAME12.bf4" );
+		overlayBg ??= new Texture( new byte[] { 10, 12, 20, 240 }, 1, 1 );
+
+		var mat = Material.UI;
+		mat.Set( "Color", overlayBg );
+		Graphics.Quad( new Rectangle( 0, 0, 1280, 720 ), mat );
+		Graphics.DrawText( overlayFont, $"Loading the {theme} park…", 640f, 372f, TextAlign.Center, 2.0f );
+		Graphics.DrawText( overlayFont, "please wait", 640f, 330f, TextAlign.Center, 1.1f );
 	}
 }
