@@ -1009,7 +1009,7 @@ public class Level
 		var mat = Material.UI;
 		mat.Set( "Color", overlayBg );
 		Graphics.Quad( new Rectangle( 0, 0, 1280, 720 ), mat );
-		Graphics.DrawText( overlayFont, $"Loading the {theme} park…", 640f, 372f, TextAlign.Center, 2.0f );
+		Graphics.DrawText( overlayFont, $"Loading {LevelTheme.DisplayName( theme )}…", 640f, 372f, TextAlign.Center, 2.0f );
 		Graphics.DrawText( overlayFont, "please wait", 640f, 330f, TextAlign.Center, 1.1f );
 	}
 }

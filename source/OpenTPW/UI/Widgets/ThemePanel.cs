@@ -91,7 +91,8 @@ internal sealed class ThemePanel : HudPanel
 			var theme = LevelTheme.Known[i];
 			bool isCurrent = theme == current;
 			var rect = new Rectangle( PanelX + 16f, RowY( i ), PanelW - 32f, RowH - 10f );
-			DrawButton( rect, isCurrent ? $"{theme}  (current)" : theme, isCurrent ? ActiveRow : OtherRow );
+			var label = LevelTheme.DisplayName( theme );
+			DrawButton( rect, isCurrent ? $"{label}  (current)" : label, isCurrent ? ActiveRow : OtherRow );
 		}
 
 		Graphics.DrawText( Font, "click a world - F12 to close", bounds.X + 16f, bounds.Y + 8f, TextAlign.Left, 1.0f );

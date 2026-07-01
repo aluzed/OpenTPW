@@ -40,6 +40,33 @@ public static class LevelTheme
 		return Default;
 	}
 
+	// The authentic per-world display names decoded from THEMENAMES.str (index-aligned with Known: 0 jungle =
+	// "Lost Kingdom", 1 hallow = "Halloween World", 2 fantasy = "Wonder Land", 3 space = "Space Zone"), loaded
+	// once. Empty if the file is unavailable → callers fall back to the folder name.
+	private static IReadOnlyList<string>? displayNames;
+
+	/// <summary>The authentic world name for a theme folder (e.g. jungle → "Lost Kingdom"), from THEMENAMES.str;
+	/// falls back to the folder name if the strings are unavailable or the index is out of range (T-062).</summary>
+	public static string DisplayName( string theme )
+	{
+		displayNames ??= LoadDisplayNames();
+		return MapDisplayName( theme, displayNames );
+	}
+
+	/// <summary>Pure index-mapping of a theme folder to a display name from <paramref name="names"/> (Known-aligned),
+	/// falling back to the folder name — unit-tested without the game file.</summary>
+	internal static string MapDisplayName( string theme, IReadOnlyList<string> names )
+	{
+		int i = System.Array.IndexOf( Known, theme );
+		return i >= 0 && i < names.Count && !string.IsNullOrWhiteSpace( names[i] ) ? names[i] : theme;
+	}
+
+	private static IReadOnlyList<string> LoadDisplayNames()
+	{
+		try { return new StringFile( "Language/English/THEMENAMES.str" ).Entries; }
+		catch ( System.Exception e ) { Log.Warning( $"[theme] display names unavailable: {e.Message}" ); return System.Array.Empty<string>(); }
+	}
+
 	/// <summary>The ride catalog names for a theme: jungle's curated set, else the theme's enumerated ride WADs.</summary>
 	public static IReadOnlyList<string> RideNames( string theme )
 		=> theme == Default ? CuratedJungleRides : EnumerateWads( $"levels/{theme}/rides", MaxEnumeratedRides );
