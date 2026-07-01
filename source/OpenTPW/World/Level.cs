@@ -790,15 +790,16 @@ public class Level
 	// point comes from the ride's UsageInfo entry/exit positions.
 	private static void PlaceEntranceExitMarkers( Ride ride, PlacementGrid grid, ParkTerrain terrain, int tx, int ty )
 	{
+		float pad = grid.TileSize * 0.4f; // sits within the tile
 		if ( ride.Shape.Entrance is { } e )
 		{
 			var p = grid.PointToWorld( tx + e.X + ride.EntryStandPos.X, ty + e.Y + ride.EntryStandPos.Y );
-			ride.OwnedEntities.Add( SpawnMarker( p.WithZ( terrain.SampleHeight( p.X, p.Y ) + 2f ), 40, 220, 60 ) );
+			ride.OwnedEntities.Add( SpawnMarker( p.WithZ( terrain.SampleHeight( p.X, p.Y ) + 0.2f ), 40, 220, 60, pad ) );
 		}
 		if ( ride.Shape.Exit is { } x )
 		{
 			var p = grid.PointToWorld( tx + x.X + ride.ExitAppearPos.X, ty + x.Y + ride.ExitAppearPos.Y );
-			ride.OwnedEntities.Add( SpawnMarker( p.WithZ( terrain.SampleHeight( p.X, p.Y ) + 2f ), 230, 40, 40 ) );
+			ride.OwnedEntities.Add( SpawnMarker( p.WithZ( terrain.SampleHeight( p.X, p.Y ) + 0.2f ), 230, 40, 40, pad ) );
 		}
 	}
 
@@ -867,11 +868,13 @@ public class Level
 		return Texture.Missing;
 	}
 
-	private static ModelEntity SpawnMarker( Vector3 position, byte r, byte g, byte b )
+	// A flat coloured pad hugging the terrain at a ride's entrance/exit cell (green = entrance, red = exit).
+	// A thin slab (not a floating cube) so it reads as a ground marker on the tile rather than scattered debris.
+	private static ModelEntity SpawnMarker( Vector3 position, byte r, byte g, byte b, float size )
 	{
 		var material = new Material<ObjectUniformBuffer>( "content/shaders/unlit.shader" );
 		material.Set( "Color", new Texture( [r, g, b, 255], 1, 1 ) );
-		return new ModelEntity { Model = Primitives.Cube.GenerateModel( material ), Position = position, Scale = new Vector3( 4f ) };
+		return new ModelEntity { Model = Primitives.Cube.GenerateModel( material ), Position = position, Scale = new Vector3( size, size, 0.3f ) };
 	}
 
 	private void SetupHud()
