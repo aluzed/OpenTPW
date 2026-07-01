@@ -4,7 +4,9 @@
 - **Type**: Engine / UI
 - **Status**: ✅ Done — hire (charge cost) + place-on-tile for all staff types, wages per head, **fire +
   patrol-zone assignment** (T-049), and **pick-up / re-place** (MOVE) all in and verified. (Per-role
-  hire-cost config has no source data in the install — see Remaining.)
+  hire-cost config has no source data in the install — see Remaining.) **Authentic role names** now shown in
+  the build catalog + HUD (`StaffNames.For`, decoded from `STAFF_TYPES.str`): a Handyman is a **Cleaner** and a
+  Researcher a **Scientist** in TPW; the others match. Verified in-game (the catalog reads "Cleaner"/"Scientist").
 - **Parent**: [T-038](T-038-park-management-ui.md). **Needs**: [T-040](T-040-build-mode-foundation.md).
   **Related**: [T-039](T-039-peep-needs-staff-depth.md).
 

@@ -103,8 +103,8 @@ internal sealed class ParkStatsPanel : HudPanel
 
 			if ( build.SelectedStaff is { } staffSel )
 				lines.Add( staffSel.HasPatrolZone
-					? $"STAFF {staffSel.Role}  zone r{staffSel.Zone!.Value.Radius:0} (FIRE/ZONE buttons)"
-					: $"STAFF {staffSel.Role}  free roam (FIRE/SET ZONE buttons)" );
+					? $"STAFF {StaffNames.For( staffSel.Role )}  zone r{staffSel.Zone!.Value.Radius:0} (FIRE/ZONE buttons)"
+					: $"STAFF {StaffNames.For( staffSel.Role )}  free roam (FIRE/SET ZONE buttons)" );
 
 			// Selected shop: its sale price (a toilet is free), adjustable with , . like a ride.
 			if ( build.SelectedShop is { } shopSel )

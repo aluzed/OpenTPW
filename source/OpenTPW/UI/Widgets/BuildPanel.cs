@@ -89,7 +89,10 @@ internal sealed class BuildPanel : HudPanel
 			var item = build.Catalog[i];
 			bool affordable = fin?.CanAfford( item.Cost ) ?? true;
 			var fill = build.Selected == i ? Selected : affordable ? Normal : Unaffordable;
-			DrawButton( Row( i ), $"{item.Name}  ${item.Cost:0}", fill );
+			// Staff show their authentic TPW role name (Cleaner/Scientist/…); the catalog key (item.Name) is
+			// unchanged (T-062).
+			var label = item.Staff is { } role ? StaffNames.For( role ) : item.Name;
+			DrawButton( Row( i ), $"{label}  ${item.Cost:0}", fill );
 		}
 	}
 }
