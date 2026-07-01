@@ -45,8 +45,11 @@ from the data rather than a fixed name list.
   covers the synchronous load: the reload is two-phase (draw the overlay one frame, do the heavy load the next),
   so the frozen frame reads as a loading screen instead of the old park (verified in-game). It can't present its
   own progress frames because the load runs mid-frame, after the render CommandList has begun (a nested present
-  would error). *Remaining*: a proper **front-end lobby picker** (F7 / env-var only today), the overlay drawing
-  under the HUD panels (UI batches per-texture), and the per-reload GPU-resource leak of the old park.
+  would error). A **click-driven theme picker** (`ThemePanel`, toggled with **F12**) lists the four worlds with
+  the active one highlighted; clicking one reloads into it (verified in-game — the panel renders jungle "(current)"
+  + hallow/fantasy/space, `OPENTPW_THEME_PANEL=1` opens it for inspection). *Remaining*: a true pre-park **lobby**
+  picker (the picker is in-park today; a lobby one needs the startup flow to defer the first park load), the
+  loading overlay drawing under the HUD panels (UI batches per-texture), and the per-reload GPU-resource leak.
 - ~~Per-theme queue/path strip textures~~ — **done**: the `jpa_que1`/`jpa_str1` filenames turned out to be
   *shared* across every theme's `queue.wad`/`terrain.wad`, so `LoadPathTexture` just routes the path through the
   active theme. (The `Terrain.cs` flat-plane class with a hardcoded jungle texture is **dead code** — the park
