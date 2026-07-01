@@ -11,11 +11,11 @@ public class BuildCameraMode : CameraMode
 	/// <summary>The ground point the camera looks at; panning moves this.</summary>
 	public static Vector3 Focus = new();
 
-	private const float Pitch = 55f;       // degrees looking down
-	private const float MinDist = 120f, MaxDist = 700f;
+	private const float Pitch = 48f;       // degrees looking down (a park view that shows the rides in profile)
+	private const float MinDist = 90f, MaxDist = 700f;
 
 	private float yaw = 45f, wishYaw = 45f;
-	private float distance = 340f;
+	private float distance = 165f;         // start zoomed in enough to actually see the rides (was 340, too far)
 	private Vector2 dragAnchor;
 	private bool wasRight;
 

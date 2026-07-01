@@ -21,8 +21,7 @@ public static class RideCarMesh
 			for ( int i = 0; i < 16; ++i )
 			{
 				if ( mesh.Materials.Length <= i ) { textures.Add( Texture.Missing ); continue; }
-				try { textures.Add( new Texture( $"{archive}/textures/{mesh.Materials[i].Name}.wct", TextureFlags.Repeat ) ); }
-				catch { textures.Add( Texture.Missing ); }
+				textures.Add( Ride.LoadRideTexture( archive, mesh.Materials[i].Name ) );
 			}
 			material.Set( "Color", [.. textures] );
 

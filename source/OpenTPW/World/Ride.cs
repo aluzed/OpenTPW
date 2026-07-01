@@ -575,6 +575,23 @@ public class Ride : Entity
 
 	// Builds a ModelEntity per mesh of an MD2 at this ride's position (the LobbyIsland pattern). Ride
 	// textures live in the WAD under textures/; missing ones fall back to Texture.Missing.
+	/// <summary>Load a ride mesh texture by material name, trying the folders a ride WAD actually uses. TPW ride
+	/// wads keep their textures under <c>stexture/</c> (the code long looked only in <c>textures/</c>, so most
+	/// ride bodies rendered as the magenta missing-texture placeholder); <c>gtexture/</c> holds the coaster
+	/// track art. Falls back to <see cref="Texture.Missing"/> when none resolve. Shared with the car meshes.</summary>
+	internal static Texture LoadRideTexture( string archive, string materialName )
+	{
+		foreach ( var folder in new[] { "stexture", "textures", "gtexture" } )
+		{
+			// PinkChromaKey: TPW ride textures use magenta (255,0,255) as the cutout colour (fences, foliage,
+			// decorative holes); keying it to alpha 0 lets the shader discard it instead of drawing solid magenta.
+			// Sampler stays AnisotropicRepeat (the Texture default), so tiling still works.
+			try { return new Texture( $"{archive}/{folder}/{materialName}.wct", TextureFlags.PinkChromaKey ); }
+			catch { /* try the next folder */ }
+		}
+		return Texture.Missing;
+	}
+
 	private List<ModelEntity> BuildMeshEntities( string md2Path, string rideArchive )
 	{
 		var modelFile = new ModelFile( md2Path );
@@ -602,9 +619,9 @@ public class Ride : Entity
 					continue;
 				}
 
-				try { textures.Add( new Texture( $"{rideArchive}/textures/{mesh.Materials[i].Name}.wct", TextureFlags.Repeat ) ); }
-				catch { textures.Add( Texture.Missing ); }
+				textures.Add( LoadRideTexture( rideArchive, mesh.Materials[i].Name ) );
 			}
+			// (LoadRideTexture is defined once below and shared with the car meshes.)
 			material.Set( "Color", [.. textures] );
 
 			var vertices = new List<Vertex>();
