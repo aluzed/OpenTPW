@@ -50,7 +50,7 @@ public sealed class Advisor : Entity
 	// On-screen anchoring: the bug head sits as a small bottom-right corner overlay, a fixed distance in
 	// front of the camera and offset right + down, scaled down to ~⅓ screen height (tuned on real jungle
 	// assets — see T-046's visual pass). The body part is hidden (BaseParts) so the talking head reads clean.
-	private const float Distance = 24f, RightOffset = 8.5f, UpOffset = -3.5f, GroupScale = 0.28f;
+	private const float Distance = 26f, RightOffset = 10.5f, UpOffset = -5.2f, GroupScale = 0.15f;
 
 	/// <summary>The viseme currently shown (for the HUD label); Closed when not speaking.</summary>
 	public MouthShape CurrentShape { get; private set; } = MouthShape.Closed;
