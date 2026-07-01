@@ -2,11 +2,13 @@
 
 public class LobbyCameraMode : CameraMode
 {
-	private float Height => 20f;
-	private float Distance => 70f;
-	private float Speed => 0.2f;
+	private float Height => 70f;
+	private float Distance => 150f;
+	private float Speed => 0.15f;
 
-	private Vector3 Target => new Vector3( 400, 400, 12.5f );
+	// Orbit the centroid of the four island spots (X,Y in 400..600) so the whole world cluster is framed, not
+	// just one island — the world-select needs the islands on-screen to click them (T-063).
+	private Vector3 Target => new Vector3( 500, 500, 12.5f );
 
 	public override void Update()
 	{

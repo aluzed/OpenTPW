@@ -20,6 +20,10 @@ public class Level
 	// True when this Level is the front-end menu (no park loaded) rather than a playable park (T-063).
 	private readonly bool menuMode;
 
+	/// <summary>The worlds shown in the lobby (folder name + island world position) — the world-select projects
+	/// these to screen so the player can click an island to enter that world (T-063). Only islands that loaded.</summary>
+	internal static readonly List<(string Theme, Vector3 Pos)> LobbyWorlds = new();
+
 	/// <summary>A playable park for <paramref name="levelName"/> (used by the world-select + reload + tests).</summary>
 	public Level( string levelName ) : this( levelName, menuMode: false ) { }
 
@@ -52,16 +56,18 @@ public class Level
 		// model can't break the menu.
 		if ( menuMode )
 		{
-			foreach ( var (pos, theme) in new[]
+			LobbyWorlds.Clear();
+			var spots = new[] { new Vector3( 400, 400, 0 ), new Vector3( 600, 400, 0 ), new Vector3( 600, 600, 0 ), new Vector3( 400, 600, 0 ) };
+			for ( int i = 0; i < LevelTheme.Known.Length && i < spots.Length; i++ )
 			{
-				(new Vector3( 400, 400, 0 ), "Jungle"),
-				(new Vector3( 600, 400, 0 ), "Hallow"),
-				(new Vector3( 600, 600, 0 ), "Fantasy"),
-				(new Vector3( 400, 600, 0 ), "Space"),
-			} )
-			{
-				try { _ = new LobbyIsland( pos, theme ); }
-				catch ( Exception e ) { Log.Warning( $"[lobby] island {theme} failed: {e.Message}" ); }
+				var folder = LevelTheme.Known[i];                        // jungle/hallow/fantasy/space (RequestReload key)
+				var display = char.ToUpper( folder[0] ) + folder[1..];  // Jungle/Hallow/… (LobbyIsland model prefix)
+				try
+				{
+					_ = new LobbyIsland( spots[i], display );
+					LobbyWorlds.Add( (folder, spots[i]) ); // only islands that loaded are clickable to enter
+				}
+				catch ( Exception e ) { Log.Warning( $"[lobby] island {display} failed: {e.Message}" ); }
 			}
 			Camera.SetCameraMode<LobbyCameraMode>();
 			InPark = false;
@@ -889,9 +895,11 @@ public class Level
 		}
 		else
 		{
-			// The original front-end UI (logo + player/menu buttons) over the lobby islands (T-063 restore).
+			// The original front-end UI (logo + player/menu buttons) over the lobby islands (T-063 restore),
+			// plus a world-select that lets the player click an island to enter that world.
 			var layout = new LobbyLayout() { Hud = Hud };
 			layout.OnInit();
+			Hud.AddChild( new LobbyWorldSelect() );
 		}
 
 		// Advisor (T-046): the real bug-head character that gives the player tips — driven by the live park
